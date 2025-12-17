@@ -1,0 +1,162 @@
+/* AnalysisFormPage 样式 */
+
+.analysisFormPage {
+  padding: 24px 0;
+}
+
+.formCard {
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+}
+
+/* 页面标题 */
+.pageHeader {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.pageHeader h2 {
+  margin-bottom: 8px !important;
+}
+
+/* 步骤指示器 */
+.steps {
+  margin-bottom: 24px;
+}
+
+/* 步骤内容区域 */
+.stepContent {
+  min-height: 300px;
+  padding: 24px 0;
+}
+
+.stepContent h4 {
+  margin-bottom: 8px !important;
+}
+
+/* 科目容器 */
+.subjectsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.subjectCard {
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.subjectCard:hover {
+  border-color: var(--color-primary-light);
+}
+
+.addSubjectBtn {
+  height: 48px;
+  border-radius: 12px;
+  margin-top: 8px;
+}
+
+/* 学校选择 */
+.schoolsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.schoolRegion {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+}
+
+.schoolRegion h5 {
+  margin-bottom: 12px !important;
+  color: var(--color-primary);
+}
+
+.schoolTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schoolTag {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid var(--border-color);
+  background: white;
+}
+
+.schoolTag:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* Ant Design CheckableTag 激活状态覆盖 */
+:global(.ant-tag-checkable-checked).schoolTag {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  border-color: transparent;
+  color: white;
+}
+
+/* 已选学校 */
+.selectedSchools {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+}
+
+.selectedTags {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* 操作按钮 */
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+  margin-top: 24px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .analysisFormPage {
+    padding: 16px 0;
+  }
+
+  .stepContent {
+    padding: 16px 0;
+    min-height: auto;
+  }
+
+  .steps :global(.ant-steps-item-description) {
+    display: none;
+  }
+
+  .formActions {
+    justify-content: center;
+  }
+
+  .schoolRegion {
+    padding: 12px;
+  }
+
+  .schoolTag {
+    padding: 4px 10px;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .steps :global(.ant-steps-item-title) {
+    font-size: 0.85rem;
+  }
+}
+

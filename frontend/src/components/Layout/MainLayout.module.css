@@ -1,0 +1,195 @@
+/* MainLayout 布局样式 */
+
+.layout {
+  min-height: 100vh;
+  background: transparent;
+}
+
+/* 顶部导航栏 */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-sm);
+  padding: 0;
+  height: 64px;
+  line-height: 64px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.headerContent {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logoIcon {
+  font-size: 1.75rem;
+}
+
+.logoText {
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 桌面端菜单 */
+.desktopMenu {
+  flex: 1;
+  justify-content: center;
+  border: none;
+  background: transparent;
+}
+
+.desktopMenu :global(.ant-menu-item) {
+  font-weight: 500;
+  margin: 0 8px;
+}
+
+.desktopMenu :global(.ant-menu-item-selected) {
+  color: var(--color-primary);
+}
+
+.desktopMenu :global(.ant-menu-item::after) {
+  border-bottom-color: var(--color-primary) !important;
+}
+
+/* 右侧操作区 */
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: 20px;
+  transition: background var(--transition-fast);
+}
+
+.userInfo:hover {
+  background: var(--bg-secondary);
+}
+
+.userName {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.loginBtn {
+  border-radius: 20px;
+}
+
+/* 移动端菜单按钮 */
+.mobileMenuBtn {
+  display: none;
+  font-size: 1.25rem;
+}
+
+/* 主内容区域 */
+.content {
+  flex: 1;
+  padding: 24px 0;
+}
+
+.contentInner {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 24px;
+  min-height: calc(100vh - 64px - 120px);
+}
+
+/* 底部版权 */
+.footer {
+  background: var(--bg-dark);
+  color: var(--text-light);
+  text-align: center;
+  padding: 24px;
+}
+
+.footerContent p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.footerLinks {
+  margin-top: 8px !important;
+}
+
+.footerLinks a {
+  color: var(--text-light);
+  transition: color var(--transition-fast);
+}
+
+.footerLinks a:hover {
+  color: var(--color-accent);
+}
+
+.divider {
+  margin: 0 12px;
+  opacity: 0.5;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .headerContent {
+    padding: 0 16px;
+  }
+
+  .desktopMenu {
+    display: none;
+  }
+
+  .mobileMenuBtn {
+    display: block;
+  }
+
+  .loginBtn {
+    display: none;
+  }
+
+  .userName {
+    display: none;
+  }
+
+  .contentInner {
+    padding: 0 16px;
+  }
+
+  .logoText {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo {
+    gap: 6px;
+  }
+
+  .logoIcon {
+    font-size: 1.5rem;
+  }
+}
+

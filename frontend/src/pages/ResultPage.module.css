@@ -1,0 +1,227 @@
+/* ResultPage 样式 */
+
+.resultPage {
+  padding: 24px 0;
+}
+
+/* 操作栏 */
+.actionBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+/* 加载和错误状态 */
+.loadingContainer,
+.errorContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  padding: 48px;
+}
+
+/* 报告内容 */
+.reportContent {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 报告头部 */
+.reportHeader {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.reportHeader::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+}
+
+.scoreCircle {
+  display: flex;
+  justify-content: center;
+}
+
+.scoreContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.scoreValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* 区块卡片 */
+.sectionCard {
+  border-radius: 16px;
+}
+
+.sectionCard :global(.ant-card-head-title) {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* 综合评估 */
+.summary {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 24px !important;
+}
+
+.listSection {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.listSection h5 {
+  margin-bottom: 12px !important;
+}
+
+/* 图表容器 */
+.chartContainer {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.chartContainer h5 {
+  margin-bottom: 16px !important;
+}
+
+/* 科目分析 */
+.subjectHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.subjectDetail {
+  padding: 8px 0;
+}
+
+.strengthWeakness {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.strengthWeakness ul {
+  margin: 8px 0 0 20px;
+  padding: 0;
+}
+
+.strengthWeakness li {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+
+/* 学校卡片 */
+.schoolCard {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.schoolCard:last-child {
+  margin-bottom: 0;
+}
+
+.compactList {
+  margin: 8px 0 0 16px;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.compactList li {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+
+/* 学习计划 */
+.planSection {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  height: 100%;
+}
+
+.planSection h5 {
+  margin-bottom: 12px !important;
+  color: var(--color-primary);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .resultPage {
+    padding: 16px 0;
+  }
+
+  .actionBar {
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .actionBar > button {
+    align-self: flex-start;
+  }
+
+  .actionBar > div {
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .strengthWeakness {
+    grid-template-columns: 1fr;
+  }
+
+  .subjectHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .planSection {
+    margin-bottom: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .scoreValue {
+    font-size: 1.5rem;
+  }
+
+  .chartContainer {
+    padding: 8px;
+  }
+}
+

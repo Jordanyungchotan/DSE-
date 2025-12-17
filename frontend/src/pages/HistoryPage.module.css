@@ -1,0 +1,74 @@
+/* HistoryPage 样式 */
+
+.historyPage {
+  padding: 24px 0;
+}
+
+.mainCard {
+  border-radius: 16px;
+}
+
+/* 页面头部 */
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.headerContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.headerIcon {
+  font-size: 2.5rem;
+  color: var(--color-primary);
+  background: linear-gradient(135deg, rgba(43, 108, 176, 0.1) 0%, rgba(26, 54, 93, 0.1) 100%);
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.headerContent h2 {
+  margin-bottom: 4px !important;
+}
+
+/* 表格样式 */
+.historyTable :global(.ant-table-thead > tr > th) {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.historyTable :global(.ant-table-tbody > tr:hover > td) {
+  background: rgba(43, 108, 176, 0.05);
+}
+
+/* 空状态 */
+.emptyState {
+  padding: 60px 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .historyPage {
+    padding: 16px 0;
+  }
+
+  .pageHeader {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .pageHeader > button {
+    width: 100%;
+  }
+
+  .headerIcon {
+    font-size: 2rem;
+    padding: 12px;
+  }
+}
+

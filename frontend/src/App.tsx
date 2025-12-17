@@ -1,0 +1,59 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { Suspense, lazy } from 'react'
+import { Spin } from 'antd'
+import MainLayout from './components/Layout/MainLayout'
+
+// 懒加载页面组件
+const HomePage = lazy(() => import('./pages/HomePage'))
+const AnalysisFormPage = lazy(() => import('./pages/AnalysisFormPage'))
+const ResultPage = lazy(() => import('./pages/ResultPage'))
+const HistoryPage = lazy(() => import('./pages/HistoryPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+
+// 加载中组件
+const LoadingFallback = () => (
+  <div style={{ 
+    display: 'flex', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    height: '100vh',
+    background: 'var(--bg-primary)'
+  }}>
+    <Spin size="large" tip="加载中..." />
+  </div>
+)
+
+/**
+ * DSE插班分析系统 - 主应用组件
+ * 
+ * 路由结构:
+ * - / : 首页，展示系统介绍和功能入口
+ * - /analysis : 分析表单页，填写学生信息
+ * - /result/:id : 分析结果页，展示AI分析报告
+ * - /history : 历史记录页，查看过往分析
+ * - /login : 登录/注册页
+ */
+function App() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <Routes>
+        {/* 登录页面 - 独立布局 */}
+        <Route path="/login" element={<LoginPage />} />
+        
+        {/* 主布局路由 */}
+        <Route path="/" element={<MainLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="analysis" element={<AnalysisFormPage />} />
+          <Route path="result/:id" element={<ResultPage />} />
+          <Route path="history" element={<HistoryPage />} />
+        </Route>
+        
+        {/* 404重定向到首页 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
+  )
+}
+
+export default App
+
