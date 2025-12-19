@@ -240,6 +240,8 @@ function buildAnalysisPrompt(studentInfo: StudentInfo): string {
     .map(s => `  - ${SUBJECT_NAME_MAP[s.subject] || s.subject}: 当前${s.currentScore}级，目标${s.targetScore}级`)
     .join('\n')
 
+  const subjectNames = studentInfo.subjects.map(s => SUBJECT_NAME_MAP[s.subject] || s.subject)
+
   return `你是一位资深的香港DSE教育专家。请根据以下学生信息，提供专业的插班分析和建议。
 
 学生信息：
@@ -253,7 +255,49 @@ ${subjectsText}
 
 目标学校：${studentInfo.targetSchools.join('、')}
 
-请以JSON格式返回分析结果，包含：overallAssessment, subjectAnalyses, schoolAssessments, studyPlan, additionalAdvice`
+请严格按照以下JSON格式返回分析结果，不要添加任何其他内容：
+
+{
+  "overallAssessment": {
+    "feasibilityScore": <0-100的整数，表示插班可行性评分>,
+    "summary": "<综合评估摘要，200字以内>",
+    "keyStrengths": ["优势1", "优势2", "优势3"],
+    "keyWeaknesses": ["待改进项1", "待改进项2", "待改进项3"]
+  },
+  "subjectAnalyses": [
+    {
+      "subject": "<科目名称>",
+      "currentLevel": "<当前等级>",
+      "targetLevel": "<目标等级>",
+      "gap": "<差距描述，如'差1级'或'已达标'>",
+      "strengths": ["科目优势1", "科目优势2"],
+      "weaknesses": ["待改进1", "待改进2"],
+      "recommendations": ["建议1", "建议2", "建议3"],
+      "estimatedTimeToImprove": "<预计提升时间>"
+    }
+  ],
+  "schoolAssessments": [
+    {
+      "schoolName": "<学校名称>",
+      "admissionProbability": <0-100的整数，录取概率>,
+      "requirements": ["录取要求1", "录取要求2"],
+      "gaps": ["差距1", "差距2"],
+      "recommendations": ["建议1", "建议2"]
+    }
+  ],
+  "studyPlan": {
+    "weeklySchedule": ["周一安排", "周二安排", "..."],
+    "monthlyGoals": ["第1个月目标", "第2个月目标", "..."],
+    "resources": ["推荐资源1", "推荐资源2", "..."]
+  },
+  "additionalAdvice": ["建议1", "建议2", "建议3", "建议4"]
+}
+
+注意：
+1. subjectAnalyses 必须包含以下科目的分析：${subjectNames.join('、')}
+2. schoolAssessments 必须包含以下学校的评估：${studentInfo.targetSchools.join('、')}
+3. 所有数组字段不能为空
+4. 只返回JSON，不要有其他文字说明`
 }
 
 // 生成模拟结果
