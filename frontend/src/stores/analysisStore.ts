@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { apiFetch } from '../config/api'
+import { useAuthStore } from './authStore'
 
 /**
  * 科目成绩接口
@@ -232,7 +233,14 @@ export const useAnalysisStore = create<AnalysisState>()(
         set({ loading: true, error: null })
         
         try {
-          const response = await apiFetch('/api/analysis/history')
+          // 获取 token
+          const token = useAuthStore.getState().token
+          const headers: Record<string, string> = {}
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`
+          }
+
+          const response = await apiFetch('/api/analysis/history', { headers })
           
           if (!response.ok) {
             throw new Error('无法加载历史记录')
@@ -240,7 +248,7 @@ export const useAnalysisStore = create<AnalysisState>()(
           
           const data = await response.json()
           set({
-            history: data.history,
+            history: data.history || [],
             loading: false,
           })
         } catch (error) {
@@ -255,12 +263,22 @@ export const useAnalysisStore = create<AnalysisState>()(
        */
       deleteHistoryItem: async (id: string) => {
         try {
+          // 获取 token
+          const token = useAuthStore.getState().token
+          if (!token) {
+            throw new Error('请先登录')
+          }
+
           const response = await apiFetch(`/api/analysis/history/${id}`, {
             method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
           })
           
           if (!response.ok) {
-            throw new Error('删除失败')
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.error || '删除失败')
           }
           
           set((state) => ({
