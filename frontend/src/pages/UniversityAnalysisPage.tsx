@@ -149,7 +149,7 @@ const UniversityAnalysisPage = () => {
       }
 
       const data = await response.json()
-      navigate(`/result/${data.result.id}?type=university`)
+      navigate(`/result/university/${data.result.id}`)
     } catch (error) {
       message.error('分析失败，请稍后重试')
       console.error(error)

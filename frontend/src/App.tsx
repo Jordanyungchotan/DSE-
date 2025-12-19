@@ -8,6 +8,7 @@ const HomePage = lazy(() => import('./pages/HomePage'))
 const AnalysisFormPage = lazy(() => import('./pages/AnalysisFormPage'))
 const UniversityAnalysisPage = lazy(() => import('./pages/UniversityAnalysisPage'))
 const ResultPage = lazy(() => import('./pages/ResultPage'))
+const UniversityResultPage = lazy(() => import('./pages/UniversityResultPage'))
 const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 
@@ -47,6 +48,7 @@ function App() {
           <Route path="analysis" element={<AnalysisFormPage />} />
           <Route path="analysis/university" element={<UniversityAnalysisPage />} />
           <Route path="result/:id" element={<ResultPage />} />
+          <Route path="result/university/:id" element={<UniversityResultPage />} />
           <Route path="history" element={<HistoryPage />} />
         </Route>
         
