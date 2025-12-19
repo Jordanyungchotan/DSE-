@@ -31,25 +31,253 @@ export const en = {
 
   // System
   system: {
-    name: 'ZhiXin DSE Analysis System',
-    shortName: 'ZhiXin DSE',
+    name: 'Center of Mass Education DSE Analysis',
+    shortName: 'CoM Education',
     slogan: 'Professional Hong Kong DSE Education Platform',
-    copyright: '© 2024 ZhiXin DSE Analysis System',
+    copyright: '© 2024 Center of Mass Education',
   },
 
-  // Home
+  // Home Page
   home: {
-    title: 'Smart DSE Education Planning',
-    subtitle: 'AI-powered personalized analysis for your academic success',
-    startAnalysis: 'Start Analysis',
-    viewHistory: 'View History',
-    features: {
-      aiAnalysis: 'AI Analysis',
-      aiAnalysisDesc: 'Advanced AI technology provides precise academic recommendations',
-      personalPlan: 'Personal Planning',
-      personalPlanDesc: 'Customized study plans based on your specific situation',
-      expertAdvice: 'Expert Advice',
-      expertAdviceDesc: 'Insights from experienced education professionals',
+    // Hero Section
+    heroBadge: '🎓 Precise Analysis · Smart Planning · Worry-free Education',
+    heroSubtitle: 'Your Exclusive Education Planning Expert',
+    heroDescription: 'We are a one-stop DSE education planning platform, combining advanced AI technology with Hong Kong local education data to provide personalized academic path analysis and professional advice. Whether you are a transfer student from Form 4-6 or a graduate facing university choices, our system can provide you with precise and scientific education guidance.',
+    startAnalysis: '🚀 Start Analysis Now',
+    consultExpert: 'Book Expert Consultation',
+    stats: {
+      students: 'Students Served',
+      accuracy: 'Analysis Accuracy',
+      partners: 'Partner Institutions',
+    },
+
+    // Core Features
+    coreFeatures: {
+      title: 'Core Features',
+      subtitle: 'Three core modules to fully cover your education needs',
+      transfer: {
+        title: 'Smart Transfer Analysis',
+        feature1: 'Precise Assessment: Analyze transfer success rate based on student grades, grade level and age',
+        feature2: 'Personalized Recommendation: Intelligently recommend the most suitable schools based on location and commute preferences',
+        feature3: 'Time Planning: Create scientific transfer preparation schedule and study plan',
+      },
+      university: {
+        title: 'University Application Analysis',
+        feature1: 'Admission Probability Prediction: Calculate admission success rate based on DSE scores and target majors',
+        feature2: 'Major Matching: Recommend the most suitable university majors based on employment trends and personal interests',
+        feature3: 'Career Prospects Analysis: Provide employment market trends and salary forecasts for each major',
+      },
+      data: {
+        title: 'Comprehensive Data Support',
+        feature1: 'Hong Kong Education Database: Integrate the latest admission data from Hong Kong secondary schools and universities',
+        feature2: 'Real-time Trend Analysis: Track DSE exam dynamics and university admission policy changes',
+        feature3: 'Personalized Reports: Generate detailed PDF analysis reports with one-click download',
+      },
+    },
+
+    // Advantages
+    advantages: {
+      title: 'System Advantages',
+      scientific: {
+        title: 'Scientific Analysis',
+        desc: 'Based on deep learning and machine learning algorithms to ensure accuracy. Integrates Hong Kong Education Bureau public data and historical admission statistics, regularly updates models to adapt to policy changes.',
+      },
+      precise: {
+        title: 'Precise Positioning',
+        desc: 'Considers student academic ability, interests and career planning, combined with family background and geographical location, provides multi-dimensional education advice.',
+      },
+      smart: {
+        title: 'Smart Recommendations',
+        desc: 'AI-driven school and major matching algorithm, career planning based on employment trends, personalized learning improvement strategies.',
+      },
+      optimize: {
+        title: 'Continuous Optimization',
+        desc: 'User feedback-driven system improvement, regular employment market data updates, algorithm optimization in cooperation with Hong Kong education experts.',
+      },
+    },
+
+    // Steps
+    steps: {
+      title: 'How to Use',
+      subtitle: 'Simple four steps to start your smart education journey',
+      step1: {
+        title: 'Select Analysis Type',
+        desc: 'Transfer Analysis: For students seeking school transfer\nUniversity Application: For students preparing for university',
+      },
+      step2: {
+        title: 'Fill in Details',
+        desc: 'Personal information, academic scores, target school/major preferences, location and commute preferences',
+      },
+      step3: {
+        title: 'Get Smart Analysis',
+        desc: 'System automatically analyzes and provides detailed reports, view admission success rate and recommendations, download personalized advice',
+      },
+      step4: {
+        title: 'Implement & Follow-up',
+        desc: 'Create study plan based on suggestions, regularly update scores for reassessment, get continuous education planning support',
+      },
+    },
+
+    // Target Users
+    targetUsers: {
+      title: 'Target Users',
+      transfer: {
+        title: 'DSE Transfer Students',
+        item1: 'Secondary students seeking transfer opportunities',
+        item2: 'Students hoping to enter a better learning environment',
+        item3: 'Families needing professional transfer guidance',
+      },
+      university: {
+        title: 'University Applicants',
+        item1: 'Form 6 students about to take DSE exams',
+        item2: 'Graduates facing university major choices',
+        item3: 'Decision makers needing employment prospect insights',
+      },
+      parents: {
+        title: 'Parents & Educators',
+        item1: 'Parents wanting to provide scientific education guidance',
+        item2: 'Education consultants needing data analysis support',
+        item3: 'Tutorial centers and school guidance teachers',
+      },
+    },
+
+    // Tech Features
+    tech: {
+      title: 'Technical Features',
+      ai: {
+        title: 'Advanced AI Technology',
+        item1: 'Integrated DeepSeek large language model',
+        item2: 'Localized education analysis algorithm',
+        item3: 'Real-time data processing and pattern recognition',
+      },
+      security: {
+        title: 'Data Security & Privacy',
+        item1: 'End-to-end data encryption',
+        item2: 'GDPR and HK Privacy Ordinance compliant',
+        item3: 'Strict access control and permission management',
+      },
+      platform: {
+        title: 'Multi-platform Support',
+        item1: 'Responsive design for all devices',
+        item2: 'Mobile optimized, access anytime anywhere',
+        item3: 'No installation needed, use directly in browser',
+      },
+      local: {
+        title: 'Localized Service',
+        item1: 'Focused on Hong Kong education system',
+        item2: 'Chinese and English bilingual interface',
+        item3: 'Local data sources and support team',
+      },
+    },
+
+    // Success Cases
+    cases: {
+      title: 'Success Stories',
+      case1: {
+        quote: 'Through system analysis, I successfully transferred from a Band 2 to Band 1 school. The study plan improved my math by two grades!',
+        author: 'Form 5 Student Chan',
+        type: 'Transfer Success Story',
+      },
+      case2: {
+        quote: 'I was confused about university majors. The system recommended Data Science based on my interests and grades. Now I am studying at HKU!',
+        author: '2024 Graduate Lee',
+        type: 'University Application Story',
+      },
+      case3: {
+        quote: 'As an education consultant, this system helps me provide more scientific advice. Parent and student satisfaction has greatly improved.',
+        author: 'Senior Education Consultant Wong',
+        type: 'Professional Use Case',
+      },
+      partners: {
+        title: '🏆 Partner Institutions',
+        desc: 'Partnering with many renowned tutorial centers and education institutions in Hong Kong, recommended by HK education professionals, providing group analysis services for schools regularly',
+      },
+    },
+
+    // FAQ
+    faq: {
+      title: 'FAQ',
+      q1: {
+        question: 'How does the system ensure analysis accuracy?',
+        answer: 'We integrate official data from HK Education Bureau, historical DSE statistics, university admission scores and employment reports, combined with AI algorithms for multi-dimensional analysis, achieving over 85% accuracy.',
+      },
+      q2: {
+        question: 'How long does it take to get analysis results?',
+        answer: 'Generally, you can get a detailed analysis report within 5-10 minutes after submission. Complex analysis may take up to 15 minutes.',
+      },
+      q3: {
+        question: 'How do I update my score information?',
+        answer: 'After logging in, you can view previous analyses in the "History" page, and resubmit latest scores for evaluation. The system will automatically generate new recommendation reports.',
+      },
+      q4: {
+        question: 'Is the system free?',
+        answer: 'We provide basic free analysis service. First-time registered users can get a complete analysis experience including detailed reports and recommendations.',
+      },
+      q5: {
+        question: 'Can analysis reports be downloaded?',
+        answer: 'Yes, all analysis reports support one-click download in PDF format for saving and printing, and can be shared with parents or teachers for reference.',
+      },
+    },
+
+    // Contact
+    contact: {
+      title: 'Contact Us',
+      service: {
+        title: '📞 Customer Service',
+        hotline: 'Hotline: (852) 2711 1288',
+        email: 'Email: support@centroid-dse.hk',
+        hours: 'Online Consultation: Tue-Sun 10:00-19:00',
+      },
+      address: {
+        title: '🏢 Office Address',
+        company: 'Center of Mass Education Tech. Limited',
+        location: 'Room B, 3/F, Blue Horseman Building, 761 Nathan Road, Prince Edward, Kowloon, Hong Kong',
+      },
+      social: {
+        title: '📱 Follow Us',
+        wechat: 'Center of Mass Education DSE',
+        facebook: 'HK Center of Mass Education',
+        instagram: '@centerofmass_hk',
+      },
+      form: {
+        title: '📝 Online Inquiry',
+        name: 'Your Name',
+        phone: 'Phone Number',
+        email: 'Email',
+        message: 'Inquiry Content',
+        namePlaceholder: 'Please enter your name',
+        phonePlaceholder: 'Please enter phone number',
+        emailPlaceholder: 'Please enter email',
+        messagePlaceholder: 'Please describe your questions or needs...',
+        submit: 'Submit Inquiry',
+      },
+    },
+
+    // Updates
+    updates: {
+      current: {
+        title: '📋 Latest Version v2.5 (2024 Update)',
+        item1: '✅ New university application analysis module',
+        item2: '✅ Smart school recommendation feature launched',
+        item3: '✅ Enhanced employment trend data analysis',
+        item4: '✅ Comprehensive UI optimization',
+        item5: '✅ Multi-language support (Simplified/Traditional Chinese/English)',
+      },
+      upcoming: {
+        title: '🔮 Coming Soon',
+        item1: '🔄 Real-time DSE mock exam analysis',
+        item2: '🔄 University interview simulation training',
+        item3: '🔄 Parent monitoring and report sharing',
+        item4: '🔄 Smart learning resource recommendations',
+      },
+    },
+
+    // CTA
+    cta: {
+      title: 'Let Data Speak, Make the Future Clearer',
+      subtitle: 'Empowering education with technology, helping every student find the most suitable education path',
+      startFree: '🚀 Start Free Analysis',
+      register: '👇 Free Registration',
     },
   },
 
@@ -62,7 +290,6 @@ export const en = {
     transfer: 'Transfer Analysis',
     university: 'University Application',
     
-    // Form Fields
     form: {
       enrollmentDate: 'Enrollment Date',
       grade: 'Grade Level',
@@ -76,7 +303,6 @@ export const en = {
       removeSubject: 'Remove Subject',
     },
 
-    // University Application Form
     universityForm: {
       dseScores: 'DSE Scores',
       targetUniversities: 'Target Universities',
@@ -86,7 +312,6 @@ export const en = {
       awards: 'Awards & Achievements',
     },
 
-    // Buttons
     submitAnalysis: 'Submit Analysis',
     analyzing: 'Analyzing...',
   },
@@ -104,7 +329,6 @@ export const en = {
     shareResult: 'Share Result',
     newAnalysis: 'New Analysis',
     
-    // University Application Results
     university: {
       admissionChance: 'Admission Probability',
       programRecommendations: 'Program Recommendations',
@@ -161,4 +385,3 @@ export const en = {
 }
 
 export default en
-

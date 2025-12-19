@@ -42,31 +42,31 @@ const HomePage = () => {
   const coreFeatures = [
     {
       icon: <BankOutlined />,
-      title: '智能插班分析',
+      title: t('home.coreFeatures.transfer.title'),
       features: [
-        '精准评估：根据学生成绩、年级和年龄，分析目标学校的插班成功率',
-        '个性化推荐：结合居住地点和交通偏好，智能推荐最适合的学校',
-        '时间规划：制定科学的插班准备时间表和学习计划',
+        t('home.coreFeatures.transfer.feature1'),
+        t('home.coreFeatures.transfer.feature2'),
+        t('home.coreFeatures.transfer.feature3'),
       ],
       color: '#2b6cb0',
     },
     {
       icon: <TrophyOutlined />,
-      title: '大学申请分析',
+      title: t('home.coreFeatures.university.title'),
       features: [
-        '录取概率预测：基于DSE成绩和目标专业，计算入读成功率',
-        '专业匹配推荐：结合就业趋势和个人兴趣，推荐最适合的大学专业',
-        '职业前景分析：提供各专业的就业市场趋势和薪资水平预测',
+        t('home.coreFeatures.university.feature1'),
+        t('home.coreFeatures.university.feature2'),
+        t('home.coreFeatures.university.feature3'),
       ],
       color: '#38a169',
     },
     {
       icon: <BarChartOutlined />,
-      title: '全方位数据支持',
+      title: t('home.coreFeatures.data.title'),
       features: [
-        '香港本地教育数据库：整合香港中学和大学的最新录取数据',
-        '实时趋势分析：追踪DSE考试动态和大学招生政策变化',
-        '个性化报告：生成详细的PDF分析报告，支持一键下载',
+        t('home.coreFeatures.data.feature1'),
+        t('home.coreFeatures.data.feature2'),
+        t('home.coreFeatures.data.feature3'),
       ],
       color: '#d69e2e',
     },
@@ -76,26 +76,26 @@ const HomePage = () => {
   const advantages = [
     {
       icon: <RocketOutlined />,
-      title: '科学分析',
-      description: '基于深度学习和机器学习算法，确保分析结果的准确性。整合香港教育局公开数据和历年录取统计，定期更新模型，适应教育政策变化。',
+      title: t('home.advantages.scientific.title'),
+      description: t('home.advantages.scientific.desc'),
       color: '#2b6cb0',
     },
     {
       icon: <FormOutlined />,
-      title: '精准定位',
-      description: '考虑学生的学术能力、兴趣偏好和职业规划，结合家庭背景和地理位置的实际情况，提供多维度、多层次的升学建议。',
+      title: t('home.advantages.precise.title'),
+      description: t('home.advantages.precise.desc'),
       color: '#38a169',
     },
     {
       icon: <ThunderboltOutlined />,
-      title: '智能推荐',
-      description: 'AI驱动的学校与专业匹配算法，基于就业趋势的职业生涯规划，个性化的学习提升策略。',
+      title: t('home.advantages.smart.title'),
+      description: t('home.advantages.smart.desc'),
       color: '#d69e2e',
     },
     {
       icon: <LineChartOutlined />,
-      title: '持续优化',
-      description: '用户反馈驱动的系统改进，定期更新就业市场分析数据，与香港教育专家合作优化算法。',
+      title: t('home.advantages.optimize.title'),
+      description: t('home.advantages.optimize.desc'),
       color: '#e53e3e',
     },
   ]
@@ -104,23 +104,23 @@ const HomePage = () => {
   const techFeatures = [
     {
       icon: <RocketOutlined />,
-      title: '先进AI技术',
-      items: ['集成DeepSeek大型语言模型', '本地化训练的教育分析算法', '实时数据处理和模式识别'],
+      title: t('home.tech.ai.title'),
+      items: [t('home.tech.ai.item1'), t('home.tech.ai.item2'), t('home.tech.ai.item3')],
     },
     {
       icon: <SafetyOutlined />,
-      title: '数据安全与隐私',
-      items: ['端到端数据加密', '符合GDPR和香港隐私条例', '严格的访问控制和权限管理'],
+      title: t('home.tech.security.title'),
+      items: [t('home.tech.security.item1'), t('home.tech.security.item2'), t('home.tech.security.item3')],
     },
     {
       icon: <GlobalOutlined />,
-      title: '多平台支持',
-      items: ['响应式网页设计，适配各种设备', '移动端优化，随时随地访问', '无需安装，浏览器直接使用'],
+      title: t('home.tech.platform.title'),
+      items: [t('home.tech.platform.item1'), t('home.tech.platform.item2'), t('home.tech.platform.item3')],
     },
     {
       icon: <EnvironmentOutlined />,
-      title: '本地化服务',
-      items: ['专注于香港教育体系', '中英文双语界面', '本地化数据源和支持团队'],
+      title: t('home.tech.local.title'),
+      items: [t('home.tech.local.item1'), t('home.tech.local.item2'), t('home.tech.local.item3')],
     },
   ]
 
@@ -129,26 +129,26 @@ const HomePage = () => {
     {
       number: '01',
       icon: <FileSearchOutlined />,
-      title: '选择分析类型',
-      description: '插班分析：适合寻求转学的学生\n大学申请分析：适合准备升读大学的学生',
+      title: t('home.steps.step1.title'),
+      description: t('home.steps.step1.desc'),
     },
     {
       number: '02',
       icon: <FormOutlined />,
-      title: '填写详细信息',
-      description: '个人基本信息、学术成绩数据、目标学校/专业偏好、居住地点和交通偏好',
+      title: t('home.steps.step2.title'),
+      description: t('home.steps.step2.desc'),
     },
     {
       number: '03',
       icon: <ScheduleOutlined />,
-      title: '获取智能分析',
-      description: '系统自动分析并提供详细报告，查看录取成功率和推荐选项，下载个性化建议',
+      title: t('home.steps.step3.title'),
+      description: t('home.steps.step3.desc'),
     },
     {
       number: '04',
       icon: <CheckCircleOutlined />,
-      title: '实施与跟进',
-      description: '根据建议制定学习计划，定期更新成绩数据重新评估，获得持续的升学规划支持',
+      title: t('home.steps.step4.title'),
+      description: t('home.steps.step4.desc'),
     },
   ]
 
@@ -156,78 +156,75 @@ const HomePage = () => {
   const targetUsers = [
     {
       icon: <UserOutlined />,
-      title: 'DSE插班生',
-      items: ['正在寻求转学机会的中学生', '希望进入更好学习环境的学生', '需要专业插班指导和规划的家庭'],
+      title: t('home.targetUsers.transfer.title'),
+      items: [
+        t('home.targetUsers.transfer.item1'),
+        t('home.targetUsers.transfer.item2'),
+        t('home.targetUsers.transfer.item3'),
+      ],
     },
     {
       icon: <TrophyOutlined />,
-      title: '大学申请者',
-      items: ['即将参加DSE考试的中六学生', '面临大学专业选择的毕业生', '需要了解就业前景的升学决策者'],
+      title: t('home.targetUsers.university.title'),
+      items: [
+        t('home.targetUsers.university.item1'),
+        t('home.targetUsers.university.item2'),
+        t('home.targetUsers.university.item3'),
+      ],
     },
     {
       icon: <TeamOutlined />,
-      title: '家长与教育工作者',
-      items: ['希望为孩子提供科学升学指导的家长', '需要数据分析支持的教育顾问', '补习班和学校升学指导老师'],
+      title: t('home.targetUsers.parents.title'),
+      items: [
+        t('home.targetUsers.parents.item1'),
+        t('home.targetUsers.parents.item2'),
+        t('home.targetUsers.parents.item3'),
+      ],
     },
   ]
 
   // 成功案例
   const successCases = [
     {
-      quote: '通过系统分析，我成功从B2中学转入B1中学，系统提供的学习计划让我的数学成绩提升了两个等级！',
-      author: '中五学生陈同学',
-      type: '插班成功案例',
+      quote: t('home.cases.case1.quote'),
+      author: t('home.cases.case1.author'),
+      type: t('home.cases.case1.type'),
     },
     {
-      quote: '原本对大学专业很迷茫，系统根据我的兴趣和成绩推荐了数据科学专业，现在我已在港大就读相关课程！',
-      author: '2024年毕业生李同学',
-      type: '大学申请案例',
+      quote: t('home.cases.case2.quote'),
+      author: t('home.cases.case2.author'),
+      type: t('home.cases.case2.type'),
     },
     {
-      quote: '作为教育顾问，这个系统帮助我为学生提供更科学的升学建议，家长和学生的满意度大幅提升。',
-      author: '资深教育顾问王老师',
-      type: '专业使用案例',
+      quote: t('home.cases.case3.quote'),
+      author: t('home.cases.case3.author'),
+      type: t('home.cases.case3.type'),
     },
   ]
 
   // FAQ数据
   const faqs = [
-    {
-      question: '系统如何确保分析准确性？',
-      answer: '我们整合了香港教育局的官方数据、历年DSE成绩统计、大学录取分数和就业市场报告，结合AI算法进行多维度分析，准确率达85%以上。',
-    },
-    {
-      question: '需要多长时间获得分析结果？',
-      answer: '一般情况下，提交信息后5-10分钟即可获得详细分析报告。复杂分析可能需要15分钟。',
-    },
-    {
-      question: '如何更新我的成绩信息？',
-      answer: '登录账户后，可以在"历史记录"页面查看之前的分析，并可以重新提交最新成绩进行评估，系统会自动生成新的建议报告。',
-    },
-    {
-      question: '系统收费吗？',
-      answer: '我们提供基础免费分析服务。首次注册用户可获得完整的分析体验，包括详细的报告和建议。',
-    },
-    {
-      question: '分析报告可以下载吗？',
-      answer: '是的，所有分析报告都支持一键下载为PDF格式，方便您保存和打印，也可以分享给家长或老师参考。',
-    },
+    { question: t('home.faq.q1.question'), answer: t('home.faq.q1.answer') },
+    { question: t('home.faq.q2.question'), answer: t('home.faq.q2.answer') },
+    { question: t('home.faq.q3.question'), answer: t('home.faq.q3.answer') },
+    { question: t('home.faq.q4.question'), answer: t('home.faq.q4.answer') },
+    { question: t('home.faq.q5.question'), answer: t('home.faq.q5.answer') },
   ]
 
   // 更新日志
   const updateLog = [
-    '✅ 新增大学申请分析模块',
-    '✅ 智能学校推荐功能上线',
-    '✅ 就业趋势数据分析增强',
-    '✅ 用户界面全面优化',
-    '✅ 多语言支持（简体/繁体/英文）',
+    t('home.updates.current.item1'),
+    t('home.updates.current.item2'),
+    t('home.updates.current.item3'),
+    t('home.updates.current.item4'),
+    t('home.updates.current.item5'),
   ]
 
   const upcomingFeatures = [
-    '🔄 实时DSE模拟考试分析',
-    '🔄 大学面试模拟训练',
-    '🔄 家长监控与报告分享',
-    '🔄 智能学习资源推荐',
+    t('home.updates.upcoming.item1'),
+    t('home.updates.upcoming.item2'),
+    t('home.updates.upcoming.item3'),
+    t('home.updates.upcoming.item4'),
   ]
 
   return (
@@ -240,18 +237,16 @@ const HomePage = () => {
         <div className={styles.heroContent}>
           <div className={styles.heroText}>
             <div className={styles.heroBadge}>
-              🎓 精准分析 · 智能规划 · 升学无忧
+              {t('home.heroBadge')}
             </div>
             <Title level={1} className={styles.heroTitle}>
               <span className="gradient-title">{t('system.name')}</span>
             </Title>
             <Title level={3} className={styles.heroSubtitle}>
-              您的专属升学规划专家
+              {t('home.heroSubtitle')}
             </Title>
             <Paragraph className={styles.heroDescription}>
-              我们是一站式DSE升学规划平台，结合先进的人工智能技术与香港本地教育数据，
-              为学生提供个性化的升学路径分析和专业建议。无论您是中四至中六的插班生，
-              还是即将面临大学选择的毕业生，我们的系统都能为您提供精准、科学的升学指导。
+              {t('home.heroDescription')}
             </Paragraph>
             <div className={styles.heroButtons}>
               <Button
@@ -261,7 +256,7 @@ const HomePage = () => {
                 onClick={() => navigate('/analysis')}
                 className={styles.primaryBtn}
               >
-                🚀 立即开始分析
+                {t('home.startAnalysis')}
               </Button>
               <Button
                 size="large"
@@ -269,21 +264,21 @@ const HomePage = () => {
                 onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
                 className={styles.secondaryBtn}
               >
-                预约专家咨询
+                {t('home.consultExpert')}
               </Button>
             </div>
             <div className={styles.heroStats}>
               <div className={styles.statItem}>
                 <span className={styles.statValue}>10,000+</span>
-                <span className={styles.statLabel}>服务学生</span>
+                <span className={styles.statLabel}>{t('home.stats.students')}</span>
               </div>
               <div className={styles.statItem}>
                 <span className={styles.statValue}>85%</span>
-                <span className={styles.statLabel}>分析准确率</span>
+                <span className={styles.statLabel}>{t('home.stats.accuracy')}</span>
               </div>
               <div className={styles.statItem}>
                 <span className={styles.statValue}>50+</span>
-                <span className={styles.statLabel}>合作机构</span>
+                <span className={styles.statLabel}>{t('home.stats.partners')}</span>
               </div>
             </div>
           </div>
@@ -292,29 +287,29 @@ const HomePage = () => {
             <div className={styles.decorativeCard}>
               <div className={styles.cardHeader}>
                 <img src="/logo.png" alt="Logo" className={styles.cardLogo} />
-                <span>智能分析报告</span>
+                <span>{t('result.title')}</span>
               </div>
               <div className={styles.scorePreview}>
                 <div className={styles.scoreCircle}>
                   <span className={styles.scoreValue}>92</span>
-                  <span className={styles.scoreLabel}>可行性评分</span>
+                  <span className={styles.scoreLabel}>{t('result.feasibilityScore')}</span>
                 </div>
                 <div className={styles.scoreDetails}>
                   <div className={styles.scoreItem}>
                     <CheckCircleOutlined style={{ color: '#38a169' }} />
-                    <span>目标学校匹配度高</span>
+                    <span>{t('result.schoolAssessment')}</span>
                   </div>
                   <div className={styles.scoreItem}>
                     <CheckCircleOutlined style={{ color: '#38a169' }} />
-                    <span>学术成绩达标</span>
+                    <span>{t('result.subjectAnalysis')}</span>
                   </div>
                   <div className={styles.scoreItem}>
                     <CheckCircleOutlined style={{ color: '#d69e2e' }} />
-                    <span>部分科目需提升</span>
+                    <span>{t('result.studyPlan')}</span>
                   </div>
                   <div className={styles.scoreItem}>
                     <CheckCircleOutlined style={{ color: '#38a169' }} />
-                    <span>升学规划清晰</span>
+                    <span>{t('result.additionalAdvice')}</span>
                   </div>
                 </div>
               </div>
@@ -326,10 +321,10 @@ const HomePage = () => {
       {/* ===== 核心功能 ===== */}
       <section className={styles.featuresSection}>
         <div className={styles.sectionHeader}>
-          <Title level={2}>核心功能</Title>
+          <Title level={2}>{t('home.coreFeatures.title')}</Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
           <Paragraph className={styles.sectionDesc}>
-            三大核心模块，全方位覆盖您的升学需求
+            {t('home.coreFeatures.subtitle')}
           </Paragraph>
         </div>
         
@@ -364,7 +359,7 @@ const HomePage = () => {
       {/* ===== 系统优势 ===== */}
       <section className={styles.advantagesSection}>
         <div className={styles.sectionHeader}>
-          <Title level={2}>系统优势</Title>
+          <Title level={2}>{t('home.advantages.title')}</Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
         </div>
         
@@ -391,10 +386,10 @@ const HomePage = () => {
       {/* ===== 使用流程 ===== */}
       <section className={styles.stepsSection}>
         <div className={styles.sectionHeader}>
-          <Title level={2}>如何使用系统</Title>
+          <Title level={2}>{t('home.steps.title')}</Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
           <Paragraph className={styles.sectionDesc}>
-            简单四步，开启您的智能升学之旅
+            {t('home.steps.subtitle')}
           </Paragraph>
         </div>
         
@@ -420,7 +415,7 @@ const HomePage = () => {
       {/* ===== 适用人群 ===== */}
       <section className={styles.targetSection}>
         <div className={styles.sectionHeader}>
-          <Title level={2}>适用人群</Title>
+          <Title level={2}>{t('home.targetUsers.title')}</Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
         </div>
         
@@ -444,7 +439,7 @@ const HomePage = () => {
       {/* ===== 技术特色 ===== */}
       <section className={styles.techSection}>
         <div className={styles.sectionHeader}>
-          <Title level={2}>技术特色</Title>
+          <Title level={2}>{t('home.tech.title')}</Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
         </div>
         
@@ -468,7 +463,7 @@ const HomePage = () => {
       {/* ===== 成功案例 ===== */}
       <section className={styles.casesSection}>
         <div className={styles.sectionHeader}>
-          <Title level={2}>成功案例</Title>
+          <Title level={2}>{t('home.cases.title')}</Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
         </div>
         
@@ -489,9 +484,9 @@ const HomePage = () => {
         </Carousel>
 
         <div className={styles.partnersSection}>
-          <Title level={4}>🏆 合作机构</Title>
+          <Title level={4}>{t('home.cases.partners.title')}</Title>
           <Paragraph>
-            与香港多家知名补习班和教育机构合作，获得香港教育界专业人士推荐，定期为学校提供集体分析服务
+            {t('home.cases.partners.desc')}
           </Paragraph>
         </div>
       </section>
@@ -500,7 +495,7 @@ const HomePage = () => {
       <section className={styles.faqSection}>
         <div className={styles.sectionHeader}>
           <Title level={2}>
-            <QuestionCircleOutlined /> 常见问题
+            <QuestionCircleOutlined /> {t('home.faq.title')}
           </Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
         </div>
@@ -524,50 +519,50 @@ const HomePage = () => {
       {/* ===== 联系我们 ===== */}
       <section className={styles.contactSection} id="contact">
         <div className={styles.sectionHeader}>
-          <Title level={2}>联系我们</Title>
+          <Title level={2}>{t('home.contact.title')}</Title>
           <div className="custom-divider" style={{ width: '60px', margin: '16px auto' }} />
         </div>
         
         <Row gutter={[48, 32]}>
           <Col xs={24} lg={12}>
             <div className={styles.contactInfo}>
-              <Title level={4}>📞 客户服务</Title>
+              <Title level={4}>{t('home.contact.service.title')}</Title>
               <div className={styles.contactItem}>
                 <PhoneOutlined />
-                <span>服务热线：(852) 2711 1288</span>
+                <span>{t('home.contact.service.hotline')}</span>
               </div>
               <div className={styles.contactItem}>
                 <MailOutlined />
-                <span>客服邮箱：support@centroid-dse.hk</span>
+                <span>{t('home.contact.service.email')}</span>
               </div>
               <div className={styles.contactItem}>
                 <ClockCircleOutlined />
-                <span>在线咨询：周二至周日 10:00-19:00</span>
+                <span>{t('home.contact.service.hours')}</span>
               </div>
 
-              <Title level={4} style={{ marginTop: 24 }}>🏢 办公地址</Title>
+              <Title level={4} style={{ marginTop: 24 }}>{t('home.contact.address.title')}</Title>
               <div className={styles.contactItem}>
                 <EnvironmentOutlined />
                 <div>
-                  <Text strong>Center of Mass education tech. limited</Text>
+                  <Text strong>{t('home.contact.address.company')}</Text>
                   <br />
-                  <Text>香港九龙弥敦道761号太子蓝马之城3楼B室</Text>
+                  <Text>{t('home.contact.address.location')}</Text>
                 </div>
               </div>
 
-              <Title level={4} style={{ marginTop: 24 }}>📱 关注我们</Title>
+              <Title level={4} style={{ marginTop: 24 }}>{t('home.contact.social.title')}</Title>
               <div className={styles.socialLinks}>
                 <div className={styles.socialItem}>
                   <WechatOutlined />
-                  <span>质心教育DSE</span>
+                  <span>{t('home.contact.social.wechat')}</span>
                 </div>
                 <div className={styles.socialItem}>
                   <FacebookOutlined />
-                  <span>香港质心教育</span>
+                  <span>{t('home.contact.social.facebook')}</span>
                 </div>
                 <div className={styles.socialItem}>
                   <InstagramOutlined />
-                  <span>@centerofmass_hk</span>
+                  <span>{t('home.contact.social.instagram')}</span>
                 </div>
               </div>
             </div>
@@ -575,22 +570,22 @@ const HomePage = () => {
           
           <Col xs={24} lg={12}>
             <Card className={styles.contactFormCard}>
-              <Title level={4}>📝 在线咨询</Title>
+              <Title level={4}>{t('home.contact.form.title')}</Title>
               <Form layout="vertical" className={styles.contactForm}>
-                <Form.Item label="您的姓名" name="name">
-                  <Input prefix={<UserOutlined />} placeholder="请输入您的姓名" />
+                <Form.Item label={t('home.contact.form.name')} name="name">
+                  <Input prefix={<UserOutlined />} placeholder={t('home.contact.form.namePlaceholder')} />
                 </Form.Item>
-                <Form.Item label="联系电话" name="phone">
-                  <Input prefix={<PhoneOutlined />} placeholder="请输入联系电话" />
+                <Form.Item label={t('home.contact.form.phone')} name="phone">
+                  <Input prefix={<PhoneOutlined />} placeholder={t('home.contact.form.phonePlaceholder')} />
                 </Form.Item>
-                <Form.Item label="电子邮箱" name="email">
-                  <Input prefix={<MailOutlined />} placeholder="请输入电子邮箱" />
+                <Form.Item label={t('home.contact.form.email')} name="email">
+                  <Input prefix={<MailOutlined />} placeholder={t('home.contact.form.emailPlaceholder')} />
                 </Form.Item>
-                <Form.Item label="咨询内容" name="message">
-                  <Input.TextArea rows={4} placeholder="请描述您的问题或需求..." />
+                <Form.Item label={t('home.contact.form.message')} name="message">
+                  <Input.TextArea rows={4} placeholder={t('home.contact.form.messagePlaceholder')} />
                 </Form.Item>
                 <Button type="primary" block size="large">
-                  提交咨询
+                  {t('home.contact.form.submit')}
                 </Button>
               </Form>
             </Card>
@@ -603,7 +598,7 @@ const HomePage = () => {
         <Row gutter={[32, 24]}>
           <Col xs={24} md={12}>
             <Card className={styles.updateCard}>
-              <Title level={4}>📋 最新版本 v2.5（2024年更新）</Title>
+              <Title level={4}>{t('home.updates.current.title')}</Title>
               <ul className={styles.updateList}>
                 {updateLog.map((item, index) => (
                   <li key={index}>{item}</li>
@@ -613,7 +608,7 @@ const HomePage = () => {
           </Col>
           <Col xs={24} md={12}>
             <Card className={styles.updateCard}>
-              <Title level={4}>🔮 即将上线功能</Title>
+              <Title level={4}>{t('home.updates.upcoming.title')}</Title>
               <ul className={styles.updateList}>
                 {upcomingFeatures.map((item, index) => (
                   <li key={index}>{item}</li>
@@ -629,13 +624,13 @@ const HomePage = () => {
         <Card className={styles.ctaCard}>
           <div className={styles.ctaContent}>
             <Title level={2} style={{ color: 'white', marginBottom: 8 }}>
-              让数据说话，让未来更清晰
+              {t('home.cta.title')}
             </Title>
             <Paragraph style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.1rem', marginBottom: 24 }}>
-              {t('system.name')} - 为每个香港学生的梦想保驾护航
+              {t('system.name')} - {t('system.slogan')}
             </Paragraph>
             <Paragraph style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 32 }}>
-              用科技为教育赋能，让每个学生都能找到最适合自己的升学之路
+              {t('home.cta.subtitle')}
             </Paragraph>
             <div className={styles.ctaButtons}>
               <Button
@@ -649,7 +644,7 @@ const HomePage = () => {
                   paddingInline: 32,
                 }}
               >
-                🚀 免费开始分析
+                {t('home.cta.startFree')}
               </Button>
               <Button
                 size="large"
@@ -662,7 +657,7 @@ const HomePage = () => {
                   color: 'white',
                 }}
               >
-                👇 免费注册体验
+                {t('home.cta.register')}
               </Button>
             </div>
           </div>
