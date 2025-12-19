@@ -13,6 +13,24 @@ export interface Env {
   CORS_ORIGIN: string
 }
 
+// 允许的 CORS 来源列表
+const ALLOWED_ORIGINS = [
+  'https://dse-analysis.pages.dev',
+  'https://dse-analysis-frontend.pages.dev',
+  'http://localhost:3000',
+  'http://localhost:5173',
+]
+
+// 检查是否是允许的来源
+function isAllowedOrigin(origin: string | null, envOrigin?: string): boolean {
+  if (!origin) return false
+  if (envOrigin && origin === envOrigin) return true
+  if (ALLOWED_ORIGINS.includes(origin)) return true
+  // 允许所有 *.pages.dev 子域名
+  if (origin.endsWith('.pages.dev')) return true
+  return false
+}
+
 // CORS 头部
 const corsHeaders = (origin: string) => ({
   'Access-Control-Allow-Origin': origin,
@@ -280,7 +298,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname
-    const origin = env.CORS_ORIGIN || '*'
+    const requestOrigin = request.headers.get('Origin')
+    
+    // 动态确定允许的 origin
+    const origin = isAllowedOrigin(requestOrigin, env.CORS_ORIGIN) 
+      ? requestOrigin! 
+      : (env.CORS_ORIGIN || '*')
 
     // 处理 CORS 预检请求
     if (request.method === 'OPTIONS') {
@@ -288,9 +311,19 @@ export default {
     }
 
     try {
-      // 健康检查
+      // 健康检查 - 添加调试信息
       if (path === '/api/health') {
-        return jsonResponse({ status: 'ok', timestamp: new Date().toISOString() }, 200, origin)
+        return jsonResponse({ 
+          status: 'ok', 
+          timestamp: new Date().toISOString(),
+          debug: {
+            requestOrigin,
+            allowedOrigin: origin,
+            hasDB: !!env.DB,
+            hasJwtSecret: !!env.JWT_SECRET,
+            hasDeepseekKey: !!env.DEEPSEEK_API_KEY,
+          }
+        }, 200, origin)
       }
 
       // 用户注册
@@ -436,6 +469,23 @@ export default {
         })
 
         return jsonResponse({ history }, 200, origin)
+      }
+
+      // 根路径 - 显示 API 状态
+      if (path === '/' || path === '') {
+        return jsonResponse({
+          name: 'DSE Analysis API',
+          version: '1.0.0',
+          status: 'running',
+          endpoints: [
+            'GET /api/health',
+            'POST /api/auth/login',
+            'POST /api/auth/register',
+            'POST /api/analysis/submit',
+            'GET /api/analysis/result/:id',
+            'GET /api/analysis/history',
+          ],
+        }, 200, origin)
       }
 
       // 404
