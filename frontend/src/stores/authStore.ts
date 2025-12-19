@@ -59,8 +59,8 @@ export const useAuthStore = create<AuthState>()(
           })
           
           if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.message || '登录失败')
+            const errorData = await response.json()
+            throw new Error(errorData.error || errorData.message || '登录失败')
           }
           
           const data = await response.json()
@@ -92,8 +92,8 @@ export const useAuthStore = create<AuthState>()(
           })
           
           if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.message || '注册失败')
+            const errorData = await response.json()
+            throw new Error(errorData.error || errorData.message || '注册失败')
           }
           
           const data = await response.json()
