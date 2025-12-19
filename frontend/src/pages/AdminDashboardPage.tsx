@@ -7,7 +7,8 @@ import {
 import { 
   DownloadOutlined, LogoutOutlined, ReloadOutlined, 
   CheckCircleOutlined, ClockCircleOutlined, PhoneOutlined,
-  UserOutlined, MailOutlined, MessageOutlined
+  UserOutlined, MailOutlined, MessageOutlined, DeleteOutlined,
+  ExclamationCircleOutlined
 } from '@ant-design/icons'
 import { apiFetch } from '../config/api'
 import styles from './AdminDashboardPage.module.css'
@@ -105,6 +106,34 @@ const AdminDashboardPage = () => {
     } finally {
       setUpdating(false)
     }
+  }
+
+  const handleDelete = (inquiry: Inquiry) => {
+    Modal.confirm({
+      title: '确认删除',
+      icon: <ExclamationCircleOutlined />,
+      content: `确定要删除 "${inquiry.name}" 的咨询记录吗？此操作不可恢复。`,
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await apiFetch(`/api/admin/inquiry/${inquiry.id}`, {
+            method: 'DELETE',
+            headers: { 'X-Admin-Key': adminKey || '' }
+          })
+          
+          if (!response.ok) {
+            throw new Error('删除失败')
+          }
+          
+          message.success('删除成功')
+          loadInquiries()
+        } catch {
+          message.error('删除失败')
+        }
+      }
+    })
   }
 
   const exportToCSV = () => {
@@ -226,11 +255,21 @@ const AdminDashboardPage = () => {
     {
       title: '操作',
       key: 'action',
-      width: 100,
+      width: 150,
       render: (_: unknown, record: Inquiry) => (
-        <Button type="link" onClick={() => handleViewDetails(record)}>
-          查看详情
-        </Button>
+        <Space>
+          <Button type="link" onClick={() => handleViewDetails(record)}>
+            详情
+          </Button>
+          <Button 
+            type="link" 
+            danger 
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record)}
+          >
+            删除
+          </Button>
+        </Space>
       )
     }
   ]

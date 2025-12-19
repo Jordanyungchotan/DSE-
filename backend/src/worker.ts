@@ -1075,6 +1075,23 @@ export default {
         return jsonResponse({ message: '更新成功' }, 200, origin)
       }
 
+      // 删除咨询记录（管理员专用）
+      if (path.startsWith('/api/admin/inquiry/') && request.method === 'DELETE') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        const inquiryId = path.split('/').pop()
+        if (!inquiryId) {
+          return errorResponse('无效的记录ID', 400, origin)
+        }
+
+        await env.DB.prepare('DELETE FROM customer_inquiries WHERE id = ?').bind(inquiryId).run()
+
+        return jsonResponse({ message: '删除成功' }, 200, origin)
+      }
+
       // 根路径 - 显示 API 状态
       if (path === '/' || path === '') {
         return jsonResponse({
