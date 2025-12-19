@@ -170,6 +170,23 @@ CREATE TABLE IF NOT EXISTS user_favorites (
 );
 
 -- =====================
+-- 客户咨询表
+-- =====================
+
+-- 客户咨询记录表
+CREATE TABLE IF NOT EXISTS customer_inquiries (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT,
+  email TEXT,
+  message TEXT NOT NULL,
+  status TEXT DEFAULT 'pending', -- 'pending' | 'contacted' | 'resolved'
+  notes TEXT, -- 管理员备注
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================
 -- 索引
 -- =====================
 

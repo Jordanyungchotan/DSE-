@@ -1012,6 +1012,69 @@ export default {
         return jsonResponse({ trends: trends.results || [] }, 200, origin)
       }
 
+      // =====================
+      // 客户咨询 API
+      // =====================
+
+      // 提交客户咨询
+      if (path === '/api/inquiry/submit' && request.method === 'POST') {
+        const body = await request.json() as {
+          name: string
+          phone?: string
+          email?: string
+          message: string
+        }
+
+        if (!body.name || !body.message) {
+          return errorResponse('姓名和咨询内容不能为空', 400, origin)
+        }
+
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+
+        await env.DB.prepare(
+          'INSERT INTO customer_inquiries (id, name, phone, email, message, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+        ).bind(id, body.name, body.phone || null, body.email || null, body.message, now).run()
+
+        return jsonResponse({ message: '咨询提交成功，我们会尽快与您联系！', id }, 200, origin)
+      }
+
+      // 获取所有客户咨询（管理员专用）
+      if (path === '/api/admin/inquiries' && request.method === 'GET') {
+        // 简单的管理员密码验证
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        const inquiries = await env.DB.prepare(
+          'SELECT * FROM customer_inquiries ORDER BY created_at DESC'
+        ).all()
+
+        return jsonResponse({ inquiries: inquiries.results || [] }, 200, origin)
+      }
+
+      // 更新咨询状态（管理员专用）
+      if (path.startsWith('/api/admin/inquiry/') && request.method === 'PUT') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        const inquiryId = path.split('/').pop()
+        const body = await request.json() as {
+          status?: string
+          notes?: string
+        }
+
+        const now = new Date().toISOString()
+        await env.DB.prepare(
+          'UPDATE customer_inquiries SET status = ?, notes = ?, updated_at = ? WHERE id = ?'
+        ).bind(body.status || 'pending', body.notes || null, now, inquiryId).run()
+
+        return jsonResponse({ message: '更新成功' }, 200, origin)
+      }
+
       // 根路径 - 显示 API 状态
       if (path === '/' || path === '') {
         return jsonResponse({

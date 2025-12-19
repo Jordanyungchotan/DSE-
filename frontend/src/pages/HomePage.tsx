@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Row, Col, Typography, Collapse, Form, Input, Carousel } from 'antd'
+import { Button, Card, Row, Col, Typography, Collapse, Form, Input, Carousel, message } from 'antd'
 import {
   FormOutlined,
   RocketOutlined,
@@ -26,6 +27,7 @@ import {
   QuestionCircleOutlined,
 } from '@ant-design/icons'
 import { useLanguageStore } from '../stores/languageStore'
+import { apiFetch } from '../config/api'
 import styles from './HomePage.module.css'
 
 const { Title, Paragraph, Text } = Typography
@@ -37,6 +39,31 @@ const { Panel } = Collapse
 const HomePage = () => {
   const navigate = useNavigate()
   const { t } = useLanguageStore()
+  const [form] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
+
+  // 提交咨询表单
+  const handleInquirySubmit = async (values: { name: string; phone?: string; email?: string; message: string }) => {
+    setSubmitting(true)
+    try {
+      const response = await apiFetch('/api/inquiry/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      })
+      
+      if (!response.ok) {
+        throw new Error('提交失败')
+      }
+      
+      message.success('咨询提交成功，我们会尽快与您联系！')
+      form.resetFields()
+    } catch {
+      message.error('提交失败，请稍后重试')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   // 核心功能数据
   const coreFeatures = [
@@ -571,8 +598,17 @@ const HomePage = () => {
           <Col xs={24} lg={12}>
             <Card className={styles.contactFormCard}>
               <Title level={4}>{t('home.contact.form.title')}</Title>
-              <Form layout="vertical" className={styles.contactForm}>
-                <Form.Item label={t('home.contact.form.name')} name="name">
+              <Form 
+                form={form}
+                layout="vertical" 
+                className={styles.contactForm}
+                onFinish={handleInquirySubmit}
+              >
+                <Form.Item 
+                  label={t('home.contact.form.name')} 
+                  name="name"
+                  rules={[{ required: true, message: '请输入您的姓名' }]}
+                >
                   <Input prefix={<UserOutlined />} placeholder={t('home.contact.form.namePlaceholder')} />
                 </Form.Item>
                 <Form.Item label={t('home.contact.form.phone')} name="phone">
@@ -581,10 +617,14 @@ const HomePage = () => {
                 <Form.Item label={t('home.contact.form.email')} name="email">
                   <Input prefix={<MailOutlined />} placeholder={t('home.contact.form.emailPlaceholder')} />
                 </Form.Item>
-                <Form.Item label={t('home.contact.form.message')} name="message">
+                <Form.Item 
+                  label={t('home.contact.form.message')} 
+                  name="message"
+                  rules={[{ required: true, message: '请输入咨询内容' }]}
+                >
                   <Input.TextArea rows={4} placeholder={t('home.contact.form.messagePlaceholder')} />
                 </Form.Item>
-                <Button type="primary" block size="large">
+                <Button type="primary" block size="large" htmlType="submit" loading={submitting}>
                   {t('home.contact.form.submit')}
                 </Button>
               </Form>
