@@ -337,6 +337,200 @@ function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
   }
 }
 
+// =====================
+// 大学申请分析相关
+// =====================
+
+interface UniversityApplicationInput {
+  dseResults: { subject: string; grade: string }[]
+  targetUniversities: string[]
+  targetMajors: string[]
+  extracurriculars?: string
+  careerInterests?: string[]
+}
+
+interface UniversityAnalysisResult {
+  admissionAnalysis: {
+    overallScore: number
+    summary: string
+    targetProgramAnalyses: {
+      university: string
+      program: string
+      admissionChance: 'high' | 'medium' | 'low'
+      minScore: number
+      yourScore: number
+      analysis: string
+      recommendations: string[]
+    }[]
+  }
+  alternativeRecommendations: {
+    program: string
+    university: string
+    matchScore: number
+    reason: string
+  }[]
+  careerAnalysis: {
+    industryTrends: string[]
+    highDemandFields: string[]
+    salaryOutlook: string
+    aiImpact: string
+  }
+  applicationStrategy: {
+    bandAStrategy: string[]
+    interviewTips: string[]
+    personalStatementAdvice: string[]
+  }
+  backupPlans: string[]
+}
+
+// 大学申请分析
+async function analyzeUniversityApplication(
+  input: UniversityApplicationInput, 
+  bestFive: number,
+  apiKey: string
+): Promise<UniversityAnalysisResult> {
+  if (!apiKey) {
+    return generateMockUniversityResult(input, bestFive)
+  }
+
+  try {
+    const prompt = buildUniversityAnalysisPrompt(input, bestFive)
+    
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: '你是一位专业的香港大学申请顾问和职业规划专家。请用JSON格式回复。' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 4000,
+        temperature: 0.7,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('DeepSeek API error:', response.status)
+      return generateMockUniversityResult(input, bestFive)
+    }
+
+    const data = await response.json() as { choices?: { message?: { content?: string } }[] }
+    const content = data.choices?.[0]?.message?.content
+
+    if (!content) {
+      return generateMockUniversityResult(input, bestFive)
+    }
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return generateMockUniversityResult(input, bestFive)
+    }
+
+    return JSON.parse(jsonMatch[0]) as UniversityAnalysisResult
+  } catch (error) {
+    console.error('DeepSeek error:', error)
+    return generateMockUniversityResult(input, bestFive)
+  }
+}
+
+// 构建大学申请分析提示词
+function buildUniversityAnalysisPrompt(input: UniversityApplicationInput, bestFive: number): string {
+  const dseText = input.dseResults.map(r => `${r.subject}: ${r.grade}`).join(', ')
+  
+  return `你是一位专业的香港大学申请顾问。请根据以下学生信息提供详细的升学分析。
+
+学生DSE成绩：${dseText}
+最佳5科总分：${bestFive}分
+
+目标大学：${input.targetUniversities.join('、')}
+目标专业：${input.targetMajors.join('、')}
+课外活动：${input.extracurriculars || '未填写'}
+职业兴趣：${input.careerInterests?.join('、') || '未填写'}
+
+请严格按照以下JSON格式返回分析结果：
+
+{
+  "admissionAnalysis": {
+    "overallScore": <0-100的整数，综合评分>,
+    "summary": "<整体分析摘要，200字以内>",
+    "targetProgramAnalyses": [
+      {
+        "university": "<大学名称>",
+        "program": "<专业名称>",
+        "admissionChance": "<'high'或'medium'或'low'>",
+        "minScore": <该专业最低录取分数>,
+        "yourScore": ${bestFive},
+        "analysis": "<录取分析>",
+        "recommendations": ["建议1", "建议2"]
+      }
+    ]
+  },
+  "alternativeRecommendations": [
+    {
+      "program": "<备选专业>",
+      "university": "<大学>",
+      "matchScore": <匹配分数0-100>,
+      "reason": "<推荐理由>"
+    }
+  ],
+  "careerAnalysis": {
+    "industryTrends": ["趋势1", "趋势2"],
+    "highDemandFields": ["领域1", "领域2"],
+    "salaryOutlook": "<薪资前景分析>",
+    "aiImpact": "<AI对这些专业的影响分析>"
+  },
+  "applicationStrategy": {
+    "bandAStrategy": ["策略1", "策略2"],
+    "interviewTips": ["技巧1", "技巧2"],
+    "personalStatementAdvice": ["建议1", "建议2"]
+  },
+  "backupPlans": ["备选方案1", "备选方案2"]
+}
+
+注意：只返回JSON，不要有其他文字。`
+}
+
+// 生成模拟大学申请分析结果
+function generateMockUniversityResult(input: UniversityApplicationInput, bestFive: number): UniversityAnalysisResult {
+  const chanceLevel = bestFive >= 30 ? 'high' : bestFive >= 24 ? 'medium' : 'low'
+  
+  return {
+    admissionAnalysis: {
+      overallScore: Math.min(95, bestFive * 3),
+      summary: `根据您的DSE成绩（最佳5科：${bestFive}分），您在JUPAS申请中具有${chanceLevel === 'high' ? '较强' : chanceLevel === 'medium' ? '一定' : '有限'}的竞争力。建议合理选择目标专业，同时准备备选方案。`,
+      targetProgramAnalyses: input.targetMajors.map((major, i) => ({
+        university: input.targetUniversities[i % input.targetUniversities.length] || '香港大学',
+        program: major,
+        admissionChance: chanceLevel,
+        minScore: 25,
+        yourScore: bestFive,
+        analysis: `该专业竞争${chanceLevel === 'high' ? '较为激烈' : '适中'}，您的成绩${bestFive >= 28 ? '具有竞争力' : '需要认真准备'}。`,
+        recommendations: ['准备好面试', '突出个人特色', '展示相关经历'],
+      })),
+    },
+    alternativeRecommendations: [
+      { program: '工商管理', university: '香港理工大学', matchScore: 75, reason: '入学门槛适中，就业前景良好' },
+      { program: '社会科学', university: '香港城市大学', matchScore: 70, reason: '课程多元，符合您的兴趣方向' },
+    ],
+    careerAnalysis: {
+      industryTrends: ['金融科技持续增长', 'AI/数据科学人才需求旺盛', '医疗健康行业稳定发展'],
+      highDemandFields: ['软件工程', '数据分析', '数字营销', '医疗护理'],
+      salaryOutlook: '大学毕业生平均起薪约$18,000-25,000港元/月，热门专业可达$30,000以上',
+      aiImpact: 'AI技术将改变多个行业的工作模式，建议培养AI相关技能以提升竞争力',
+    },
+    applicationStrategy: {
+      bandAStrategy: ['第一选择放心仪专业', '第二选择放稳妥专业', '第三选择作为保底'],
+      interviewTips: ['了解专业课程内容', '准备个人经历分享', '展示学习热情'],
+      personalStatementAdvice: ['突出个人特色', '结合实际经历', '展示对专业的理解'],
+    },
+    backupPlans: ['考虑副学士课程', '海外升学选项', '重读提升成绩'],
+  }
+}
+
 // 主请求处理
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -515,19 +709,298 @@ export default {
         return jsonResponse({ history }, 200, origin)
       }
 
+      // =====================
+      // 学生信息相关 API
+      // =====================
+
+      // 保存/更新居住信息
+      if (path === '/api/student/residence' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const body = await request.json() as {
+          district: string
+          address?: string
+          maxCommuteTime?: number
+          transportPreference?: string
+          crossDistrict?: boolean
+        }
+
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+
+        // 先删除旧记录再插入新记录
+        await env.DB.prepare('DELETE FROM student_residence WHERE user_id = ?').bind(tokenData.userId).run()
+        await env.DB.prepare(
+          `INSERT INTO student_residence (id, user_id, district, address, max_commute_time, transport_preference, cross_district, created_at, updated_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id, tokenData.userId, body.district, body.address || null,
+          body.maxCommuteTime || 60, body.transportPreference || 'public',
+          body.crossDistrict ? 1 : 0, now, now
+        ).run()
+
+        return jsonResponse({ message: '居住信息已保存', id }, 200, origin)
+      }
+
+      // 获取居住信息
+      if (path === '/api/student/residence' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const residence = await env.DB.prepare(
+          'SELECT * FROM student_residence WHERE user_id = ?'
+        ).bind(tokenData.userId).first()
+
+        return jsonResponse({ residence: residence || null }, 200, origin)
+      }
+
+      // 保存学校偏好
+      if (path === '/api/student/preferences' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const body = await request.json() as {
+          schoolType?: string
+          religionPreference?: string
+          extracurricularImportance?: number
+        }
+
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+
+        await env.DB.prepare('DELETE FROM school_preferences WHERE user_id = ?').bind(tokenData.userId).run()
+        await env.DB.prepare(
+          `INSERT INTO school_preferences (id, user_id, school_type, religion_preference, extracurricular_importance, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(
+          id, tokenData.userId, body.schoolType || 'coed',
+          body.religionPreference || null, body.extracurricularImportance || 3, now
+        ).run()
+
+        return jsonResponse({ message: '学校偏好已保存', id }, 200, origin)
+      }
+
+      // =====================
+      // 学校推荐 API
+      // =====================
+
+      // 获取学校推荐
+      if (path === '/api/schools/recommend' && request.method === 'POST') {
+        const body = await request.json() as {
+          district?: string
+          grade: string
+          subjects: { subject: string; currentScore: string; targetScore: string }[]
+          schoolType?: string
+          maxCommuteTime?: number
+        }
+
+        // 从数据库获取学校列表
+        let query = 'SELECT * FROM hk_schools WHERE 1=1'
+        const params: string[] = []
+
+        if (body.district) {
+          query += ' AND district = ?'
+          params.push(body.district)
+        }
+        if (body.schoolType && body.schoolType !== 'any') {
+          query += ' AND school_type = ?'
+          params.push(body.schoolType)
+        }
+
+        query += ' ORDER BY banding ASC LIMIT 20'
+
+        const schools = await env.DB.prepare(query).bind(...params).all()
+
+        // 计算匹配分数
+        const recommendations = (schools.results || []).map((school: Record<string, unknown>) => {
+          const avgScore = body.subjects.reduce((sum, s) => sum + parseInt(s.currentScore), 0) / body.subjects.length
+          const bandingMatch = school.banding === 1 ? (avgScore >= 4 ? 90 : 60) :
+                              school.banding === 2 ? (avgScore >= 3 ? 85 : 70) : 80
+          
+          return {
+            school: {
+              id: school.id,
+              name: school.name_zh,
+              nameEn: school.name_en,
+              district: school.district,
+              type: school.school_type,
+              religion: school.religion,
+              banding: school.banding,
+              address: school.address,
+            },
+            matchScore: bandingMatch,
+            admissionChance: Math.min(95, bandingMatch + Math.random() * 10),
+            reasons: [
+              `位于${school.district}，交通便利`,
+              school.banding === 1 ? '属于第一组别学校，学术表现优异' : '学术氛围良好',
+              '符合您的学校类型偏好',
+            ],
+          }
+        })
+
+        // 按匹配分数排序
+        recommendations.sort((a, b) => b.matchScore - a.matchScore)
+
+        return jsonResponse({ recommendations: recommendations.slice(0, 10) }, 200, origin)
+      }
+
+      // 获取香港18区列表
+      if (path === '/api/districts' && request.method === 'GET') {
+        const districts = [
+          { code: 'central_western', name: '中西区' },
+          { code: 'wan_chai', name: '湾仔区' },
+          { code: 'eastern', name: '东区' },
+          { code: 'southern', name: '南区' },
+          { code: 'yau_tsim_mong', name: '油尖旺区' },
+          { code: 'sham_shui_po', name: '深水埗区' },
+          { code: 'kowloon_city', name: '九龙城区' },
+          { code: 'wong_tai_sin', name: '黄大仙区' },
+          { code: 'kwun_tong', name: '观塘区' },
+          { code: 'tsuen_wan', name: '荃湾区' },
+          { code: 'tuen_mun', name: '屯门区' },
+          { code: 'yuen_long', name: '元朗区' },
+          { code: 'north', name: '北区' },
+          { code: 'tai_po', name: '大埔区' },
+          { code: 'sha_tin', name: '沙田区' },
+          { code: 'sai_kung', name: '西贡区' },
+          { code: 'kwai_tsing', name: '葵青区' },
+          { code: 'islands', name: '离岛区' },
+        ]
+        return jsonResponse({ districts }, 200, origin)
+      }
+
+      // =====================
+      // 大学申请分析 API
+      // =====================
+
+      // 提交大学申请分析
+      if (path === '/api/analysis/university' && request.method === 'POST') {
+        const body = await request.json() as {
+          dseResults: { subject: string; grade: string }[]
+          targetUniversities: string[]
+          targetMajors: string[]
+          extracurriculars?: string
+          careerInterests?: string[]
+        }
+
+        // 计算最佳5科/6科分数
+        const gradeToScore: Record<string, number> = {
+          '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
+        }
+        const scores = body.dseResults.map(r => gradeToScore[r.grade] || 0).sort((a, b) => b - a)
+        const bestFive = scores.slice(0, 5).reduce((a, b) => a + b, 0)
+        const bestSix = scores.slice(0, 6).reduce((a, b) => a + b, 0)
+
+        // 调用 DeepSeek 进行分析
+        const universityAnalysisResult = await analyzeUniversityApplication(body, bestFive, env.DEEPSEEK_API_KEY)
+
+        // 获取用户ID（如果有token）
+        let userId: string | null = null
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          userId = tokenData?.userId || null
+        }
+
+        const recordId = crypto.randomUUID()
+        const now = new Date().toISOString()
+
+        // 保存到数据库
+        await env.DB.prepare(
+          `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+           VALUES (?, ?, 'university', ?, ?, ?)`
+        ).bind(recordId, userId, JSON.stringify({ ...body, bestFive, bestSix }), JSON.stringify(universityAnalysisResult), now).run()
+
+        return jsonResponse({
+          message: '大学申请分析完成',
+          result: {
+            id: recordId,
+            createdAt: now,
+            bestFive,
+            bestSix,
+            ...universityAnalysisResult,
+          },
+        }, 200, origin)
+      }
+
+      // 获取大学专业列表
+      if (path === '/api/universities/programs' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const category = url.searchParams.get('category')
+        const university = url.searchParams.get('university')
+
+        let query = 'SELECT * FROM university_programs WHERE 1=1'
+        const params: string[] = []
+
+        if (category) {
+          query += ' AND category = ?'
+          params.push(category)
+        }
+        if (university) {
+          query += ' AND university_code = ?'
+          params.push(university)
+        }
+
+        query += ' ORDER BY min_score_2024 DESC'
+
+        const programs = await env.DB.prepare(query).bind(...params).all()
+
+        return jsonResponse({ programs: programs.results || [] }, 200, origin)
+      }
+
+      // =====================
+      // 就业趋势 API
+      // =====================
+
+      // 获取就业趋势
+      if (path === '/api/trends/employment' && request.method === 'GET') {
+        const trends = await env.DB.prepare(
+          'SELECT * FROM employment_trends ORDER BY growth_rate DESC'
+        ).all()
+
+        return jsonResponse({ trends: trends.results || [] }, 200, origin)
+      }
+
       // 根路径 - 显示 API 状态
       if (path === '/' || path === '') {
         return jsonResponse({
           name: 'DSE Analysis API',
-          version: '1.0.0',
+          version: '2.0.0',
           status: 'running',
           endpoints: [
             'GET /api/health',
             'POST /api/auth/login',
             'POST /api/auth/register',
             'POST /api/analysis/submit',
+            'POST /api/analysis/university',
             'GET /api/analysis/result/:id',
             'GET /api/analysis/history',
+            'POST /api/student/residence',
+            'GET /api/student/residence',
+            'POST /api/student/preferences',
+            'POST /api/schools/recommend',
+            'GET /api/districts',
+            'GET /api/universities/programs',
+            'GET /api/trends/employment',
           ],
         }, 200, origin)
       }
