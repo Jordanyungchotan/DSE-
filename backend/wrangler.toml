@@ -13,5 +13,5 @@ database_id = "ebac4d13-515a-453c-9a93-7ef16c747989"
 
 # 环境变量（敏感信息请在 Dashboard 中设置）
 [vars]
-CORS_ORIGIN = "https://dse-analysis.pages.dev"
+CORS_ORIGIN = "https://dse-29x.pages.dev"
 
