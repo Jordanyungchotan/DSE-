@@ -37,9 +37,42 @@ const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
 
 /**
- * DSE科目列表
+ * 小学科目列表
  */
-const DSE_SUBJECTS = [
+const PRIMARY_SUBJECTS = [
+  { value: 'chinese', label: '中文', category: 'core' },
+  { value: 'english', label: '英文', category: 'core' },
+  { value: 'math', label: '数学', category: 'core' },
+  { value: 'general_studies', label: '常识', category: 'core' },
+  { value: 'music', label: '音乐', category: 'elective' },
+  { value: 'visual_arts', label: '视觉艺术', category: 'elective' },
+  { value: 'pe', label: '体育', category: 'elective' },
+  { value: 'putonghua', label: '普通话', category: 'elective' },
+]
+
+/**
+ * 初中科目列表 (中一至中三)
+ */
+const JUNIOR_SECONDARY_SUBJECTS = [
+  { value: 'chinese', label: '中国语文', category: 'core' },
+  { value: 'english', label: '英国语文', category: 'core' },
+  { value: 'math', label: '数学', category: 'core' },
+  { value: 'integrated_science', label: '综合科学', category: 'core' },
+  { value: 'integrated_humanities', label: '综合人文', category: 'core' },
+  { value: 'chinese_history', label: '中国历史', category: 'elective' },
+  { value: 'geography', label: '地理', category: 'elective' },
+  { value: 'history', label: '历史', category: 'elective' },
+  { value: 'computer', label: '电脑', category: 'elective' },
+  { value: 'music', label: '音乐', category: 'elective' },
+  { value: 'visual_arts', label: '视觉艺术', category: 'elective' },
+  { value: 'pe', label: '体育', category: 'elective' },
+  { value: 'putonghua', label: '普通话', category: 'elective' },
+]
+
+/**
+ * 高中/DSE科目列表 (中四至中六)
+ */
+const SENIOR_SECONDARY_SUBJECTS = [
   { value: 'chinese', label: '中国语文', category: 'core' },
   { value: 'english', label: '英国语文', category: 'core' },
   { value: 'math', label: '数学', category: 'core' },
@@ -51,24 +84,26 @@ const DSE_SUBJECTS = [
   { value: 'bafs', label: '企业会计与财务概论', category: 'elective' },
   { value: 'geography', label: '地理', category: 'elective' },
   { value: 'history', label: '历史', category: 'elective' },
+  { value: 'chinese_history', label: '中国历史', category: 'elective' },
   { value: 'ict', label: '资讯及通讯科技', category: 'elective' },
+  { value: 'visual_arts', label: '视觉艺术', category: 'elective' },
+  { value: 'music', label: '音乐', category: 'elective' },
   { value: 'm1', label: '数学延伸部分(M1)', category: 'elective' },
   { value: 'm2', label: '数学延伸部分(M2)', category: 'elective' },
 ]
 
 /**
- * DSE成绩等级
+ * 根据年级获取对应的科目列表
  */
-const DSE_GRADES = [
-  { value: '5**', label: '5**' },
-  { value: '5*', label: '5*' },
-  { value: '5', label: '5' },
-  { value: '4', label: '4' },
-  { value: '3', label: '3' },
-  { value: '2', label: '2' },
-  { value: '1', label: '1' },
-  { value: 'U', label: 'U (不予评级)' },
-]
+const getSubjectsByGrade = (grade: string) => {
+  if (grade?.startsWith('primary')) {
+    return PRIMARY_SUBJECTS
+  } else if (['form1', 'form2', 'form3'].includes(grade)) {
+    return JUNIOR_SECONDARY_SUBJECTS
+  } else {
+    return SENIOR_SECONDARY_SUBJECTS
+  }
+}
 
 /**
  * 年级选项 - 小一到中六
@@ -458,11 +493,22 @@ const AnalysisFormPage = () => {
   /**
    * 渲染步骤3 - 科目成绩
    */
-  const renderStep3 = () => (
+  const renderStep3 = () => {
+    const currentGrade = form.getFieldValue('grade') || 'form4'
+    const availableSubjects = getSubjectsByGrade(currentGrade)
+    const isPrimary = currentGrade?.startsWith('primary')
+    const isJunior = ['form1', 'form2', 'form3'].includes(currentGrade)
+    
+    return (
     <div className={styles.stepContent}>
       <Title level={4}>科目成绩录入</Title>
       <Paragraph type="secondary">
-        请添加并填写各科目的当前成绩和目标成绩
+        {isPrimary 
+          ? '请添加并填写各科目的当前分数和目标分数（满分100分）'
+          : isJunior
+          ? '请添加并填写各科目的当前分数和目标分数（满分100分）'
+          : '请添加并填写各科目的当前分数和目标分数（满分100分）'
+        }
       </Paragraph>
 
       <div className={styles.subjectsContainer}>
@@ -489,7 +535,7 @@ const AnalysisFormPage = () => {
                     placeholder="选择科目"
                     value={subject.subject || undefined}
                     onChange={(value) => handleSubjectChange(index, 'subject', value)}
-                    options={DSE_SUBJECTS.map((s) => ({
+                    options={availableSubjects.map((s) => ({
                       value: s.value,
                       label: (
                         <span>
@@ -504,22 +550,28 @@ const AnalysisFormPage = () => {
                 </Form.Item>
               </Col>
               <Col xs={12} sm={8}>
-                <Form.Item label="当前成绩" required>
-                  <Select
-                    placeholder="选择成绩"
-                    value={subject.currentScore || undefined}
-                    onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
-                    options={DSE_GRADES}
+                <Form.Item label="当前分数" required>
+                  <InputNumber
+                    min={0}
+                    max={100}
+                    placeholder="0-100"
+                    value={subject.currentScore ? Number(subject.currentScore) : undefined}
+                    onChange={(value) => handleSubjectChange(index, 'currentScore', String(value || ''))}
+                    style={{ width: '100%' }}
+                    addonAfter="分"
                   />
                 </Form.Item>
               </Col>
               <Col xs={12} sm={8}>
-                <Form.Item label="目标成绩" required>
-                  <Select
-                    placeholder="选择目标"
-                    value={subject.targetScore || undefined}
-                    onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
-                    options={DSE_GRADES}
+                <Form.Item label="目标分数" required>
+                  <InputNumber
+                    min={0}
+                    max={100}
+                    placeholder="0-100"
+                    value={subject.targetScore ? Number(subject.targetScore) : undefined}
+                    onChange={(value) => handleSubjectChange(index, 'targetScore', String(value || ''))}
+                    style={{ width: '100%' }}
+                    addonAfter="分"
                   />
                 </Form.Item>
               </Col>
@@ -538,7 +590,7 @@ const AnalysisFormPage = () => {
         </Button>
       </div>
     </div>
-  )
+  )}
 
   /**
    * 渲染步骤4 - 目标学校

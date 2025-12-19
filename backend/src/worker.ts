@@ -221,13 +221,23 @@ interface AnalysisResult {
   additionalAdvice: string[]
 }
 
-// 科目名称映射
+// 科目名称映射（包含小学、初中、高中科目）
 const SUBJECT_NAME_MAP: Record<string, string> = {
+  // 小学科目
+  general_studies: '常识',
+  // 初中科目
+  integrated_science: '综合科学',
+  integrated_humanities: '综合人文',
+  computer: '电脑',
+  // 高中/DSE科目
   chinese: '中国语文', english: '英国语文', math: '数学',
   liberal: '公民与社会发展', physics: '物理', chemistry: '化学',
   biology: '生物', economics: '经济', bafs: '企业会计与财务概论',
-  geography: '地理', history: '历史', ict: '资讯及通讯科技',
+  geography: '地理', history: '历史', chinese_history: '中国历史',
+  ict: '资讯及通讯科技',
   m1: '数学延伸部分(M1)', m2: '数学延伸部分(M2)',
+  // 通用科目
+  music: '音乐', visual_arts: '视觉艺术', pe: '体育', putonghua: '普通话',
 }
 
 const GRADE_NAME_MAP: Record<string, string> = {
@@ -240,7 +250,7 @@ const GRADE_NAME_MAP: Record<string, string> = {
 // 构建分析提示词
 function buildAnalysisPrompt(studentInfo: StudentInfo): string {
   const subjectsText = studentInfo.subjects
-    .map(s => `  - ${SUBJECT_NAME_MAP[s.subject] || s.subject}: 当前${s.currentScore}级，目标${s.targetScore}级`)
+    .map(s => `  - ${SUBJECT_NAME_MAP[s.subject] || s.subject}: 当前${s.currentScore}分，目标${s.targetScore}分`)
     .join('\n')
 
   const subjectNames = studentInfo.subjects.map(s => SUBJECT_NAME_MAP[s.subject] || s.subject)
@@ -345,9 +355,9 @@ function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
     },
     subjectAnalyses: studentInfo.subjects.map(s => ({
       subject: SUBJECT_NAME_MAP[s.subject] || s.subject,
-      currentLevel: s.currentScore,
-      targetLevel: s.targetScore,
-      gap: parseInt(s.targetScore) > parseInt(s.currentScore) ? `差${parseInt(s.targetScore) - parseInt(s.currentScore)}级` : '已达标',
+      currentLevel: s.currentScore + '分',
+      targetLevel: s.targetScore + '分',
+      gap: parseInt(s.targetScore) > parseInt(s.currentScore) ? `差${parseInt(s.targetScore) - parseInt(s.currentScore)}分` : '已达标',
       strengths: ['有一定基础', '学习态度积极'],
       weaknesses: ['需要提升', '部分知识点需巩固'],
       recommendations: ['每天复习30分钟', '完成每周练习题', '定期进行模拟测试'],
