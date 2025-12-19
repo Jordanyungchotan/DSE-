@@ -163,9 +163,18 @@ export const useAnalysisStore = create<AnalysisState>()(
         set({ loading: true, error: null })
         
         try {
+          // 获取 token 以关联用户
+          const token = useAuthStore.getState().token
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          }
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`
+          }
+
           const response = await apiFetch('/api/analysis/submit', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify(formData),
           })
           
