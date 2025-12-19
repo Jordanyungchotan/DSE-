@@ -59,8 +59,14 @@ export const useAuthStore = create<AuthState>()(
           })
           
           if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || errorData.message || '登录失败')
+            let errorMessage = '登录失败'
+            try {
+              const errorData = await response.json()
+              errorMessage = errorData.error || errorData.message || '登录失败'
+            } catch {
+              errorMessage = `登录失败 (${response.status})`
+            }
+            throw new Error(errorMessage)
           }
           
           const data = await response.json()
@@ -72,7 +78,14 @@ export const useAuthStore = create<AuthState>()(
           })
         } catch (error) {
           set({ loading: false })
-          throw error
+          if (error instanceof Error) {
+            // 网络错误
+            if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+              throw new Error('网络连接失败，请检查网络后重试')
+            }
+            throw error
+          }
+          throw new Error('登录失败，请稍后重试')
         }
       },
 
@@ -92,8 +105,14 @@ export const useAuthStore = create<AuthState>()(
           })
           
           if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || errorData.message || '注册失败')
+            let errorMessage = '注册失败'
+            try {
+              const errorData = await response.json()
+              errorMessage = errorData.error || errorData.message || '注册失败'
+            } catch {
+              errorMessage = `注册失败 (${response.status})`
+            }
+            throw new Error(errorMessage)
           }
           
           const data = await response.json()
@@ -105,7 +124,14 @@ export const useAuthStore = create<AuthState>()(
           })
         } catch (error) {
           set({ loading: false })
-          throw error
+          if (error instanceof Error) {
+            // 网络错误
+            if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+              throw new Error('网络连接失败，请检查网络后重试')
+            }
+            throw error
+          }
+          throw new Error('注册失败，请稍后重试')
         }
       },
 
