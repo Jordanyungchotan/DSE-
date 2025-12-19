@@ -2,11 +2,15 @@
  * API 配置
  * 
  * 在本地开发时使用 Vite 代理 (/api -> localhost:5000)
- * 在生产环境使用 VITE_API_URL 环境变量指向 Cloudflare Worker
+ * 在生产环境使用 Cloudflare Worker URL
  */
 
 // 获取 API 基础 URL
-export const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+// 生产环境直接使用后端 Worker URL
+const PRODUCTION_API_URL = 'https://dse-analysis-api.jordanyungchotan.workers.dev'
+
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD ? PRODUCTION_API_URL : '')
 
 /**
  * 构建完整的 API URL
