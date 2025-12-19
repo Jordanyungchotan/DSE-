@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { apiFetch } from '../config/api'
 
 /**
  * 科目成绩接口
@@ -161,7 +162,7 @@ export const useAnalysisStore = create<AnalysisState>()(
         set({ loading: true, error: null })
         
         try {
-          const response = await fetch('/api/analysis/submit', {
+          const response = await apiFetch('/api/analysis/submit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData),
@@ -206,7 +207,7 @@ export const useAnalysisStore = create<AnalysisState>()(
         set({ loading: true, error: null })
         
         try {
-          const response = await fetch(`/api/analysis/result/${id}`)
+          const response = await apiFetch(`/api/analysis/result/${id}`)
           
           if (!response.ok) {
             throw new Error('无法加载分析结果')
@@ -231,7 +232,7 @@ export const useAnalysisStore = create<AnalysisState>()(
         set({ loading: true, error: null })
         
         try {
-          const response = await fetch('/api/analysis/history')
+          const response = await apiFetch('/api/analysis/history')
           
           if (!response.ok) {
             throw new Error('无法加载历史记录')
@@ -254,7 +255,7 @@ export const useAnalysisStore = create<AnalysisState>()(
        */
       deleteHistoryItem: async (id: string) => {
         try {
-          const response = await fetch(`/api/analysis/history/${id}`, {
+          const response = await apiFetch(`/api/analysis/history/${id}`, {
             method: 'DELETE',
           })
           
