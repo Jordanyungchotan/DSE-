@@ -170,8 +170,8 @@ export const useAnalysisStore = create<AnalysisState>()(
           })
           
           if (!response.ok) {
-            const error = await response.json()
-            throw new Error(error.message || '分析请求失败')
+            const errorData = await response.json()
+            throw new Error(errorData.error || errorData.message || '分析请求失败')
           }
           
           const data = await response.json()
