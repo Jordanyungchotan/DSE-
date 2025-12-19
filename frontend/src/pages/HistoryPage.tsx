@@ -165,41 +165,8 @@ const HistoryPage = () => {
     },
   ]
 
-  // 模拟历史数据（实际应从API获取）
-  const mockHistory: HistoryItem[] = history.length > 0 ? history : [
-    {
-      id: 'demo-1',
-      createdAt: new Date().toISOString(),
-      studentInfo: {
-        enrollmentDate: '2025-02-01',
-        semester: '2024-2025-2',
-        grade: 'form5',
-        age: 16,
-        currentSchool: '某中学',
-        subjects: [],
-        targetSchools: ['喇沙书院', '拔萃男书院'],
-        notes: '',
-      },
-      feasibilityScore: 75,
-      summary: '该学生整体学术表现良好，数学和英语科目表现优秀。',
-    },
-    {
-      id: 'demo-2',
-      createdAt: new Date(Date.now() - 86400000).toISOString(),
-      studentInfo: {
-        enrollmentDate: '2025-01-15',
-        semester: '2024-2025-2',
-        grade: 'form4',
-        age: 15,
-        currentSchool: '另一中学',
-        subjects: [],
-        targetSchools: ['皇仁书院'],
-        notes: '',
-      },
-      feasibilityScore: 82,
-      summary: '学生基础扎实，各科成绩均衡，插班成功率较高。',
-    },
-  ]
+  // 使用真实历史数据
+  const displayHistory = history
 
   return (
     <div className={styles.historyPage}>
@@ -228,10 +195,10 @@ const HistoryPage = () => {
         </div>
 
         {/* 历史记录表格 */}
-        {mockHistory.length > 0 ? (
+        {displayHistory.length > 0 ? (
           <Table
             columns={columns}
-            dataSource={mockHistory}
+            dataSource={displayHistory}
             rowKey="id"
             loading={loading}
             pagination={{
