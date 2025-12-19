@@ -225,12 +225,12 @@ export const en = {
       service: {
         title: '📞 Customer Service',
         hotline: 'Hotline: (852) 2711 1288',
-        email: 'Email: support@centroid-dse.hk',
+        email: 'Email: wengzudan@eduzhixin.com',
         hours: 'Online Consultation: Tue-Sun 10:00-19:00',
       },
       address: {
         title: '🏢 Office Address',
-        company: 'Center of Mass Education Tech. Limited',
+        company: 'Center of Mass education tech. limited',
         location: 'Room B, 3/F, Blue Horseman Building, 761 Nathan Road, Prince Edward, Kowloon, Hong Kong',
       },
       social: {

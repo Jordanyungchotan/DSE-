@@ -709,6 +709,38 @@ export default {
         return jsonResponse({ history }, 200, origin)
       }
 
+      // 删除历史记录
+      if (path.startsWith('/api/analysis/history/') && request.method === 'DELETE') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const recordId = path.split('/').pop()
+        if (!recordId) {
+          return errorResponse('无效的记录ID', 400, origin)
+        }
+
+        // 验证记录是否属于当前用户
+        const record = await env.DB.prepare(
+          'SELECT id FROM analysis_records WHERE id = ? AND user_id = ?'
+        ).bind(recordId, tokenData.userId).first()
+
+        if (!record) {
+          return errorResponse('记录不存在或无权删除', 404, origin)
+        }
+
+        // 删除记录
+        await env.DB.prepare('DELETE FROM analysis_records WHERE id = ?').bind(recordId).run()
+
+        return jsonResponse({ message: '删除成功' }, 200, origin)
+      }
+
       // =====================
       // 学生信息相关 API
       // =====================

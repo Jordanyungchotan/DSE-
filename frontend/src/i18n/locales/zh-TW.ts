@@ -225,12 +225,12 @@ export const zhTW = {
       service: {
         title: '📞 客戶服務',
         hotline: '服務熱線：(852) 2711 1288',
-        email: '客服郵箱：support@centroid-dse.hk',
+        email: '客服郵箱：wengzudan@eduzhixin.com',
         hours: '在線諮詢：週二至週日 10:00-19:00',
       },
       address: {
         title: '🏢 辦公地址',
-        company: 'Center of Mass education tech. limited',
+        company: '香港質心教育',
         location: '香港九龍彌敦道761號太子藍馬之城3樓B室',
       },
       social: {
