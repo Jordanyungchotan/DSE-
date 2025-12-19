@@ -242,18 +242,18 @@ function buildAnalysisPrompt(studentInfo: StudentInfo): string {
 
   const subjectNames = studentInfo.subjects.map(s => SUBJECT_NAME_MAP[s.subject] || s.subject)
 
-  return `你是一位资深的香港DSE教育专家。请根据以下学生信息，提供专业的插班分析和建议。
+  return `你是一位资深的香港DSE教育专家。请根据以下【已完整提供】的学生信息，提供专业的插班分析和建议。
 
-学生信息：
+【学生基本信息】（以下信息已全部提供，请直接使用这些信息进行分析，不要说信息缺失）：
 - 插班日期：${studentInfo.enrollmentDate}
-- 年级：${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}
-- 年龄：${studentInfo.age}岁
-- 当前学校：${studentInfo.currentSchool || '未填写'}
+- 当前年级：${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}
+- 学生年龄：${studentInfo.age}岁
+- 原就读学校：${studentInfo.currentSchool || '未填写'}
 
-各科目成绩：
+【各科目成绩详情】：
 ${subjectsText}
 
-目标学校：${studentInfo.targetSchools.join('、')}
+【目标学校】：${studentInfo.targetSchools.join('、')}
 
 请严格按照以下JSON格式返回分析结果，不要添加任何其他内容：
 
@@ -293,11 +293,13 @@ ${subjectsText}
   "additionalAdvice": ["建议1", "建议2", "建议3", "建议4"]
 }
 
-注意：
+重要注意事项：
 1. subjectAnalyses 必须包含以下科目的分析：${subjectNames.join('、')}
 2. schoolAssessments 必须包含以下学校的评估：${studentInfo.targetSchools.join('、')}
 3. 所有数组字段不能为空
-4. 只返回JSON，不要有其他文字说明`
+4. 只返回JSON，不要有其他文字说明
+5. 【特别重要】上述学生信息已完整提供，请在分析中充分利用年级（${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}）、年龄（${studentInfo.age}岁）等信息。绝对不要在keyWeaknesses或任何地方说"信息缺失"、"资料缺失"或类似表述
+6. 请根据学生当前年级评估其与目标学校课程进度的匹配度`
 }
 
 // 生成模拟结果
