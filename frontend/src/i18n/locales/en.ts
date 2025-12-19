@@ -238,6 +238,8 @@ export const en = {
         wechat: 'Center of Mass Education DSE',
         facebook: 'HK Center of Mass Education',
         instagram: '@centerofmass_hk',
+        wechatModal: 'WeChat Official Account',
+        wechatScan: 'Scan the QR code to follow our WeChat Official Account',
       },
       form: {
         title: '📝 Online Inquiry',

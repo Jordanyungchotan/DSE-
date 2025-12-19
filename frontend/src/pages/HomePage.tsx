@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Card, Row, Col, Typography, Collapse, Form, Input, Carousel, message } from 'antd'
+import { Button, Card, Row, Col, Typography, Collapse, Form, Input, Carousel, message, Modal } from 'antd'
 import {
   FormOutlined,
   RocketOutlined,
@@ -41,6 +41,14 @@ const HomePage = () => {
   const { t } = useLanguageStore()
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const [wechatModalVisible, setWechatModalVisible] = useState(false)
+
+  // 社交媒体链接
+  const socialLinks = {
+    googleMaps: 'https://maps.app.goo.gl/jyDjPeBWYumwvfsMA',
+    facebook: 'https://www.facebook.com/zhixinhk',
+    instagram: 'https://www.instagram.com/centerofmass_hk/',
+  }
 
   // 提交咨询表单
   const handleInquirySubmit = async (values: { name: string; phone?: string; email?: string; message: string }) => {
@@ -568,29 +576,53 @@ const HomePage = () => {
               </div>
 
               <Title level={4} style={{ marginTop: 24 }}>{t('home.contact.address.title')}</Title>
-              <div className={styles.contactItem}>
-                <EnvironmentOutlined />
-                <div>
-                  <Text strong>{t('home.contact.address.company')}</Text>
-                  <br />
-                  <Text>{t('home.contact.address.location')}</Text>
+              <a 
+                href={socialLinks.googleMaps}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.contactItemLink}
+              >
+                <div className={styles.contactItem}>
+                  <EnvironmentOutlined />
+                  <div>
+                    <Text strong>{t('home.contact.address.company')}</Text>
+                    <br />
+                    <Text>{t('home.contact.address.location')}</Text>
+                  </div>
                 </div>
-              </div>
+              </a>
 
               <Title level={4} style={{ marginTop: 24 }}>{t('home.contact.social.title')}</Title>
               <div className={styles.socialLinks}>
-                <div className={styles.socialItem}>
+                <div 
+                  className={`${styles.socialItem} ${styles.clickable}`}
+                  onClick={() => setWechatModalVisible(true)}
+                >
                   <WechatOutlined />
                   <span>{t('home.contact.social.wechat')}</span>
                 </div>
-                <div className={styles.socialItem}>
-                  <FacebookOutlined />
-                  <span>{t('home.contact.social.facebook')}</span>
-                </div>
-                <div className={styles.socialItem}>
-                  <InstagramOutlined />
-                  <span>{t('home.contact.social.instagram')}</span>
-                </div>
+                <a 
+                  href={socialLinks.facebook}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.socialItemLink}
+                >
+                  <div className={styles.socialItem}>
+                    <FacebookOutlined />
+                    <span>{t('home.contact.social.facebook')}</span>
+                  </div>
+                </a>
+                <a 
+                  href={socialLinks.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.socialItemLink}
+                >
+                  <div className={styles.socialItem}>
+                    <InstagramOutlined />
+                    <span>{t('home.contact.social.instagram')}</span>
+                  </div>
+                </a>
               </div>
             </div>
           </Col>
@@ -665,25 +697,25 @@ const HomePage = () => {
           <div className={styles.ctaContent}>
             <Title level={2} style={{ color: 'white', marginBottom: 8 }}>
               {t('home.cta.title')}
-            </Title>
+          </Title>
             <Paragraph style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1.1rem', marginBottom: 24 }}>
               {t('system.name')} - {t('system.slogan')}
             </Paragraph>
             <Paragraph style={{ color: 'rgba(255,255,255,0.8)', marginBottom: 32 }}>
               {t('home.cta.subtitle')}
-            </Paragraph>
+          </Paragraph>
             <div className={styles.ctaButtons}>
-              <Button
-                size="large"
-                onClick={() => navigate('/analysis')}
-                style={{ 
-                  background: 'white', 
-                  color: 'var(--color-primary)',
-                  fontWeight: 600,
-                  height: 48,
-                  paddingInline: 32,
-                }}
-              >
+          <Button
+            size="large"
+            onClick={() => navigate('/analysis')}
+            style={{ 
+              background: 'white', 
+              color: 'var(--color-primary)',
+              fontWeight: 600,
+              height: 48,
+              paddingInline: 32,
+            }}
+          >
                 {t('home.cta.startFree')}
               </Button>
               <Button
@@ -698,11 +730,32 @@ const HomePage = () => {
                 }}
               >
                 {t('home.cta.register')}
-              </Button>
+          </Button>
             </div>
           </div>
         </Card>
       </section>
+
+      {/* 微信公众号二维码弹窗 */}
+      <Modal
+        title={t('home.contact.social.wechatModal')}
+        open={wechatModalVisible}
+        onCancel={() => setWechatModalVisible(false)}
+        footer={null}
+        centered
+        width={360}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <img 
+            src="/wechat-qrcode.png" 
+            alt="微信公众号二维码" 
+            style={{ width: '100%', maxWidth: 280, borderRadius: 8 }}
+          />
+          <Paragraph style={{ marginTop: 16, color: 'var(--text-secondary)' }}>
+            {t('home.contact.social.wechatScan')}
+          </Paragraph>
+        </div>
+      </Modal>
     </div>
   )
 }

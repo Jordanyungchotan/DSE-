@@ -238,6 +238,8 @@ export const zhTW = {
         wechat: '質心教育DSE',
         facebook: '香港質心教育',
         instagram: '@centerofmass_hk',
+        wechatModal: '微信公眾號',
+        wechatScan: '掃描二維碼關注我們的微信公眾號',
       },
       form: {
         title: '📝 在線諮詢',

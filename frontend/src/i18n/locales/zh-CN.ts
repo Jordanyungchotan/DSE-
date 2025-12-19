@@ -238,6 +238,8 @@ export const zhCN = {
         wechat: '质心教育DSE',
         facebook: '香港质心教育',
         instagram: '@centerofmass_hk',
+        wechatModal: '微信公众号',
+        wechatScan: '扫描二维码关注我们的微信公众号',
       },
       form: {
         title: '📝 在线咨询',

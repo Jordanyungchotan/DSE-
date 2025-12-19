@@ -713,10 +713,40 @@
   align-items: center;
   gap: 8px;
   color: var(--text-secondary);
+  transition: all 0.3s ease;
+}
+
+.socialItem:hover {
+  color: var(--color-primary);
+  transform: translateX(5px);
+}
+
+.socialItem.clickable {
+  cursor: pointer;
 }
 
 .socialItem :global(.anticon) {
   font-size: 1.25rem;
+  color: var(--color-primary);
+}
+
+.socialItemLink,
+.contactItemLink {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.socialItemLink:hover,
+.contactItemLink:hover {
+  text-decoration: none;
+}
+
+.contactItemLink .contactItem {
+  cursor: pointer;
+}
+
+.contactItemLink .contactItem:hover {
   color: var(--color-primary);
 }
 
