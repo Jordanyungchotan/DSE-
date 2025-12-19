@@ -569,14 +569,40 @@ export default {
         const body = await request.json() as { name: string; email: string; password: string }
         const { name, email, password } = body
 
-        if (!name || !email || !password) {
-          return errorResponse('请填写完整信息', 400, origin)
+        // 详细的字段验证
+        if (!name || name.trim().length === 0) {
+          return errorResponse('请输入用户名', 400, origin)
+        }
+        if (name.trim().length < 2) {
+          return errorResponse('用户名至少需要2个字符', 400, origin)
+        }
+        if (name.trim().length > 50) {
+          return errorResponse('用户名不能超过50个字符', 400, origin)
+        }
+
+        if (!email || email.trim().length === 0) {
+          return errorResponse('请输入邮箱地址', 400, origin)
+        }
+        // 简单的邮箱格式验证
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(email)) {
+          return errorResponse('请输入有效的邮箱地址', 400, origin)
+        }
+
+        if (!password) {
+          return errorResponse('请输入密码', 400, origin)
+        }
+        if (password.length < 6) {
+          return errorResponse('密码至少需要6个字符', 400, origin)
+        }
+        if (password.length > 100) {
+          return errorResponse('密码不能超过100个字符', 400, origin)
         }
 
         // 检查邮箱是否已存在
-        const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first()
+        const existing = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email.toLowerCase().trim()).first()
         if (existing) {
-          return errorResponse('该邮箱已被注册', 400, origin)
+          return errorResponse('该邮箱已被注册，请使用其他邮箱或直接登录', 400, origin)
         }
 
         const userId = crypto.randomUUID()
@@ -585,13 +611,13 @@ export default {
 
         await env.DB.prepare(
           'INSERT INTO users (id, name, email, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(userId, name, email, passwordHash, now, now).run()
+        ).bind(userId, name.trim(), email.toLowerCase().trim(), passwordHash, now, now).run()
 
-        const token = await generateToken({ userId, email }, env.JWT_SECRET)
+        const token = await generateToken({ userId, email: email.toLowerCase().trim() }, env.JWT_SECRET)
 
         return jsonResponse({
           message: '注册成功',
-          user: { id: userId, name, email, createdAt: now },
+          user: { id: userId, name: name.trim(), email: email.toLowerCase().trim(), createdAt: now },
           token,
         }, 201, origin)
       }
@@ -601,17 +627,25 @@ export default {
         const body = await request.json() as { email: string; password: string }
         const { email, password } = body
 
+        // 验证输入
+        if (!email || email.trim().length === 0) {
+          return errorResponse('请输入邮箱地址', 400, origin)
+        }
+        if (!password) {
+          return errorResponse('请输入密码', 400, origin)
+        }
+
         const user = await env.DB.prepare(
           'SELECT id, name, email, password_hash, created_at FROM users WHERE email = ?'
-        ).bind(email).first() as { id: string; name: string; email: string; password_hash: string; created_at: string } | null
+        ).bind(email.toLowerCase().trim()).first() as { id: string; name: string; email: string; password_hash: string; created_at: string } | null
 
         if (!user) {
-          return errorResponse('邮箱或密码错误', 401, origin)
+          return errorResponse('该邮箱尚未注册，请先注册账号', 401, origin)
         }
 
         const valid = await verifyPassword(password, user.password_hash)
         if (!valid) {
-          return errorResponse('邮箱或密码错误', 401, origin)
+          return errorResponse('密码错误，请重新输入', 401, origin)
         }
 
         const token = await generateToken({ userId: user.id, email: user.email }, env.JWT_SECRET)
