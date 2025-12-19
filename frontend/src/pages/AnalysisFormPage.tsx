@@ -71,9 +71,18 @@ const DSE_GRADES = [
 ]
 
 /**
- * 年级选项
+ * 年级选项 - 小一到中六
  */
 const GRADE_OPTIONS = [
+  { value: 'primary1', label: '小一' },
+  { value: 'primary2', label: '小二' },
+  { value: 'primary3', label: '小三' },
+  { value: 'primary4', label: '小四' },
+  { value: 'primary5', label: '小五' },
+  { value: 'primary6', label: '小六' },
+  { value: 'form1', label: '中一' },
+  { value: 'form2', label: '中二' },
+  { value: 'form3', label: '中三' },
   { value: 'form4', label: '中四' },
   { value: 'form5', label: '中五' },
   { value: 'form6', label: '中六' },

@@ -231,6 +231,9 @@ const SUBJECT_NAME_MAP: Record<string, string> = {
 }
 
 const GRADE_NAME_MAP: Record<string, string> = {
+  primary1: '小一', primary2: '小二', primary3: '小三',
+  primary4: '小四', primary5: '小五', primary6: '小六',
+  form1: '中一', form2: '中二', form3: '中三',
   form4: '中四', form5: '中五', form6: '中六',
 }
 
@@ -241,12 +244,29 @@ function buildAnalysisPrompt(studentInfo: StudentInfo): string {
     .join('\n')
 
   const subjectNames = studentInfo.subjects.map(s => SUBJECT_NAME_MAP[s.subject] || s.subject)
+  const gradeName = GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade
+  
+  // 根据年级确定教育阶段
+  const isPrimary = studentInfo.grade.startsWith('primary')
+  const isJuniorSecondary = ['form1', 'form2', 'form3'].includes(studentInfo.grade)
+  const isSeniorSecondary = ['form4', 'form5', 'form6'].includes(studentInfo.grade)
+  
+  let educationContext = ''
+  if (isPrimary) {
+    educationContext = `该学生正处于小学阶段（${gradeName}），这是建立学习基础和培养良好学习习惯的关键时期。分析应重点关注：基础学科能力、学习习惯、适应新环境的能力、课外活动发展。`
+  } else if (isJuniorSecondary) {
+    educationContext = `该学生正处于初中阶段（${gradeName}），这是学业过渡和能力提升的重要时期。分析应重点关注：学科基础巩固、学习方法改进、升学路径规划、全面素质发展。`
+  } else if (isSeniorSecondary) {
+    educationContext = `该学生正处于高中阶段（${gradeName}），面临香港DSE考试的关键时期。分析应重点关注：DSE考试准备、学科成绩提升、大学升学规划、时间管理和考试技巧。`
+  }
 
-  return `你是一位资深的香港DSE教育专家。请根据以下学生信息，提供专业的插班分析和建议。
+  return `你是一位资深的香港教育专家，精通从小学到中学的全面教育规划。请根据以下学生信息，提供专业的插班分析和建议。
+
+${educationContext}
 
 学生信息：
 - 插班日期：${studentInfo.enrollmentDate}
-- 年级：${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}
+- 年级：${gradeName}
 - 年龄：${studentInfo.age}岁
 - 当前学校：${studentInfo.currentSchool || '未填写'}
 
@@ -302,7 +322,19 @@ ${subjectsText}
 
 // 生成模拟结果
 function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
-  const baseScore = studentInfo.grade === 'form6' ? 60 : studentInfo.grade === 'form4' ? 75 : 70
+  // 根据年级调整基础分数
+  let baseScore = 70
+  if (studentInfo.grade.startsWith('primary')) {
+    baseScore = 80 // 小学生插班相对容易
+  } else if (['form1', 'form2', 'form3'].includes(studentInfo.grade)) {
+    baseScore = 75 // 初中插班较容易
+  } else if (studentInfo.grade === 'form6') {
+    baseScore = 60 // 中六插班最难
+  } else if (studentInfo.grade === 'form5') {
+    baseScore = 65
+  } else if (studentInfo.grade === 'form4') {
+    baseScore = 70
+  }
 
   return {
     overallAssessment: {
