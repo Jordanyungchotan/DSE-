@@ -92,36 +92,69 @@ const SEMESTER_OPTIONS = [
 /**
  * 香港著名中学列表（按地区分类）
  */
+/**
+ * 香港中学列表（按区域分类）
+ */
 const HK_SCHOOLS = {
   hongKongIsland: [
-    '皇仁书院',
-    '英皇书院',
-    '圣保罗男女中学',
-    '圣若瑟书院',
-    '香港华仁书院',
-    '嘉诺撒圣心书院',
-    '圣士提反女子中学',
-    '金文泰中学',
+    // 中西区
+    '皇仁书院', '英皇书院', '圣保罗男女中学', '圣若瑟书院', '圣士提反女子中学',
+    '英华女学校', '圣类斯中学', '高主教书院', '圣嘉勒女书院', '圣保罗书院',
+    // 湾仔区
+    '香港华仁书院', '玛利曼中学', '圣保禄学校', '嘉诺撒圣方济各书院', '香港真光中学',
+    '皇仁旧生会中学', '邓肇坚维多利亚官立中学',
+    // 东区
+    '庇理罗士女子中学', '筲箕湾官立中学', '张祝珊英文中学', '港岛民生书院', '中华基金中学',
+    '卫理中学', '嘉诺撒书院', '圣马可中学', '文理书院(香港)',
+    // 南区
+    '嘉诺撒圣心书院', '圣士提反书院', '港大同学会书院', '余振强纪念第二中学',
+    '金文泰中学', '明爱庄月明中学',
   ],
   kowloon: [
-    '喇沙书院',
-    '拔萃男书院',
-    '拔萃女书院',
-    '协恩中学',
-    '华英中学',
-    '九龙华仁书院',
-    '玛利诺修院学校',
-    '圣芳济书院',
+    // 油尖旺区
+    '拔萃女书院', '真光女书院', '循道中学', '伊利沙伯中学', '九龙华仁书院',
+    '官立嘉道理爵士中学', '中华基督教会铭基书院', '油麻地天主教小学(中学部)',
+    // 深水埗区
+    '英华书院', '圣芳济书院', '德雅中学', '宝血会上智英文书院', '长沙湾天主教英文中学',
+    '惠侨英文中学', '香港四邑商工总会黄棣珊纪念中学',
+    // 九龙城区
+    '喇沙书院', '拔萃男书院', '玛利诺修院学校', '协恩中学', '华英中学',
+    '民生书院', '何明华会督银禧中学', '旺角劳工子弟学校', '迦密中学',
+    '东华三院黄笏南中学', '保良局颜宝铃书院', '圣公会圣三一堂中学',
+    // 黄大仙区
+    '德望学校', '保良局第一张永庆中学', '中华基督教会协和书院', '圣文德书院',
+    '可立中学(啬色园主办)', '佛教孔仙洲纪念中学',
+    // 观塘区
+    '圣杰灵女子中学', '圣言中学', '观塘玛利诺书院', '顺利天主教中学',
+    '梁式芝书院', '观塘官立中学', '宁波公学', '圣傑灵女子中学',
   ],
   newTerritories: [
-    '圣保罗书院',
-    '培正中学',
-    '沙田官立中学',
-    '浸信会吕明才中学',
-    '圣公会曾肇添中学',
-    '保良局百周年李兆忠纪念中学',
-    '天主教郭得胜中学',
-    '沙田培英中学',
+    // 沙田区
+    '沙田官立中学', '浸信会吕明才中学', '圣公会曾肇添中学', '沙田培英中学',
+    '沙田循道卫理中学', '圣罗撒书院', '天主教郭得胜中学', '五旬节林汉光中学',
+    '圣母无玷圣心书院', '培侨中学', '香港浸会大学附属学校王锦辉中小学',
+    // 大埔区
+    '圣公会莫寿增会督中学', '迦密柏雨中学', '恩主教书院', '王肇枝中学',
+    '南亚路德会沐恩中学', '罗定邦中学',
+    // 北区
+    '圣芳济各书院', '风采中学(教育评议会主办)', '东华三院李嘉诚中学',
+    '田家炳中学', '保良局马锦明中学',
+    // 元朗区
+    '天主教崇德英文书院', '圣公会白约翰会督中学', '新界乡议局元朗区中学',
+    '元朗公立中学', '东华三院卢干庭纪念中学', '基督教香港信义会元朗信义中学',
+    // 屯门区
+    '保良局百周年李兆忠纪念中学', '屯门官立中学', '顺德联谊总会谭伯羽中学',
+    '妙法寺刘金龙中学', '南屯门官立中学', '保良局董玉娣中学',
+    // 荃湾区
+    '荃湾官立中学', '保良局李城璧中学', '廖宝珊纪念书院', '宝安商会王少清中学',
+    // 葵青区
+    '圣公会林护纪念中学', '顺德联谊总会李兆基中学', '东华三院伍若瑜夫人纪念中学',
+    '佛教善德英文中学', '皇仁旧生会中学',
+    // 西贡区
+    '迦密主恩中学', '将军澳官立中学', '景岭书院', '宝觉中学',
+    '仁济医院王华湘中学', '西贡崇真天主教学校(中学部)',
+    // 离岛区
+    '长洲官立中学', '东涌天主教学校', '灵粮堂怡文中学',
   ],
 }
 
@@ -534,17 +567,47 @@ const AnalysisFormPage = () => {
   /**
    * 渲染步骤4 - 目标学校
    */
+  // 手动输入学校
+  const [customSchool, setCustomSchool] = useState('')
+  
+  const handleAddCustomSchool = () => {
+    const trimmed = customSchool.trim()
+    if (trimmed && !selectedSchools.includes(trimmed)) {
+      setSelectedSchools([...selectedSchools, trimmed])
+      setCustomSchool('')
+    }
+  }
+
   const renderStep4 = () => (
     <div className={styles.stepContent}>
       <Title level={4}>选择目标学校</Title>
       <Paragraph type="secondary">
-        请选择您期望入读的学校（可多选）
+        请选择您期望入读的学校（可多选），也可以手动输入学校名称
       </Paragraph>
+
+      {/* 手动输入学校 */}
+      <div style={{ marginBottom: 24 }}>
+        <Text strong>手动添加学校：</Text>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <Input
+            placeholder="输入学校名称"
+            value={customSchool}
+            onChange={(e) => setCustomSchool(e.target.value)}
+            onPressEnter={handleAddCustomSchool}
+            style={{ maxWidth: 300 }}
+          />
+          <Button type="primary" onClick={handleAddCustomSchool}>
+            添加
+          </Button>
+        </div>
+      </div>
+
+      <Divider>或从列表中选择</Divider>
 
       <div className={styles.schoolsContainer}>
         {/* 港岛区 */}
         <div className={styles.schoolRegion}>
-          <Title level={5}>港岛区</Title>
+          <Title level={5}>🏝️ 港岛区 ({HK_SCHOOLS.hongKongIsland.length}所)</Title>
           <div className={styles.schoolTags}>
             {HK_SCHOOLS.hongKongIsland.map((school) => (
               <Tag.CheckableTag
@@ -567,7 +630,7 @@ const AnalysisFormPage = () => {
 
         {/* 九龙区 */}
         <div className={styles.schoolRegion}>
-          <Title level={5}>九龙区</Title>
+          <Title level={5}>🏙️ 九龙区 ({HK_SCHOOLS.kowloon.length}所)</Title>
           <div className={styles.schoolTags}>
             {HK_SCHOOLS.kowloon.map((school) => (
               <Tag.CheckableTag
@@ -590,7 +653,7 @@ const AnalysisFormPage = () => {
 
         {/* 新界区 */}
         <div className={styles.schoolRegion}>
-          <Title level={5}>新界区</Title>
+          <Title level={5}>🌿 新界区 ({HK_SCHOOLS.newTerritories.length}所)</Title>
           <div className={styles.schoolTags}>
             {HK_SCHOOLS.newTerritories.map((school) => (
               <Tag.CheckableTag
