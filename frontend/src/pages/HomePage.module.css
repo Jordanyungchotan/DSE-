@@ -317,20 +317,19 @@
 .featureList li {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
-  padding: 16px;
-  margin-bottom: 12px;
-  font-size: 0.95rem;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
   color: var(--text-secondary);
-  line-height: 1.7;
+  line-height: 1.6;
   background: rgba(43, 108, 176, 0.04);
-  border-radius: 14px;
+  border-radius: 10px;
   transition: all 0.2s ease;
 }
 
 .featureList li:hover {
   background: rgba(43, 108, 176, 0.08);
-  transform: translateX(4px);
 }
 
 .featureList li:last-child {
@@ -338,8 +337,8 @@
 }
 
 .featureList li :global(.anticon) {
-  font-size: 1.1rem;
-  margin-top: 3px;
+  font-size: 1rem;
+  margin-top: 2px;
   flex-shrink: 0;
 }
 

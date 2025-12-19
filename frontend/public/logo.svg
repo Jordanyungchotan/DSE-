@@ -1,27 +1,26 @@
 <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
   <!-- 外圈虚线 -->
-  <circle cx="100" cy="100" r="95" fill="none" stroke="#a8d8d8" stroke-width="1" stroke-dasharray="4,4"/>
-  <circle cx="100" cy="100" r="85" fill="none" stroke="#c8e8e8" stroke-width="1" stroke-dasharray="4,4"/>
+  <circle cx="100" cy="100" r="96" fill="none" stroke="#b8dad8" stroke-width="1.5" stroke-dasharray="5,5"/>
+  <circle cx="100" cy="100" r="88" fill="none" stroke="#cce8e6" stroke-width="1" stroke-dasharray="4,4"/>
   
   <!-- 主背景圆 -->
-  <circle cx="100" cy="100" r="75" fill="url(#bgGradient)"/>
+  <circle cx="100" cy="100" r="78" fill="url(#bgGradient)"/>
   
   <!-- 渐变定义 -->
   <defs>
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#d4f0f0;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#b8e6e6;stop-opacity:1" />
+      <stop offset="0%" style="stop-color:#d8f4f2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c4ebe8;stop-opacity:1" />
     </linearGradient>
   </defs>
   
-  <!-- Z 字母主体 - 青色 -->
-  <path d="M55 55 L130 55 C138 55 140 58 140 65 C140 72 135 75 130 75 L78 75 L130 130 C132 132 130 145 120 145 L50 145 C42 145 40 140 40 135 C40 128 45 125 50 125 L102 125 L50 70 C48 68 50 55 55 55 Z" 
-        fill="#3bb8b8" stroke="#3bb8b8" stroke-width="2" stroke-linecap="round"/>
+  <!-- Z 字母 - 青色主体 -->
+  <path d="M52 52 L138 52 C146 52 150 58 150 66 C150 74 146 78 138 78 L80 78 L138 138 C144 144 140 152 130 152 L48 152 C40 152 36 146 36 138 C36 130 40 124 48 124 L108 124 L48 62 C42 56 44 52 52 52 Z" 
+        fill="#3ab8b0" stroke="#3ab8b0" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
   
-  <!-- 橙色装饰点 -->
-  <ellipse cx="68" cy="85" rx="8" ry="6" fill="#f5a623" transform="rotate(-35 68 85)"/>
-  <ellipse cx="68" cy="115" rx="8" ry="6" fill="#f5a623" transform="rotate(-35 68 115)"/>
-  <ellipse cx="112" cy="85" rx="8" ry="6" fill="#f5a623" transform="rotate(35 112 85)"/>
-  <ellipse cx="112" cy="115" rx="8" ry="6" fill="#f5a623" transform="rotate(35 112 115)"/>
+  <!-- 橙色装饰斜线 -->
+  <line x1="62" y1="78" x2="78" y2="95" stroke="#f5a623" stroke-width="8" stroke-linecap="round"/>
+  <line x1="62" y1="108" x2="78" y2="125" stroke="#f5a623" stroke-width="8" stroke-linecap="round"/>
+  <line x1="122" y1="78" x2="138" y2="95" stroke="#f5a623" stroke-width="8" stroke-linecap="round"/>
+  <line x1="122" y1="108" x2="138" y2="125" stroke="#f5a623" stroke-width="8" stroke-linecap="round"/>
 </svg>
-
