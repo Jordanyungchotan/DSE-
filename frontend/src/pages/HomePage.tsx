@@ -291,7 +291,7 @@ const HomePage = () => {
           <div className={styles.heroVisual}>
             <div className={styles.decorativeCard}>
               <div className={styles.cardHeader}>
-                <img src="/logo.svg" alt="Logo" className={styles.cardLogo} />
+                <img src="/logo.png" alt="Logo" className={styles.cardLogo} />
                 <span>智能分析报告</span>
               </div>
               <div className={styles.scorePreview}>

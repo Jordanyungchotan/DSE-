@@ -79,7 +79,7 @@ const MainLayout = () => {
         <div className={styles.headerContent}>
           {/* Logo */}
           <Link to="/" className={styles.logo}>
-            <img src="/logo.svg" alt="Logo" className={styles.logoImage} />
+            <img src="/logo.png" alt="Logo" className={styles.logoImage} />
             <span className={styles.logoText}>{t('system.name')}</span>
           </Link>
 
