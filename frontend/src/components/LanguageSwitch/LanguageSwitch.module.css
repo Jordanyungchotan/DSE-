@@ -1,0 +1,52 @@
+/* 语言切换按钮样式 */
+
+.switchButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  height: auto;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.switchButton:hover {
+  background: var(--bg-secondary);
+  color: var(--color-primary);
+}
+
+.currentLang {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.flag {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.langText {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .langText {
+    display: none;
+  }
+  
+  .switchButton {
+    padding: 4px 8px;
+  }
+}
+

@@ -11,6 +11,8 @@ import {
   LoginOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
+import { useLanguageStore } from '../../stores/languageStore'
+import LanguageSwitch from '../LanguageSwitch/LanguageSwitch'
 import styles from './MainLayout.module.css'
 
 const { Header, Content, Footer } = Layout
@@ -24,23 +26,24 @@ const MainLayout = () => {
   const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { isAuthenticated, user, logout } = useAuthStore()
+  const { t } = useLanguageStore()
 
   // 导航菜单项
   const menuItems = [
     {
       key: '/',
       icon: <HomeOutlined />,
-      label: '首页',
+      label: t('nav.home'),
     },
     {
       key: '/analysis',
       icon: <FormOutlined />,
-      label: '开始分析',
+      label: t('nav.analysis'),
     },
     {
       key: '/history',
       icon: <HistoryOutlined />,
-      label: '历史记录',
+      label: t('nav.history'),
     },
   ]
 
@@ -49,7 +52,7 @@ const MainLayout = () => {
     {
       key: 'history',
       icon: <HistoryOutlined />,
-      label: '我的记录',
+      label: t('nav.myRecords'),
       onClick: () => navigate('/history'),
     },
     {
@@ -58,7 +61,7 @@ const MainLayout = () => {
     {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: '退出登录',
+      label: t('nav.logout'),
       onClick: () => {
         logout()
         navigate('/')
@@ -76,8 +79,8 @@ const MainLayout = () => {
         <div className={styles.headerContent}>
           {/* Logo */}
           <Link to="/" className={styles.logo}>
-            <span className={styles.logoIcon}>📚</span>
-            <span className={styles.logoText}>DSE插班分析</span>
+            <img src="/logo.svg" alt="Logo" className={styles.logoImage} />
+            <span className={styles.logoText}>{t('system.name')}</span>
           </Link>
 
           {/* 桌面端导航菜单 */}
@@ -91,6 +94,9 @@ const MainLayout = () => {
 
           {/* 右侧操作区 */}
           <div className={styles.headerRight}>
+            {/* 语言切换 */}
+            <LanguageSwitch />
+
             {isAuthenticated ? (
               <Dropdown
                 menu={{ items: userMenuItems }}
@@ -103,7 +109,7 @@ const MainLayout = () => {
                     icon={<UserOutlined />}
                     style={{ backgroundColor: 'var(--color-primary)' }}
                   />
-                  <span className={styles.userName}>{user?.name || '用户'}</span>
+                  <span className={styles.userName}>{user?.name || t('common.loading')}</span>
                 </div>
               </Dropdown>
             ) : (
@@ -113,7 +119,7 @@ const MainLayout = () => {
                 onClick={() => navigate('/login')}
                 className={styles.loginBtn}
               >
-                登录
+                {t('nav.login')}
               </Button>
             )}
 
@@ -130,7 +136,7 @@ const MainLayout = () => {
 
       {/* 移动端抽屉菜单 */}
       <Drawer
-        title="导航菜单"
+        title={t('nav.home')}
         placement="right"
         onClose={() => setMobileMenuOpen(false)}
         open={mobileMenuOpen}
@@ -146,7 +152,13 @@ const MainLayout = () => {
           }}
           style={{ border: 'none' }}
         />
-        <div style={{ padding: '16px', marginTop: '16px', borderTop: '1px solid var(--border-color)' }}>
+        
+        {/* 移动端语言切换 */}
+        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)' }}>
+          <LanguageSwitch />
+        </div>
+        
+        <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)' }}>
           {isAuthenticated ? (
             <Button
               block
@@ -157,7 +169,7 @@ const MainLayout = () => {
                 setMobileMenuOpen(false)
               }}
             >
-              退出登录
+              {t('nav.logout')}
             </Button>
           ) : (
             <Button
@@ -169,7 +181,7 @@ const MainLayout = () => {
                 setMobileMenuOpen(false)
               }}
             >
-              登录 / 注册
+              {t('nav.login')} / {t('nav.register')}
             </Button>
           )}
         </div>
@@ -185,13 +197,13 @@ const MainLayout = () => {
       {/* 底部版权信息 */}
       <Footer className={styles.footer}>
         <div className={styles.footerContent}>
-          <p>© 2024 DSE插班分析系统 | 专业的香港DSE升学辅导平台</p>
+          <p>{t('system.copyright')} | {t('system.slogan')}</p>
           <p className={styles.footerLinks}>
-            <Link to="/">关于我们</Link>
+            <Link to="/">{t('footer.aboutUs')}</Link>
             <span className={styles.divider}>|</span>
-            <Link to="/">使用条款</Link>
+            <Link to="/">{t('footer.terms')}</Link>
             <span className={styles.divider}>|</span>
-            <Link to="/">隐私政策</Link>
+            <Link to="/">{t('footer.privacy')}</Link>
           </p>
         </div>
       </Footer>
@@ -200,4 +212,3 @@ const MainLayout = () => {
 }
 
 export default MainLayout
-
