@@ -4,6 +4,88 @@
   padding: 24px 0;
 }
 
+/* 功能选择器样式 */
+.selectorContainer {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+}
+
+.selectorHeader {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.selectorCards {
+  margin-top: 24px;
+}
+
+.selectorCard {
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  height: 100%;
+  cursor: pointer;
+}
+
+.selectorCard:hover {
+  border-color: #1890ff;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(24, 144, 255, 0.15);
+}
+
+.selectorCardContent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.selectorIconWrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.selectorTextContent {
+  flex: 1;
+}
+
+.selectorTextContent h4 {
+  margin-bottom: 4px !important;
+}
+
+.selectorArrow {
+  font-size: 20px;
+  color: #bfbfbf;
+  transition: all 0.3s ease;
+}
+
+.selectorCard:hover .selectorArrow {
+  color: #1890ff;
+  transform: translateX(4px);
+}
+
+.selectorFeatures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.featureTag {
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%);
+  border-radius: 16px;
+  font-size: 12px;
+  color: #1890ff;
+}
+
 .formCard {
   border-radius: 16px;
   box-shadow: var(--shadow-lg);

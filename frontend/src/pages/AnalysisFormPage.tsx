@@ -25,6 +25,9 @@ import {
   CheckCircleOutlined,
   PlusOutlined,
   DeleteOutlined,
+  SwapOutlined,
+  RocketOutlined,
+  RightOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAnalysisStore, SubjectScore } from '../stores/analysisStore'
@@ -128,10 +131,88 @@ const HK_SCHOOLS = {
 const AnalysisFormPage = () => {
   const navigate = useNavigate()
   const [form] = Form.useForm()
+  const [showSelector, setShowSelector] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
   const [subjects, setSubjects] = useState<SubjectScore[]>([])
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
   const { updateFormData, submitAnalysis, loading } = useAnalysisStore()
+
+  // 处理分析类型选择
+  const handleSelectType = (type: 'transfer' | 'university') => {
+    if (type === 'university') {
+      navigate('/analysis/university')
+    } else {
+      setShowSelector(false)
+    }
+  }
+
+  // 功能选择器
+  const renderSelector = () => (
+    <div className={styles.selectorContainer}>
+      <div className={styles.selectorHeader}>
+        <Title level={2} className="gradient-title">
+          选择分析类型
+        </Title>
+        <Text type="secondary">
+          请选择您需要的分析服务
+        </Text>
+      </div>
+
+      <Row gutter={[24, 24]} className={styles.selectorCards}>
+        <Col xs={24} md={12}>
+          <Card 
+            className={styles.selectorCard}
+            hoverable
+            onClick={() => handleSelectType('transfer')}
+          >
+            <div className={styles.selectorCardContent}>
+              <div className={styles.selectorIconWrapper} style={{ backgroundColor: '#e6f7ff' }}>
+                <SwapOutlined style={{ fontSize: 28, color: '#1890ff' }} />
+              </div>
+              <div className={styles.selectorTextContent}>
+                <Title level={4}>插班分析</Title>
+                <Text type="secondary">
+                  分析学生的插班可行性，提供学校推荐、科目提升建议
+                </Text>
+              </div>
+              <RightOutlined className={styles.selectorArrow} />
+            </div>
+            <div className={styles.selectorFeatures}>
+              <span className={styles.featureTag}>智能学校推荐</span>
+              <span className={styles.featureTag}>科目分析</span>
+              <span className={styles.featureTag}>学习计划</span>
+            </div>
+          </Card>
+        </Col>
+
+        <Col xs={24} md={12}>
+          <Card 
+            className={styles.selectorCard}
+            hoverable
+            onClick={() => handleSelectType('university')}
+          >
+            <div className={styles.selectorCardContent}>
+              <div className={styles.selectorIconWrapper} style={{ backgroundColor: '#f6ffed' }}>
+                <RocketOutlined style={{ fontSize: 28, color: '#52c41a' }} />
+              </div>
+              <div className={styles.selectorTextContent}>
+                <Title level={4}>大学申请分析</Title>
+                <Text type="secondary">
+                  分析DSE成绩与目标大学专业的匹配度
+                </Text>
+              </div>
+              <RightOutlined className={styles.selectorArrow} />
+            </div>
+            <div className={styles.selectorFeatures}>
+              <span className={styles.featureTag}>录取概率分析</span>
+              <span className={styles.featureTag}>专业推荐</span>
+              <span className={styles.featureTag}>就业趋势</span>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  )
 
   // 步骤配置
   const steps = [
@@ -584,11 +665,27 @@ const AnalysisFormPage = () => {
     }
   }
 
+  // 如果显示选择器
+  if (showSelector) {
+    return (
+      <div className={styles.analysisFormPage}>
+        {renderSelector()}
+      </div>
+    )
+  }
+
   return (
     <div className={styles.analysisFormPage}>
       <Card className={styles.formCard}>
         {/* 页面标题 */}
         <div className={styles.pageHeader}>
+          <Button 
+            type="link" 
+            onClick={() => setShowSelector(true)}
+            style={{ padding: 0, marginBottom: 16 }}
+          >
+            ← 返回选择
+          </Button>
           <Title level={2} className="gradient-title">
             DSE插班分析
           </Title>

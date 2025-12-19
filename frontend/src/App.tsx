@@ -6,6 +6,7 @@ import MainLayout from './components/Layout/MainLayout'
 // 懒加载页面组件
 const HomePage = lazy(() => import('./pages/HomePage'))
 const AnalysisFormPage = lazy(() => import('./pages/AnalysisFormPage'))
+const UniversityAnalysisPage = lazy(() => import('./pages/UniversityAnalysisPage'))
 const ResultPage = lazy(() => import('./pages/ResultPage'))
 const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
@@ -44,6 +45,7 @@ function App() {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<HomePage />} />
           <Route path="analysis" element={<AnalysisFormPage />} />
+          <Route path="analysis/university" element={<UniversityAnalysisPage />} />
           <Route path="result/:id" element={<ResultPage />} />
           <Route path="history" element={<HistoryPage />} />
         </Route>
