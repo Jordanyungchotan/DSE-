@@ -244,54 +244,108 @@
 }
 
 .featureCard {
-  padding: 36px 28px;
+  padding: 40px 32px;
   height: 100%;
-  border-radius: 20px;
-  border: 1px solid var(--border-color);
+  border-radius: 24px;
+  border: none;
   transition: all var(--transition-normal);
-  background: white;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.featureCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .featureCard:hover {
-  transform: translateY(-10px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-  border-color: transparent;
+  transform: translateY(-8px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.12);
+}
+
+.featureCard:hover::before {
+  opacity: 1;
 }
 
 .featureIcon {
-  width: 72px;
-  height: 72px;
-  border-radius: 20px;
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
-  margin-bottom: 24px;
+  font-size: 2.25rem;
+  margin: 0 auto 28px;
+  position: relative;
+}
+
+.featureIcon::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 28px;
+  background: inherit;
+  opacity: 0.3;
+  filter: blur(8px);
+  z-index: -1;
 }
 
 .featureTitle {
-  margin-bottom: 20px !important;
-  font-size: 1.35rem !important;
+  margin-bottom: 24px !important;
+  font-size: 1.5rem !important;
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .featureList {
   list-style: none;
   padding: 0;
   margin: 0;
+  text-align: left;
 }
 
 .featureList li {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 12px;
   font-size: 0.95rem;
   color: var(--text-secondary);
-  line-height: 1.6;
+  line-height: 1.7;
+  background: rgba(43, 108, 176, 0.04);
+  border-radius: 14px;
+  transition: all 0.2s ease;
+}
+
+.featureList li:hover {
+  background: rgba(43, 108, 176, 0.08);
+  transform: translateX(4px);
+}
+
+.featureList li:last-child {
+  margin-bottom: 0;
+}
+
+.featureList li :global(.anticon) {
+  font-size: 1.1rem;
+  margin-top: 3px;
+  flex-shrink: 0;
 }
 
 .featureList li span {
   flex: 1;
+  font-weight: 500;
 }
 
 /* ===== 系统优势区域 ===== */
