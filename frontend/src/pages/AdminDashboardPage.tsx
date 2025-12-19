@@ -1,0 +1,416 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { 
+  Table, Card, Button, Tag, Space, Typography, message, 
+  Modal, Input, Select, Statistic, Row, Col, Tooltip 
+} from 'antd'
+import { 
+  DownloadOutlined, LogoutOutlined, ReloadOutlined, 
+  CheckCircleOutlined, ClockCircleOutlined, PhoneOutlined,
+  UserOutlined, MailOutlined, MessageOutlined
+} from '@ant-design/icons'
+import { apiFetch } from '../config/api'
+import styles from './AdminDashboardPage.module.css'
+
+const { Title, Text, Paragraph } = Typography
+const { TextArea } = Input
+
+interface Inquiry {
+  id: string
+  name: string
+  phone: string | null
+  email: string | null
+  message: string
+  status: 'pending' | 'contacted' | 'resolved'
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+const AdminDashboardPage = () => {
+  const navigate = useNavigate()
+  const [inquiries, setInquiries] = useState<Inquiry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedInquiry, setSelectedInquiry] = useState<Inquiry | null>(null)
+  const [modalVisible, setModalVisible] = useState(false)
+  const [editStatus, setEditStatus] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [updating, setUpdating] = useState(false)
+
+  const adminKey = sessionStorage.getItem('adminKey')
+
+  useEffect(() => {
+    if (!adminKey) {
+      navigate('/admin')
+      return
+    }
+    loadInquiries()
+  }, [adminKey, navigate])
+
+  const loadInquiries = async () => {
+    setLoading(true)
+    try {
+      const response = await apiFetch('/api/admin/inquiries', {
+        headers: { 'X-Admin-Key': adminKey || '' }
+      })
+      
+      if (!response.ok) {
+        throw new Error('加载失败')
+      }
+      
+      const data = await response.json()
+      setInquiries(data.inquiries || [])
+    } catch {
+      message.error('加载客户咨询失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('adminKey')
+    navigate('/admin')
+  }
+
+  const handleViewDetails = (inquiry: Inquiry) => {
+    setSelectedInquiry(inquiry)
+    setEditStatus(inquiry.status)
+    setEditNotes(inquiry.notes || '')
+    setModalVisible(true)
+  }
+
+  const handleUpdateStatus = async () => {
+    if (!selectedInquiry) return
+    
+    setUpdating(true)
+    try {
+      const response = await apiFetch(`/api/admin/inquiry/${selectedInquiry.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Key': adminKey || '' 
+        },
+        body: JSON.stringify({ status: editStatus, notes: editNotes })
+      })
+      
+      if (!response.ok) {
+        throw new Error('更新失败')
+      }
+      
+      message.success('更新成功')
+      setModalVisible(false)
+      loadInquiries()
+    } catch {
+      message.error('更新失败')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const exportToCSV = () => {
+    if (inquiries.length === 0) {
+      message.warning('没有数据可导出')
+      return
+    }
+
+    const headers = ['姓名', '电话', '邮箱', '咨询内容', '状态', '备注', '提交时间']
+    const statusMap: Record<string, string> = {
+      pending: '待处理',
+      contacted: '已联系',
+      resolved: '已解决'
+    }
+    
+    const rows = inquiries.map(item => [
+      item.name,
+      item.phone || '',
+      item.email || '',
+      item.message.replace(/,/g, '，').replace(/\n/g, ' '),
+      statusMap[item.status] || item.status,
+      (item.notes || '').replace(/,/g, '，').replace(/\n/g, ' '),
+      new Date(item.created_at).toLocaleString('zh-CN')
+    ])
+
+    const csvContent = '\uFEFF' + [headers, ...rows]
+      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `客户咨询_${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    
+    message.success('导出成功')
+  }
+
+  const getStatusTag = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Tag icon={<ClockCircleOutlined />} color="warning">待处理</Tag>
+      case 'contacted':
+        return <Tag icon={<PhoneOutlined />} color="processing">已联系</Tag>
+      case 'resolved':
+        return <Tag icon={<CheckCircleOutlined />} color="success">已解决</Tag>
+      default:
+        return <Tag>{status}</Tag>
+    }
+  }
+
+  const columns = [
+    {
+      title: '姓名',
+      dataIndex: 'name',
+      key: 'name',
+      width: 100,
+      render: (name: string) => (
+        <Space>
+          <UserOutlined />
+          <Text strong>{name}</Text>
+        </Space>
+      )
+    },
+    {
+      title: '联系方式',
+      key: 'contact',
+      width: 180,
+      render: (_: unknown, record: Inquiry) => (
+        <div>
+          {record.phone && (
+            <div><PhoneOutlined /> {record.phone}</div>
+          )}
+          {record.email && (
+            <div><MailOutlined /> {record.email}</div>
+          )}
+          {!record.phone && !record.email && (
+            <Text type="secondary">未提供</Text>
+          )}
+        </div>
+      )
+    },
+    {
+      title: '咨询内容',
+      dataIndex: 'message',
+      key: 'message',
+      ellipsis: true,
+      render: (message: string) => (
+        <Tooltip title={message}>
+          <Paragraph ellipsis={{ rows: 2 }} style={{ margin: 0 }}>
+            <MessageOutlined style={{ marginRight: 8 }} />
+            {message}
+          </Paragraph>
+        </Tooltip>
+      )
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      filters: [
+        { text: '待处理', value: 'pending' },
+        { text: '已联系', value: 'contacted' },
+        { text: '已解决', value: 'resolved' },
+      ],
+      onFilter: (value: unknown, record: Inquiry) => record.status === value,
+      render: (status: string) => getStatusTag(status)
+    },
+    {
+      title: '提交时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      width: 160,
+      sorter: (a: Inquiry, b: Inquiry) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      render: (date: string) => new Date(date).toLocaleString('zh-CN')
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 100,
+      render: (_: unknown, record: Inquiry) => (
+        <Button type="link" onClick={() => handleViewDetails(record)}>
+          查看详情
+        </Button>
+      )
+    }
+  ]
+
+  // 统计数据
+  const stats = {
+    total: inquiries.length,
+    pending: inquiries.filter(i => i.status === 'pending').length,
+    contacted: inquiries.filter(i => i.status === 'contacted').length,
+    resolved: inquiries.filter(i => i.status === 'resolved').length,
+  }
+
+  return (
+    <div className={styles.adminDashboard}>
+      <header className={styles.header}>
+        <div className={styles.headerContent}>
+          <Title level={3} style={{ margin: 0, color: '#fff' }}>
+            管理员后台
+          </Title>
+          <Button 
+            icon={<LogoutOutlined />} 
+            onClick={handleLogout}
+            type="text"
+            style={{ color: '#fff' }}
+          >
+            退出登录
+          </Button>
+        </div>
+      </header>
+
+      <main className={styles.main}>
+        {/* 统计卡片 */}
+        <Row gutter={[16, 16]} className={styles.statsRow}>
+          <Col xs={12} sm={6}>
+            <Card className={styles.statCard}>
+              <Statistic title="总咨询数" value={stats.total} />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className={`${styles.statCard} ${styles.pending}`}>
+              <Statistic 
+                title="待处理" 
+                value={stats.pending} 
+                valueStyle={{ color: '#faad14' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className={`${styles.statCard} ${styles.contacted}`}>
+              <Statistic 
+                title="已联系" 
+                value={stats.contacted}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className={`${styles.statCard} ${styles.resolved}`}>
+              <Statistic 
+                title="已解决" 
+                value={stats.resolved}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 数据表格 */}
+        <Card 
+          className={styles.tableCard}
+          title="客户咨询列表"
+          extra={
+            <Space>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={loadInquiries}
+                loading={loading}
+              >
+                刷新
+              </Button>
+              <Button 
+                type="primary" 
+                icon={<DownloadOutlined />} 
+                onClick={exportToCSV}
+              >
+                导出CSV
+              </Button>
+            </Space>
+          }
+        >
+          <Table
+            columns={columns}
+            dataSource={inquiries}
+            rowKey="id"
+            loading={loading}
+            pagination={{
+              pageSize: 10,
+              showTotal: (total) => `共 ${total} 条记录`
+            }}
+            scroll={{ x: 800 }}
+          />
+        </Card>
+      </main>
+
+      {/* 详情弹窗 */}
+      <Modal
+        title="咨询详情"
+        open={modalVisible}
+        onCancel={() => setModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setModalVisible(false)}>
+            取消
+          </Button>,
+          <Button 
+            key="save" 
+            type="primary" 
+            loading={updating}
+            onClick={handleUpdateStatus}
+          >
+            保存
+          </Button>
+        ]}
+        width={600}
+      >
+        {selectedInquiry && (
+          <div className={styles.detailContent}>
+            <div className={styles.detailItem}>
+              <Text type="secondary">姓名：</Text>
+              <Text strong>{selectedInquiry.name}</Text>
+            </div>
+            <div className={styles.detailItem}>
+              <Text type="secondary">电话：</Text>
+              <Text>{selectedInquiry.phone || '未提供'}</Text>
+            </div>
+            <div className={styles.detailItem}>
+              <Text type="secondary">邮箱：</Text>
+              <Text>{selectedInquiry.email || '未提供'}</Text>
+            </div>
+            <div className={styles.detailItem}>
+              <Text type="secondary">咨询内容：</Text>
+              <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
+                {selectedInquiry.message}
+              </Paragraph>
+            </div>
+            <div className={styles.detailItem}>
+              <Text type="secondary">提交时间：</Text>
+              <Text>{new Date(selectedInquiry.created_at).toLocaleString('zh-CN')}</Text>
+            </div>
+            
+            <div className={styles.editSection}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">状态：</Text>
+                <Select
+                  value={editStatus}
+                  onChange={setEditStatus}
+                  style={{ width: 150 }}
+                  options={[
+                    { value: 'pending', label: '待处理' },
+                    { value: 'contacted', label: '已联系' },
+                    { value: 'resolved', label: '已解决' },
+                  ]}
+                />
+              </div>
+              <div className={styles.detailItem}>
+                <Text type="secondary">备注：</Text>
+                <TextArea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  rows={3}
+                  placeholder="添加跟进备注..."
+                  style={{ marginTop: 8 }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  )
+}
+
+export default AdminDashboardPage
+

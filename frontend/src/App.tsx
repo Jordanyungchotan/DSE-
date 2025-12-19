@@ -12,6 +12,10 @@ const UniversityResultPage = lazy(() => import('./pages/UniversityResultPage'))
 const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 
+// 管理员后台页面
+const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
+
 // 加载中组件
 const LoadingFallback = () => (
   <div style={{ 
@@ -41,6 +45,10 @@ function App() {
       <Routes>
         {/* 登录页面 - 独立布局 */}
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* 管理员后台 - 独立布局 */}
+        <Route path="/admin" element={<AdminLoginPage />} />
+        <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
         
         {/* 主布局路由 */}
         <Route path="/" element={<MainLayout />}>
