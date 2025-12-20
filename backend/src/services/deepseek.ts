@@ -123,15 +123,33 @@ const buildAnalysisPrompt = (studentInfo: StudentInfo): string => {
   // 获取年级显示名称
   const gradeName = GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade
 
-  return `你是一位资深的香港DSE教育专家，拥有超过15年的DSE教学和升学辅导经验。请根据以下【完整的】学生信息，提供专业、详细、可行的插班分析和建议。
+  return `你是一位资深的香港DSE教育专家，拥有超过15年的DSE教学和升学辅导经验。
 
-## 学生信息（以下信息均已完整提供）
+## ⚠️ 重要：禁止使用的表述
 
-- **插班日期**：${studentInfo.enrollmentDate}
-- **目标学期**：${studentInfo.semester}
-- **就读年级**：${gradeName}（已明确）
-- **学生年龄**：${studentInfo.age}岁（已明确）
-- **当前学校**：${studentInfo.currentSchool || '未填写'}
+在你的回复中，**绝对禁止**使用以下任何表述：
+- "年级信息未明确"
+- "年龄信息未明确"  
+- "信息未明确"
+- "信息不完整"
+- "信息缺失"
+- "无法确定年级"
+- "需要明确年级"
+- "由于年级信息未明确"
+
+学生的年级是【${gradeName}】，年龄是【${studentInfo.age}岁】，这些信息已经100%明确提供，请直接使用。
+
+---
+
+## 学生完整信息
+
+| 项目 | 信息 |
+|------|------|
+| 插班日期 | ${studentInfo.enrollmentDate} |
+| 目标学期 | ${studentInfo.semester} |
+| **就读年级** | **${gradeName}** ✓ |
+| **学生年龄** | **${studentInfo.age}岁** ✓ |
+| 当前学校 | ${studentInfo.currentSchool || '未填写'} |
 
 ### 各科目成绩（共${studentInfo.subjects.length}个科目）
 
@@ -147,16 +165,14 @@ ${studentInfo.notes || '无'}
 
 ---
 
-**重要提示**：以上学生信息已完整提供，包括年级（${gradeName}）和年龄（${studentInfo.age}岁）。请在分析中直接引用这些信息，不要说"信息未明确"或"信息不完整"。
-
 请以JSON格式返回分析结果，严格按照以下结构：
 
 {
   "overallAssessment": {
     "feasibilityScore": <0-100的整数，表示插班成功的可行性评分>,
-    "summary": "<200-300字的综合评估，必须包含对该${gradeName}、${studentInfo.age}岁学生的具体情况分析>",
+    "summary": "<200-300字的综合评估，开头必须写'该${gradeName}学生，${studentInfo.age}岁，...'，然后分析具体情况>",
     "keyStrengths": ["<优势1>", "<优势2>", "<优势3>"],
-    "keyWeaknesses": ["<待改进项1>", "<待改进项2>", "<待改进项3>"]
+    "keyWeaknesses": ["<待改进项1，不能说年级信息未明确>", "<待改进项2>", "<待改进项3>"]
   },
   "subjectAnalyses": [
     {
@@ -190,10 +206,10 @@ ${studentInfo.notes || '无'}
 注意事项：
 1. 所有分析必须基于香港DSE考试的真实情况和标准
 2. 对目标学校的评估要考虑该校的实际录取标准和竞争程度
-3. 建议要具体、可操作、有时间节点，针对${gradeName}学生的实际情况
+3. 建议要具体、可操作，针对${gradeName}（${studentInfo.age}岁）学生的实际情况
 4. 评分要客观，不要过于乐观或悲观
 5. 只返回JSON，不要有任何其他文字
-6. 在summary中必须明确提及学生的年级（${gradeName}）和年龄（${studentInfo.age}岁），不要说信息未提供`
+6. **再次强调：禁止在任何地方说"年级信息未明确"，学生就读${gradeName}，${studentInfo.age}岁**`
 }
 
 /**
@@ -220,7 +236,12 @@ export const analyzeWithDeepSeek = async (studentInfo: StudentInfo): Promise<Ana
         messages: [
           {
             role: 'system',
-            content: '你是一位专业的香港DSE教育顾问，擅长分析学生情况并提供升学建议。请用JSON格式回复。',
+            content: `你是一位专业的香港DSE教育顾问，擅长分析学生情况并提供升学建议。
+
+重要规则：
+1. 用户提供的学生信息（年级、年龄等）都是完整的，绝对不要说"信息未明确"、"信息不完整"、"年级信息未明确"等类似表述
+2. 直接使用用户提供的年级和年龄进行分析
+3. 只返回JSON格式的分析结果`,
           },
           {
             role: 'user',
