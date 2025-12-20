@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Card,
@@ -11,7 +11,8 @@ import {
   Input,
   Tag,
   message,
-  Spin,
+  Modal,
+  Progress,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -19,6 +20,8 @@ import {
   RocketOutlined,
   BookOutlined,
   TrophyOutlined,
+  LoadingOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { apiFetch } from '../config/api'
 import styles from './UniversityAnalysisPage.module.css'
@@ -77,6 +80,19 @@ interface DseResult {
 }
 
 /**
+ * 分析进度阶段
+ */
+const ANALYSIS_STAGES = [
+  { progress: 10, text: '正在连接AI分析服务...' },
+  { progress: 25, text: '正在解析DSE成绩数据...' },
+  { progress: 40, text: '正在匹配大学录取要求...' },
+  { progress: 55, text: '正在分析专业适配度...' },
+  { progress: 70, text: '正在评估录取概率...' },
+  { progress: 85, text: '正在生成申请建议...' },
+  { progress: 95, text: '即将完成，请稍候...' },
+]
+
+/**
  * 大学申请分析页面
  */
 const UniversityAnalysisPage = () => {
@@ -89,6 +105,32 @@ const UniversityAnalysisPage = () => {
     { subject: 'math', grade: '' },
     { subject: 'liberal', grade: '' },
   ])
+
+  // 分析进度状态
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [analysisStage, setAnalysisStage] = useState('')
+
+  // 模拟分析进度
+  useEffect(() => {
+    if (loading) {
+      setAnalysisProgress(0)
+      setAnalysisStage(ANALYSIS_STAGES[0].text)
+      
+      let stageIndex = 0
+      const interval = setInterval(() => {
+        stageIndex++
+        if (stageIndex < ANALYSIS_STAGES.length) {
+          setAnalysisProgress(ANALYSIS_STAGES[stageIndex].progress)
+          setAnalysisStage(ANALYSIS_STAGES[stageIndex].text)
+        }
+      }, 8000) // 每8秒更新一次进度
+
+      return () => clearInterval(interval)
+    } else {
+      setAnalysisProgress(0)
+      setAnalysisStage('')
+    }
+  }, [loading])
 
   // 添加科目
   const addSubject = () => {
@@ -179,13 +221,12 @@ const UniversityAnalysisPage = () => {
         </div>
       </div>
 
-      <Spin spinning={loading} tip="正在分析中，请稍候...">
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleSubmit}
-          className={styles.form}
-        >
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={handleSubmit}
+        className={styles.form}
+      >
           {/* DSE成绩输入 */}
           <Card 
             title={<><BookOutlined /> DSE成绩</>}
@@ -323,7 +364,53 @@ const UniversityAnalysisPage = () => {
             </Button>
           </div>
         </Form>
-      </Spin>
+
+      {/* AI分析进度弹窗 */}
+      <Modal
+        open={loading}
+        closable={false}
+        footer={null}
+        centered
+        width={480}
+        maskClosable={false}
+        className={styles.analysisModal}
+      >
+        <div className={styles.analysisModalContent}>
+          <div className={styles.analysisIconWrapper}>
+            <RobotOutlined className={styles.analysisIcon} />
+            <div className={styles.analysisIconPulse} />
+          </div>
+          
+          <Title level={3} style={{ marginBottom: 8, marginTop: 24 }}>
+            AI 正在分析中
+          </Title>
+          
+          <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
+            请耐心等待，分析过程通常需要 1-2 分钟
+          </Text>
+          
+          <Progress 
+            percent={analysisProgress} 
+            status="active"
+            strokeColor={{
+              '0%': '#52c41a',
+              '100%': '#1890ff',
+            }}
+            style={{ marginBottom: 16 }}
+          />
+          
+          <div className={styles.analysisStage}>
+            <LoadingOutlined style={{ marginRight: 8 }} />
+            <span>{analysisStage || '准备中...'}</span>
+          </div>
+          
+          <div className={styles.analysisTips}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              💡 提示：AI正在分析您的成绩与各大学专业的匹配度
+            </Text>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

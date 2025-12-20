@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Form,
@@ -16,6 +16,8 @@ import {
   message,
   Divider,
   Tag,
+  Modal,
+  Progress,
 } from 'antd'
 import {
   CalendarOutlined,
@@ -28,6 +30,8 @@ import {
   SwapOutlined,
   RocketOutlined,
   RightOutlined,
+  LoadingOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAnalysisStore, SubjectScore } from '../stores/analysisStore'
@@ -159,6 +163,19 @@ const HK_SCHOOLS = {
 }
 
 /**
+ * 分析进度阶段
+ */
+const ANALYSIS_STAGES = [
+  { progress: 10, text: '正在连接AI分析服务...' },
+  { progress: 25, text: '正在解析学生信息...' },
+  { progress: 40, text: '正在分析各科目成绩...' },
+  { progress: 55, text: '正在评估目标学校录取概率...' },
+  { progress: 70, text: '正在生成学习计划建议...' },
+  { progress: 85, text: '正在整理分析报告...' },
+  { progress: 95, text: '即将完成，请稍候...' },
+]
+
+/**
  * 分析表单页面组件
  */
 const AnalysisFormPage = () => {
@@ -169,6 +186,32 @@ const AnalysisFormPage = () => {
   const [subjects, setSubjects] = useState<SubjectScore[]>([])
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
   const { updateFormData, submitAnalysis, loading } = useAnalysisStore()
+
+  // 分析进度状态
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [analysisStage, setAnalysisStage] = useState('')
+
+  // 模拟分析进度
+  useEffect(() => {
+    if (loading) {
+      setAnalysisProgress(0)
+      setAnalysisStage(ANALYSIS_STAGES[0].text)
+      
+      let stageIndex = 0
+      const interval = setInterval(() => {
+        stageIndex++
+        if (stageIndex < ANALYSIS_STAGES.length) {
+          setAnalysisProgress(ANALYSIS_STAGES[stageIndex].progress)
+          setAnalysisStage(ANALYSIS_STAGES[stageIndex].text)
+        }
+      }, 8000) // 每8秒更新一次进度
+
+      return () => clearInterval(interval)
+    } else {
+      setAnalysisProgress(0)
+      setAnalysisStage('')
+    }
+  }, [loading])
 
   // 处理分析类型选择
   const handleSelectType = (type: 'transfer' | 'university') => {
@@ -808,6 +851,53 @@ const AnalysisFormPage = () => {
           </Space>
         </div>
       </Card>
+
+      {/* AI分析进度弹窗 */}
+      <Modal
+        open={loading}
+        closable={false}
+        footer={null}
+        centered
+        width={480}
+        maskClosable={false}
+        className={styles.analysisModal}
+      >
+        <div className={styles.analysisModalContent}>
+          <div className={styles.analysisIconWrapper}>
+            <RobotOutlined className={styles.analysisIcon} />
+            <div className={styles.analysisIconPulse} />
+          </div>
+          
+          <Title level={3} style={{ marginBottom: 8, marginTop: 24 }}>
+            AI 正在分析中
+          </Title>
+          
+          <Paragraph type="secondary" style={{ marginBottom: 24 }}>
+            请耐心等待，分析过程通常需要 1-2 分钟
+          </Paragraph>
+          
+          <Progress 
+            percent={analysisProgress} 
+            status="active"
+            strokeColor={{
+              '0%': '#1890ff',
+              '100%': '#52c41a',
+            }}
+            style={{ marginBottom: 16 }}
+          />
+          
+          <div className={styles.analysisStage}>
+            <LoadingOutlined style={{ marginRight: 8 }} />
+            <span>{analysisStage || '准备中...'}</span>
+          </div>
+          
+          <div className={styles.analysisTips}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              💡 提示：AI正在综合分析您的成绩、目标学校录取标准等多维度数据
+            </Text>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
