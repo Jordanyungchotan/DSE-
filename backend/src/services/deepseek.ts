@@ -120,21 +120,24 @@ const buildAnalysisPrompt = (studentInfo: StudentInfo): string => {
   // 格式化目标学校
   const schoolsText = studentInfo.targetSchools.join('、')
 
-  return `你是一位资深的香港DSE教育专家，拥有超过15年的DSE教学和升学辅导经验。请根据以下学生信息，提供专业、详细、可行的插班分析和建议。
+  // 获取年级显示名称
+  const gradeName = GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade
 
-## 学生信息
+  return `你是一位资深的香港DSE教育专家，拥有超过15年的DSE教学和升学辅导经验。请根据以下【完整的】学生信息，提供专业、详细、可行的插班分析和建议。
+
+## 学生信息（以下信息均已完整提供）
 
 - **插班日期**：${studentInfo.enrollmentDate}
 - **目标学期**：${studentInfo.semester}
-- **就读年级**：${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}
-- **学生年龄**：${studentInfo.age}岁
+- **就读年级**：${gradeName}（已明确）
+- **学生年龄**：${studentInfo.age}岁（已明确）
 - **当前学校**：${studentInfo.currentSchool || '未填写'}
 
-### 各科目成绩
+### 各科目成绩（共${studentInfo.subjects.length}个科目）
 
 ${subjectsText}
 
-### 目标学校
+### 目标学校（共${studentInfo.targetSchools.length}所）
 
 ${schoolsText}
 
@@ -144,12 +147,14 @@ ${studentInfo.notes || '无'}
 
 ---
 
+**重要提示**：以上学生信息已完整提供，包括年级（${gradeName}）和年龄（${studentInfo.age}岁）。请在分析中直接引用这些信息，不要说"信息未明确"或"信息不完整"。
+
 请以JSON格式返回分析结果，严格按照以下结构：
 
 {
   "overallAssessment": {
     "feasibilityScore": <0-100的整数，表示插班成功的可行性评分>,
-    "summary": "<200-300字的综合评估，包括对学生整体情况的分析>",
+    "summary": "<200-300字的综合评估，必须包含对该${gradeName}、${studentInfo.age}岁学生的具体情况分析>",
     "keyStrengths": ["<优势1>", "<优势2>", "<优势3>"],
     "keyWeaknesses": ["<待改进项1>", "<待改进项2>", "<待改进项3>"]
   },
@@ -185,9 +190,10 @@ ${studentInfo.notes || '无'}
 注意事项：
 1. 所有分析必须基于香港DSE考试的真实情况和标准
 2. 对目标学校的评估要考虑该校的实际录取标准和竞争程度
-3. 建议要具体、可操作、有时间节点
+3. 建议要具体、可操作、有时间节点，针对${gradeName}学生的实际情况
 4. 评分要客观，不要过于乐观或悲观
-5. 只返回JSON，不要有任何其他文字`
+5. 只返回JSON，不要有任何其他文字
+6. 在summary中必须明确提及学生的年级（${gradeName}）和年龄（${studentInfo.age}岁），不要说信息未提供`
 }
 
 /**
