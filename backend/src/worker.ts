@@ -1128,6 +1128,50 @@ export default {
         return jsonResponse({ message: '删除成功' }, 200, origin)
       }
 
+      // 获取系统统计数据（管理员专用）
+      if (path === '/api/admin/stats' && request.method === 'GET') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        // 获取用户总数
+        const usersCount = await env.DB.prepare(
+          'SELECT COUNT(*) as count FROM users'
+        ).first() as { count: number } | null
+
+        // 获取今日新注册用户数
+        const today = new Date().toISOString().split('T')[0]
+        const todayUsersCount = await env.DB.prepare(
+          'SELECT COUNT(*) as count FROM users WHERE DATE(created_at) = ?'
+        ).bind(today).first() as { count: number } | null
+
+        // 获取分析记录总数
+        const analysisCount = await env.DB.prepare(
+          'SELECT COUNT(*) as count FROM analysis_records'
+        ).first() as { count: number } | null
+
+        // 获取今日分析数
+        const todayAnalysisCount = await env.DB.prepare(
+          'SELECT COUNT(*) as count FROM analysis_records WHERE DATE(created_at) = ?'
+        ).bind(today).first() as { count: number } | null
+
+        // 获取最近注册的用户列表（最近10个）
+        const recentUsers = await env.DB.prepare(
+          'SELECT id, name, email, created_at FROM users ORDER BY created_at DESC LIMIT 10'
+        ).all()
+
+        return jsonResponse({
+          stats: {
+            totalUsers: usersCount?.count || 0,
+            todayUsers: todayUsersCount?.count || 0,
+            totalAnalysis: analysisCount?.count || 0,
+            todayAnalysis: todayAnalysisCount?.count || 0,
+          },
+          recentUsers: recentUsers.results || [],
+        }, 200, origin)
+      }
+
       // 根路径 - 显示 API 状态
       if (path === '/' || path === '') {
         return jsonResponse({

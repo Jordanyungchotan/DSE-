@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Table, Card, Button, Tag, Space, Typography, message, 
-  Modal, Input, Select, Statistic, Row, Col, Tooltip 
+  Modal, Input, Select, Statistic, Row, Col, Tooltip, Divider, List, Avatar
 } from 'antd'
 import { 
   DownloadOutlined, LogoutOutlined, ReloadOutlined, 
   CheckCircleOutlined, ClockCircleOutlined, PhoneOutlined,
   UserOutlined, MailOutlined, MessageOutlined, DeleteOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined, TeamOutlined, BarChartOutlined,
+  RiseOutlined
 } from '@ant-design/icons'
 import { apiFetch } from '../config/api'
 import styles from './AdminDashboardPage.module.css'
@@ -28,6 +29,20 @@ interface Inquiry {
   updated_at: string
 }
 
+interface SystemStats {
+  totalUsers: number
+  todayUsers: number
+  totalAnalysis: number
+  todayAnalysis: number
+}
+
+interface RecentUser {
+  id: string
+  name: string
+  email: string
+  created_at: string
+}
+
 const AdminDashboardPage = () => {
   const navigate = useNavigate()
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
@@ -37,6 +52,15 @@ const AdminDashboardPage = () => {
   const [editStatus, setEditStatus] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [updating, setUpdating] = useState(false)
+  
+  // 系统统计数据
+  const [systemStats, setSystemStats] = useState<SystemStats>({
+    totalUsers: 0,
+    todayUsers: 0,
+    totalAnalysis: 0,
+    todayAnalysis: 0,
+  })
+  const [recentUsers, setRecentUsers] = useState<RecentUser[]>([])
 
   const adminKey = sessionStorage.getItem('adminKey')
 
@@ -46,7 +70,25 @@ const AdminDashboardPage = () => {
       return
     }
     loadInquiries()
+    loadSystemStats()
   }, [adminKey, navigate])
+
+  // 加载系统统计数据
+  const loadSystemStats = async () => {
+    try {
+      const response = await apiFetch('/api/admin/stats', {
+        headers: { 'X-Admin-Key': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSystemStats(data.stats)
+        setRecentUsers(data.recentUsers || [])
+      }
+    } catch {
+      console.error('加载统计数据失败')
+    }
+  }
 
   const loadInquiries = async () => {
     setLoading(true)
@@ -301,7 +343,82 @@ const AdminDashboardPage = () => {
       </header>
 
       <main className={styles.main}>
-        {/* 统计卡片 */}
+        {/* 系统概览统计 */}
+        <Row gutter={[16, 16]} className={styles.statsRow}>
+          <Col xs={12} sm={6}>
+            <Card className={styles.statCard}>
+              <Statistic 
+                title="注册用户总数" 
+                value={systemStats.totalUsers}
+                prefix={<TeamOutlined />}
+                valueStyle={{ color: '#722ed1' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className={styles.statCard}>
+              <Statistic 
+                title="今日新用户" 
+                value={systemStats.todayUsers}
+                prefix={<RiseOutlined />}
+                valueStyle={{ color: '#13c2c2' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className={styles.statCard}>
+              <Statistic 
+                title="分析报告总数" 
+                value={systemStats.totalAnalysis}
+                prefix={<BarChartOutlined />}
+                valueStyle={{ color: '#1890ff' }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} sm={6}>
+            <Card className={styles.statCard}>
+              <Statistic 
+                title="今日分析数" 
+                value={systemStats.todayAnalysis}
+                prefix={<RiseOutlined />}
+                valueStyle={{ color: '#52c41a' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* 最近注册用户 */}
+        {recentUsers.length > 0 && (
+          <Card 
+            title="最近注册用户" 
+            className={styles.tableCard}
+            style={{ marginBottom: 24 }}
+          >
+            <List
+              itemLayout="horizontal"
+              dataSource={recentUsers}
+              renderItem={(user) => (
+                <List.Item>
+                  <List.Item.Meta
+                    avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#722ed1' }} />}
+                    title={user.name}
+                    description={
+                      <Space split={<Divider type="vertical" />}>
+                        <span><MailOutlined /> {user.email}</span>
+                        <span>注册时间: {new Date(user.created_at).toLocaleString('zh-CN')}</span>
+                      </Space>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          </Card>
+        )}
+
+        <Divider />
+
+        {/* 咨询统计卡片 */}
+        <Title level={4} style={{ marginBottom: 16 }}>客户咨询管理</Title>
         <Row gutter={[16, 16]} className={styles.statsRow}>
           <Col xs={12} sm={6}>
             <Card className={styles.statCard}>
