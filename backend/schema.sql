@@ -187,6 +187,73 @@ CREATE TABLE IF NOT EXISTS customer_inquiries (
 );
 
 -- =====================
+-- 智能刷题相关表
+-- =====================
+
+-- 刷题会话表
+CREATE TABLE IF NOT EXISTS quiz_sessions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  config TEXT NOT NULL, -- JSON: 刷题配置
+  status TEXT DEFAULT 'active', -- 'active' | 'completed' | 'paused'
+  questions TEXT NOT NULL, -- JSON: 生成的题目列表
+  start_time TEXT DEFAULT CURRENT_TIMESTAMP,
+  end_time TEXT,
+  score INTEGER,
+  accuracy REAL,
+  total_time INTEGER, -- 总用时（秒）
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- 用户答案记录表
+CREATE TABLE IF NOT EXISTS quiz_answers (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  question_id TEXT NOT NULL,
+  user_answer TEXT,
+  is_correct INTEGER, -- 0/1
+  time_spent INTEGER, -- 答题用时（秒）
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (session_id) REFERENCES quiz_sessions(id) ON DELETE CASCADE
+);
+
+-- 学习进度表
+CREATE TABLE IF NOT EXISTS learning_progress (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  total_attempts INTEGER DEFAULT 0,
+  correct_attempts INTEGER DEFAULT 0,
+  last_practiced TEXT,
+  confidence_score REAL DEFAULT 0, -- 掌握信心度 0-1
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(user_id, subject, topic)
+);
+
+-- 错题本表
+CREATE TABLE IF NOT EXISTS wrong_questions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  question_id TEXT NOT NULL,
+  question_text TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  topic TEXT,
+  user_answer TEXT,
+  correct_answer TEXT,
+  explanation TEXT,
+  first_attempt_date TEXT DEFAULT CURRENT_TIMESTAMP,
+  last_attempt_date TEXT,
+  wrong_count INTEGER DEFAULT 1,
+  status TEXT DEFAULT 'unreviewed', -- 'unreviewed' | 'reviewed' | 'mastered'
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================
 -- 索引
 -- =====================
 
@@ -201,5 +268,14 @@ CREATE INDEX IF NOT EXISTS idx_schools_banding ON hk_schools(banding);
 CREATE INDEX IF NOT EXISTS idx_programs_university ON university_programs(university_code);
 CREATE INDEX IF NOT EXISTS idx_programs_category ON university_programs(category);
 CREATE INDEX IF NOT EXISTS idx_trends_industry ON employment_trends(industry);
-CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id)
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON user_favorites(user_id);
+
+-- 刷题相关索引
+CREATE INDEX IF NOT EXISTS idx_quiz_sessions_user ON quiz_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_sessions_status ON quiz_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_quiz_answers_session ON quiz_answers(session_id);
+CREATE INDEX IF NOT EXISTS idx_learning_progress_user ON learning_progress(user_id);
+CREATE INDEX IF NOT EXISTS idx_learning_progress_subject ON learning_progress(subject);
+CREATE INDEX IF NOT EXISTS idx_wrong_questions_user ON wrong_questions(user_id);
+CREATE INDEX IF NOT EXISTS idx_wrong_questions_subject ON wrong_questions(subject)
 

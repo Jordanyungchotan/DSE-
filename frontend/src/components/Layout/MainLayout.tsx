@@ -9,6 +9,7 @@ import {
   UserOutlined,
   LogoutOutlined,
   LoginOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import { useLanguageStore } from '../../stores/languageStore'
@@ -39,6 +40,11 @@ const MainLayout = () => {
       key: '/analysis',
       icon: <FormOutlined />,
       label: t('nav.analysis'),
+    },
+    {
+      key: '/quiz',
+      icon: <ExperimentOutlined />,
+      label: '智能刷题',
     },
     {
       key: '/history',

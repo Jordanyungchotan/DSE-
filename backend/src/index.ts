@@ -15,6 +15,7 @@ import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import { authRouter } from './routes/auth.js'
 import { analysisRouter } from './routes/analysis.js'
+import { quizRouter } from './routes/quiz.js'
 import { errorHandler } from './middleware/errorHandler.js'
 import { initDatabase } from './database/init.js'
 
@@ -67,6 +68,9 @@ app.use('/api/auth', authRouter)
 
 // 分析路由
 app.use('/api/analysis', analysisRouter)
+
+// 刷题路由
+app.use('/api/quiz', quizRouter)
 
 // ===== 错误处理 =====
 app.use(errorHandler)

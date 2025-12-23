@@ -1,0 +1,436 @@
+/* ===== DSE智能刷题 - 结果页面样式 ===== */
+
+.resultPage {
+  padding-bottom: 48px;
+  min-height: 100vh;
+}
+
+/* ===== 顶部英雄区域 ===== */
+.heroSection {
+  text-align: center;
+  padding: 60px 0 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroSection::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 20%, rgba(82, 196, 26, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(214, 158, 46, 0.08) 0%, transparent 50%);
+  z-index: 0;
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+}
+
+.trophyIcon {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 24px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: white;
+  box-shadow: 0 15px 40px rgba(255, 179, 0, 0.4);
+  animation: bounce 0.6s ease;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.heroTitle {
+  margin-bottom: 16px !important;
+}
+
+.sessionInfo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 1rem;
+}
+
+/* ===== 成绩区域 ===== */
+.scoreSection {
+  margin-bottom: 24px;
+}
+
+.mainScoreCard {
+  border-radius: 24px;
+  border: none;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  height: 100%;
+}
+
+.mainScoreCard :global(.ant-card-body) {
+  padding: 36px;
+}
+
+.scoreCircle {
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 24px;
+  background: linear-gradient(145deg, #f0f0f0, #ffffff);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 
+    inset 0 -5px 10px rgba(0, 0, 0, 0.05),
+    0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+.scoreValue {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.accuracyBar {
+  background: var(--bg-secondary);
+  padding: 20px;
+  border-radius: 16px;
+}
+
+.accuracyLabel {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.accuracyValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.statsCard {
+  border-radius: 24px;
+  border: none;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  height: 100%;
+}
+
+.statsCard :global(.ant-card-body) {
+  padding: 36px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.statItem {
+  text-align: center;
+}
+
+.statIcon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.statLabel {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* ===== AI建议卡片 ===== */
+.recommendCard {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.recommendCard :global(.ant-card-body) {
+  padding: 28px;
+}
+
+.recommendHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.recommendIcon {
+  font-size: 1.5rem;
+  color: var(--color-accent);
+}
+
+.recommendHeader h4 {
+  margin: 0 !important;
+}
+
+.recommendList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recommendItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.recommendItem:hover {
+  background: rgba(43, 108, 176, 0.08);
+  transform: translateX(5px);
+}
+
+.recommendArrow {
+  color: var(--color-primary);
+  margin-top: 4px;
+}
+
+/* ===== 详细答题记录 ===== */
+.detailCard {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  margin-bottom: 32px;
+}
+
+.detailCard :global(.ant-card-body) {
+  padding: 28px;
+}
+
+.detailTitle {
+  margin-bottom: 20px !important;
+}
+
+.detailCollapse {
+  border: none;
+  background: transparent;
+}
+
+.detailCollapse :global(.ant-collapse-item) {
+  border: 1px solid var(--border-color);
+  border-radius: 14px !important;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.detailCollapse :global(.ant-collapse-header) {
+  padding: 16px 20px !important;
+  background: var(--bg-secondary);
+}
+
+.detailCollapse :global(.ant-collapse-content-box) {
+  padding: 20px !important;
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.questionNum {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.answerDetail {
+  line-height: 1.8;
+}
+
+.questionText {
+  margin-bottom: 16px;
+}
+
+.questionText p {
+  margin-top: 8px !important;
+  margin-bottom: 0 !important;
+}
+
+.answerCompare {
+  display: flex;
+  gap: 24px;
+}
+
+.answerItem {
+  flex: 1;
+}
+
+.answerBox {
+  margin-top: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.answerBox.correct {
+  background: rgba(82, 196, 26, 0.1);
+  border: 1px solid var(--color-success);
+  color: var(--color-success);
+}
+
+.answerBox.incorrect {
+  background: rgba(245, 34, 45, 0.1);
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+}
+
+.explanationSection {
+  margin-top: 16px;
+}
+
+.explanationText {
+  margin-top: 8px !important;
+  margin-bottom: 0 !important;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  color: var(--text-secondary);
+}
+
+/* ===== 操作按钮 ===== */
+.actionSection {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.homeButton {
+  height: 52px;
+  padding: 0 32px;
+  font-size: 1rem;
+  border-radius: 14px;
+}
+
+.restartButton {
+  height: 52px;
+  padding: 0 48px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  box-shadow: 0 8px 20px rgba(43, 108, 176, 0.3);
+}
+
+.restartButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(43, 108, 176, 0.4);
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+  .heroSection {
+    padding: 40px 0 32px;
+  }
+
+  .trophyIcon {
+    width: 80px;
+    height: 80px;
+    font-size: 2.5rem;
+  }
+
+  .scoreCircle {
+    width: 120px;
+    height: 120px;
+  }
+
+  .scoreValue {
+    font-size: 2.75rem;
+  }
+
+  .mainScoreCard :global(.ant-card-body),
+  .statsCard :global(.ant-card-body) {
+    padding: 24px;
+  }
+
+  .statValue {
+    font-size: 1.5rem;
+  }
+
+  .statIcon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
+
+  .answerCompare {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .actionSection {
+    flex-direction: column;
+    padding: 0 16px;
+  }
+
+  .homeButton,
+  .restartButton {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .sessionInfo {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .recommendItem {
+    padding: 12px;
+  }
+
+  .detailCollapse :global(.ant-collapse-header) {
+    padding: 12px 16px !important;
+  }
+
+  .panelHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+

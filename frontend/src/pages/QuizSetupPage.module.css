@@ -1,0 +1,546 @@
+/* ===== DSE智能刷题 - 配置页面样式 ===== */
+
+.setupPage {
+  padding-bottom: 48px;
+  min-height: 100vh;
+}
+
+/* ===== 页面头部 ===== */
+.pageHeader {
+  text-align: center;
+  padding: 60px 0 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pageHeader::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 30%, rgba(43, 108, 176, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 70% 70%, rgba(214, 158, 46, 0.06) 0%, transparent 50%);
+  z-index: 0;
+}
+
+.headerContent {
+  position: relative;
+  z-index: 1;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(43, 108, 176, 0.1), rgba(214, 158, 46, 0.1));
+  border: 1px solid rgba(43, 108, 176, 0.2);
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  margin-bottom: 20px;
+}
+
+.pageTitle {
+  font-size: 2.5rem !important;
+  margin-bottom: 16px !important;
+}
+
+.pageDesc {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  max-width: 600px;
+  margin: 0 auto !important;
+}
+
+/* ===== 配置区域 ===== */
+.configSection {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.configCard {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.configCard :global(.ant-card-body) {
+  padding: 28px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cardIcon {
+  font-size: 1.75rem;
+  color: var(--color-primary);
+  background: rgba(43, 108, 176, 0.1);
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.cardHeader h4 {
+  margin-bottom: 4px !important;
+}
+
+/* ===== 年级选项 ===== */
+.optionsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.optionCard {
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  position: relative;
+}
+
+.optionCard:hover {
+  background: rgba(43, 108, 176, 0.08);
+  transform: translateY(-2px);
+}
+
+.optionCard.selected {
+  background: rgba(43, 108, 176, 0.1);
+  border-color: var(--color-primary);
+}
+
+.optionMain {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.optionTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.optionDesc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.checkIcon {
+  color: var(--color-primary);
+  font-size: 1.1rem;
+}
+
+/* ===== 科目选择 ===== */
+.subjectSection {
+  margin-bottom: 24px;
+}
+
+.subjectSection:last-child {
+  margin-bottom: 0;
+}
+
+.sectionLabel {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.subjectsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.subjectCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 12px;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  position: relative;
+  text-align: center;
+}
+
+.subjectCard:hover {
+  background: rgba(43, 108, 176, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.subjectCard.selected {
+  background: rgba(43, 108, 176, 0.1);
+  border-color: var(--color-primary);
+}
+
+.subjectCard .checkIcon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.9rem;
+}
+
+.subjectIcon {
+  font-size: 1.75rem;
+}
+
+.subjectName {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* ===== 难度选择 ===== */
+.difficultyGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.difficultyCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  position: relative;
+}
+
+.difficultyCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.difficultyCard.selected {
+  background: rgba(43, 108, 176, 0.05);
+  border-color: var(--accent-color);
+}
+
+.difficultyIndicator {
+  width: 6px;
+  height: 100%;
+  min-height: 60px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.difficultyContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.difficultyName {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.difficultyDesc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.difficultyTarget {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.difficultyCard .checkIcon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+/* ===== 题目数量 ===== */
+.countGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.countCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 16px;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  position: relative;
+  text-align: center;
+}
+
+.countCard:hover {
+  background: rgba(43, 108, 176, 0.08);
+  transform: translateY(-2px);
+}
+
+.countCard.selected {
+  background: rgba(43, 108, 176, 0.1);
+  border-color: var(--color-primary);
+}
+
+.countCard .checkIcon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.9rem;
+}
+
+.countValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.countLabel {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.countDesc {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ===== 右侧摘要 ===== */
+.summarySticky {
+  position: sticky;
+  top: 24px;
+}
+
+.summaryCard {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  overflow: hidden;
+  background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.summaryCard :global(.ant-card-body) {
+  padding: 28px;
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.summaryIcon {
+  font-size: 1.5rem;
+  color: var(--color-accent);
+}
+
+.summaryHeader h4 {
+  margin: 0 !important;
+}
+
+.summaryList {
+  margin-bottom: 24px;
+}
+
+.summaryItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.summaryItem:last-child {
+  border-bottom: none;
+}
+
+.summaryLabel {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.summaryValue {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.errorMessage {
+  background: rgba(229, 62, 62, 0.1);
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.startButton {
+  height: 54px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  box-shadow: 0 8px 20px rgba(43, 108, 176, 0.3);
+  transition: all 0.3s ease;
+}
+
+.startButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(43, 108, 176, 0.4);
+}
+
+.startButton:disabled {
+  opacity: 0.7;
+}
+
+.tipBox {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(214, 158, 46, 0.1);
+  border-radius: 12px;
+}
+
+.tipIcon {
+  font-size: 1.25rem;
+  color: var(--color-accent);
+  margin-top: 2px;
+}
+
+/* ===== 特色卡片 ===== */
+.featureCard {
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.featureCard :global(.ant-card-body) {
+  padding: 20px;
+}
+
+.featureCard h5 {
+  margin-bottom: 16px !important;
+}
+
+.featureList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.featureCheck {
+  color: var(--color-success);
+  font-size: 1rem;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 991px) {
+  .summarySticky {
+    position: static;
+  }
+
+  .optionsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .difficultyGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .countGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .pageHeader {
+    padding: 40px 0 32px;
+  }
+
+  .pageTitle {
+    font-size: 1.75rem !important;
+  }
+
+  .pageDesc {
+    font-size: 0.95rem;
+  }
+
+  .configCard :global(.ant-card-body) {
+    padding: 20px;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .optionsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .subjectsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .countGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .subjectsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .countGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summaryCard :global(.ant-card-body) {
+    padding: 20px;
+  }
+}
+

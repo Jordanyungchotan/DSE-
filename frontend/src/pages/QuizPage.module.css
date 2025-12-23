@@ -1,0 +1,526 @@
+/* ===== DSE智能刷题 - 答题页面样式 ===== */
+
+.quizPage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 120px;
+  position: relative;
+}
+
+/* ===== 顶部状态栏 ===== */
+.statusBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.statusLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.subjectBadge {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.gradeBadge {
+  font-size: 0.85rem;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-radius: 20px;
+  color: var(--text-secondary);
+}
+
+.difficultyTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.statusCenter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary);
+}
+
+.timer {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusRight {
+  display: flex;
+  gap: 8px;
+}
+
+/* ===== 进度条 ===== */
+.progressSection {
+  margin-bottom: 24px;
+}
+
+.progressInfo {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.progressInfo strong {
+  color: var(--color-primary);
+  font-size: 1.1rem;
+}
+
+.progressBar :global(.ant-progress-inner) {
+  border-radius: 10px;
+  height: 10px;
+}
+
+.progressBar :global(.ant-progress-bg) {
+  border-radius: 10px;
+}
+
+/* ===== 暂停遮罩 ===== */
+.pauseOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pauseContent {
+  text-align: center;
+  color: white;
+}
+
+.pauseIcon {
+  font-size: 5rem;
+  color: var(--color-accent);
+  margin-bottom: 24px;
+}
+
+.pauseContent h3 {
+  color: white !important;
+  margin-bottom: 12px !important;
+}
+
+.pauseContent p {
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 24px !important;
+}
+
+/* ===== 题目区域 ===== */
+.questionSection {
+  flex: 1;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.questionCard {
+  border-radius: 24px;
+  border: none;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.questionCard :global(.ant-card-body) {
+  padding: 36px;
+}
+
+.questionMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.questionContent {
+  margin-bottom: 32px;
+}
+
+.questionText {
+  font-size: 1.2rem !important;
+  line-height: 1.8 !important;
+  color: var(--text-primary) !important;
+}
+
+/* ===== 答题区域 ===== */
+.answerSection {
+  margin-bottom: 24px;
+}
+
+.optionsGroup {
+  width: 100%;
+}
+
+.optionItem {
+  display: flex !important;
+  align-items: flex-start !important;
+  padding: 16px 20px !important;
+  margin-bottom: 12px !important;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.optionItem:hover {
+  background: rgba(43, 108, 176, 0.08);
+}
+
+.optionItem :global(.ant-radio) {
+  margin-top: 4px;
+}
+
+.optionItem.correct {
+  background: rgba(56, 161, 105, 0.15);
+  border-color: var(--color-success);
+}
+
+.optionItem.incorrect {
+  background: rgba(229, 62, 62, 0.15);
+  border-color: var(--color-error);
+}
+
+.optionLabel {
+  font-weight: 600;
+  margin-right: 12px;
+  color: var(--color-primary);
+  min-width: 24px;
+}
+
+.optionText {
+  flex: 1;
+  line-height: 1.6;
+}
+
+.answerInput {
+  border-radius: 14px;
+  padding: 16px;
+  font-size: 1rem;
+  border: 2px solid var(--border-color);
+  transition: all 0.3s ease;
+}
+
+.answerInput:focus {
+  border-color: var(--color-primary);
+}
+
+/* ===== 提示区域 ===== */
+.hintSection {
+  margin-bottom: 24px;
+}
+
+.hintBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  background: rgba(214, 158, 46, 0.1);
+  border-radius: 12px;
+  border-left: 4px solid var(--color-accent);
+}
+
+.hintIcon {
+  font-size: 1.25rem;
+  color: var(--color-accent);
+}
+
+/* ===== 解析区域 ===== */
+.explanationSection {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px dashed var(--border-color);
+}
+
+.resultBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.correctBadge {
+  background: rgba(56, 161, 105, 0.15);
+  color: var(--color-success);
+}
+
+.incorrectBadge {
+  background: rgba(229, 62, 62, 0.15);
+  color: var(--color-error);
+}
+
+.correctAnswer {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  background: rgba(56, 161, 105, 0.1);
+  border-radius: 10px;
+}
+
+.explanationBox {
+  padding: 20px;
+  background: var(--bg-secondary);
+  border-radius: 14px;
+}
+
+.explanationBox h5 {
+  margin-bottom: 12px !important;
+  color: var(--color-primary);
+}
+
+.explanationBox p {
+  margin-bottom: 0 !important;
+  line-height: 1.8;
+  color: var(--text-secondary);
+}
+
+/* ===== 底部导航 ===== */
+.navigationBar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: white;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+}
+
+.navButton {
+  min-width: 120px;
+  height: 48px;
+  border-radius: 12px;
+}
+
+.navCenter {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.submitButton {
+  height: 52px;
+  padding: 0 48px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-light) 100%);
+  box-shadow: 0 8px 20px rgba(43, 108, 176, 0.3);
+}
+
+.submitButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(43, 108, 176, 0.4);
+}
+
+.finishButton {
+  height: 52px;
+  padding: 0 48px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--color-success) 0%, #48bb78 100%);
+  box-shadow: 0 8px 20px rgba(56, 161, 105, 0.3);
+}
+
+/* ===== 题目快速导航 ===== */
+.questionNav {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  max-width: 90%;
+  z-index: 99;
+}
+
+.questionDot {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.questionDot:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+.questionDot.current {
+  background: var(--color-primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(43, 108, 176, 0.3);
+}
+
+.questionDot.correct {
+  background: rgba(56, 161, 105, 0.2);
+  color: var(--color-success);
+}
+
+.questionDot.incorrect {
+  background: rgba(229, 62, 62, 0.2);
+  color: var(--color-error);
+}
+
+.questionDot.current.correct,
+.questionDot.current.incorrect {
+  box-shadow: none;
+}
+
+/* ===== 退出弹窗 ===== */
+.exitModal {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.exitModal p {
+  margin-bottom: 16px !important;
+}
+
+.exitButtons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+  .statusBar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  .statusLeft {
+    order: 1;
+    flex: 1;
+  }
+
+  .statusCenter {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .statusRight {
+    order: 2;
+  }
+
+  .questionCard :global(.ant-card-body) {
+    padding: 24px;
+  }
+
+  .questionText {
+    font-size: 1.05rem !important;
+  }
+
+  .navigationBar {
+    padding: 12px 16px;
+  }
+
+  .navButton {
+    min-width: 90px;
+    height: 44px;
+    font-size: 0.9rem;
+  }
+
+  .submitButton,
+  .finishButton {
+    height: 48px;
+    padding: 0 32px;
+    font-size: 1rem;
+  }
+
+  .questionNav {
+    bottom: 80px;
+    padding: 10px 16px;
+    gap: 6px;
+  }
+
+  .questionDot {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .exitButtons {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .statusBar {
+    border-radius: 12px;
+  }
+
+  .subjectBadge {
+    font-size: 0.9rem;
+  }
+
+  .timer {
+    font-size: 1.25rem;
+  }
+
+  .optionItem {
+    padding: 12px 16px !important;
+  }
+
+  .navButton span:not(.anticon) {
+    display: none;
+  }
+
+  .navButton {
+    min-width: auto;
+    padding: 0 16px;
+  }
+}
+

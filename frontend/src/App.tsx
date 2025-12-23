@@ -12,6 +12,11 @@ const UniversityResultPage = lazy(() => import('./pages/UniversityResultPage'))
 const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 
+// 智能刷题页面
+const QuizSetupPage = lazy(() => import('./pages/QuizSetupPage'))
+const QuizPage = lazy(() => import('./pages/QuizPage'))
+const QuizResultPage = lazy(() => import('./pages/QuizResultPage'))
+
 // 管理员后台页面
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
@@ -38,6 +43,9 @@ const LoadingFallback = () => (
  * - /result/:id : 分析结果页，展示AI分析报告
  * - /history : 历史记录页，查看过往分析
  * - /login : 登录/注册页
+ * - /quiz : 智能刷题配置页
+ * - /quiz/practice : 答题页面
+ * - /quiz/result : 刷题结果页
  */
 function App() {
   return (
@@ -58,6 +66,9 @@ function App() {
           <Route path="result/:id" element={<ResultPage />} />
           <Route path="result/university/:id" element={<UniversityResultPage />} />
           <Route path="history" element={<HistoryPage />} />
+          <Route path="quiz" element={<QuizSetupPage />} />
+          <Route path="quiz/practice" element={<QuizPage />} />
+          <Route path="quiz/result" element={<QuizResultPage />} />
         </Route>
         
         {/* 404重定向到首页 */}
