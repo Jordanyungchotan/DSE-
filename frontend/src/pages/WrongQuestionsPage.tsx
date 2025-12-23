@@ -14,7 +14,7 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
-import { SUPPORTED_SUBJECTS, DIFFICULTY_LEVELS } from '../stores/quizStore'
+import { SUPPORTED_SUBJECTS } from '../stores/quizStore'
 import { apiFetch } from '../config/api'
 import styles from './WrongQuestionsPage.module.css'
 
@@ -51,7 +51,6 @@ const WrongQuestionsPage = () => {
   const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>([])
   const [loading, setLoading] = useState(true)
   const [filterSubject, setFilterSubject] = useState<string>('all')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
   const [activeTab, setActiveTab] = useState('unreviewed')
 
   // 获取所有科目
@@ -210,7 +209,6 @@ const WrongQuestionsPage = () => {
   // 过滤错题
   const filteredQuestions = wrongQuestions.filter((q) => {
     if (filterSubject !== 'all' && q.subject !== filterSubject) return false
-    if (filterStatus !== 'all' && q.status !== filterStatus) return false
     if (activeTab === 'unreviewed' && q.status !== 'unreviewed') return false
     if (activeTab === 'reviewed' && q.status !== 'reviewed') return false
     if (activeTab === 'mastered' && q.status !== 'mastered') return false
