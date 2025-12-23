@@ -196,7 +196,7 @@ const defaultConfig: QuizConfig = {
  * 刷题状态管理Store
  */
 export const useQuizStore = create<QuizState>()(
-  persist<QuizState>(
+  persist(
     (set, get) => ({
       // 初始状态
       config: { ...defaultConfig },
@@ -601,10 +601,10 @@ export const useQuizStore = create<QuizState>()(
     }),
     {
       name: 'dse-quiz-storage',
-      partialize: (state) => ({
+      partialize: (state: QuizState) => ({
         config: state.config,
         quizHistory: state.quizHistory
-      })
+      } as unknown as QuizState)
     }
   )
 )
