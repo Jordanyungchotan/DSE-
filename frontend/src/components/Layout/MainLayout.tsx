@@ -10,6 +10,7 @@ import {
   LogoutOutlined,
   LoginOutlined,
   ExperimentOutlined,
+  BookOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import { useLanguageStore } from '../../stores/languageStore'
@@ -42,9 +43,26 @@ const MainLayout = () => {
       label: t('nav.analysis'),
     },
     {
-      key: '/quiz',
+      key: 'quiz-group',
       icon: <ExperimentOutlined />,
       label: '智能刷题',
+      children: [
+        {
+          key: '/quiz',
+          icon: <ExperimentOutlined />,
+          label: '开始刷题',
+        },
+        {
+          key: '/quiz/wrong-questions',
+          icon: <BookOutlined />,
+          label: '错题本',
+        },
+        {
+          key: '/quiz/history',
+          icon: <HistoryOutlined />,
+          label: '刷题记录',
+        },
+      ],
     },
     {
       key: '/history',

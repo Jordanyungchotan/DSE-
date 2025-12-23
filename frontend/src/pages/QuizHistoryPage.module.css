@@ -1,0 +1,235 @@
+/* ===== 刷题历史页面样式 ===== */
+
+.historyPage {
+  padding-bottom: 48px;
+  min-height: 100vh;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+}
+
+/* ===== 页面标题 ===== */
+.pageHeader {
+  text-align: center;
+  padding: 48px 0 32px;
+  position: relative;
+}
+
+.pageHeader::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 30%, rgba(43, 108, 176, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 70% 70%, rgba(82, 196, 26, 0.05) 0%, transparent 50%);
+  z-index: 0;
+}
+
+.headerContent {
+  position: relative;
+  z-index: 1;
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, rgba(43, 108, 176, 0.1), rgba(82, 196, 26, 0.1));
+  border: 1px solid rgba(43, 108, 176, 0.2);
+  padding: 8px 20px;
+  border-radius: 30px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-primary);
+  margin-bottom: 16px;
+}
+
+.pageTitle {
+  margin-bottom: 12px !important;
+}
+
+.pageDesc {
+  color: var(--text-secondary);
+  max-width: 500px;
+  margin: 0 auto !important;
+}
+
+/* ===== 统计卡片 ===== */
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.statCard {
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.statCard :global(.ant-card-body) {
+  padding: 24px;
+}
+
+.statCard :global(.ant-statistic-title) {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.statCard :global(.ant-statistic-content) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===== 操作栏 ===== */
+.actionCard {
+  border-radius: 16px;
+  margin-bottom: 20px;
+  border: none;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+}
+
+.actionCard :global(.ant-card-body) {
+  padding: 16px 20px;
+}
+
+.actionBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+}
+
+/* ===== 空状态 ===== */
+.emptyCard {
+  border-radius: 20px;
+  text-align: center;
+  padding: 48px 24px;
+}
+
+/* ===== 表格卡片 ===== */
+.tableCard {
+  border-radius: 20px;
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.tableCard :global(.ant-card-body) {
+  padding: 0;
+}
+
+.tableCard :global(.ant-table-thead > tr > th) {
+  background: var(--bg-secondary);
+  font-weight: 600;
+}
+
+.tableCard :global(.ant-table-tbody > tr:hover > td) {
+  background: rgba(43, 108, 176, 0.04);
+}
+
+.tableCard :global(.ant-pagination) {
+  padding: 16px;
+}
+
+/* ===== 快速入口 ===== */
+.quickLinks {
+  margin-top: 32px;
+}
+
+.linkCard {
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.linkCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.linkCard :global(.ant-card-body) {
+  padding: 24px;
+}
+
+.linkContent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.linkIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.linkContent h4 {
+  margin-bottom: 4px !important;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+  .pageHeader {
+    padding: 32px 0 24px;
+  }
+
+  .actionBar {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .actions {
+    justify-content: flex-end;
+  }
+
+  .statCard :global(.ant-card-body) {
+    padding: 16px;
+  }
+
+  .statCard :global(.ant-statistic-content-value) {
+    font-size: 1.25rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .actions {
+    flex-direction: column;
+  }
+
+  .actions button {
+    width: 100%;
+  }
+
+  .linkContent {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+

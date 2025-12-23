@@ -157,6 +157,98 @@ const generateId = (): string => {
 }
 
 /**
+ * 获取科目特定的出题指导
+ */
+const getSubjectSpecificGuidance = (subject: string, grade: string): string => {
+  const guidanceMap: Record<string, string> = {
+    math: `### 数学科DSE特点
+- Paper 1 (常规题): 包含短题目和长题目，考查代数、几何、统计
+- Paper 2 (MC): 45道选择题，每题1分，涵盖必修和延伸部分
+- 常见题型：代数运算、方程求解、几何证明、数据分析
+- ${grade}重点：函数图像分析、坐标几何、概率计算
+- 计算题需给出完整步骤，数字要简洁（避免复杂小数）`,
+
+    physics: `### 物理科DSE特点
+- Paper 1A (MC): 36道选择题
+- Paper 1B: 常规题，包含计算和解释
+- 常见题型：力学分析、电路计算、波动现象、能量转换
+- ${grade}重点：牛顿定律应用、能量守恒、电磁学基础
+- 计算题需注意单位换算和有效数字`,
+
+    chemistry: `### 化学科DSE特点
+- Paper 1A (MC): 36道选择题
+- Paper 1B: 结构题，包含方程式配平和计算
+- 常见题型：化学方程式、摩尔计算、氧化还原、有机反应
+- ${grade}重点：化学平衡、反应速率、酸碱滴定
+- 需要写出完整的化学方程式和反应条件`,
+
+    biology: `### 生物科DSE特点
+- Paper 1A (MC): 36道选择题
+- Paper 1B: 结构题，包含图表分析和实验设计
+- 常见题型：细胞结构、遗传图谱、生态系统、人体系统
+- ${grade}重点：光合作用与呼吸作用、DNA复制、神经传导
+- 需结合图表数据进行分析`,
+
+    chinese: `### 中国语文科DSE特点
+- Paper 1: 阅读理解（文言文+白话文）
+- Paper 2: 写作（命题作文、实用文）
+- 常见题型：词义辨析、句式分析、主旨概括、写作手法
+- ${grade}重点：文言虚词、修辞手法、论证方法
+- 选择题注重细节理解和推断能力`,
+
+    english: `### English Language DSE Features
+- Paper 1: Reading (Part A & B)
+- Paper 2: Writing (short tasks & essay)
+- Common question types: Vocabulary, grammar, comprehension, summary
+- ${grade} focus: Complex sentences, text organization, inference skills
+- MC questions test nuanced understanding of context`,
+
+    economics: `### 经济科DSE特点
+- Paper 1 (MC): 45道选择题
+- Paper 2: 数据题和论述题
+- 常见题型：供需分析、市场失灵、宏观经济指标
+- ${grade}重点：弹性计算、GDP分析、货币政策
+- 需结合图表进行经济分析`,
+
+    ls: `### 公民与社会发展科DSE特点
+- 只有一份试卷，包含选择题和资料回应题
+- 常见题型：资料分析、因果关系、比较评论
+- ${grade}重点：香港社会议题、国家发展、全球化
+- 需展示批判性思维和多角度分析能力`,
+
+    geography: `### 地理科DSE特点
+- Paper 1: 数据/技能题 + 论述题
+- Paper 2: 野外考察为本的问题
+- 常见题型：地图阅读、数据分析、成因解释
+- ${grade}重点：气候变化、城市问题、可持续发展
+- 需准确使用地理术语`,
+
+    history: `### 历史科DSE特点
+- Paper 1: 资料题（历史资料分析）
+- Paper 2: 论述题
+- 常见题型：史料分析、因果解释、比较评价
+- ${grade}重点：二十世纪历史、冷战、香港历史
+- 需引用史实支持论点`,
+
+    chinese_history: `### 中国历史科DSE特点
+- Paper 1: 资料题
+- Paper 2: 论述题
+- 常见题型：史料解读、时代背景分析、历史评价
+- ${grade}重点：近现代史、重大历史事件、人物评价
+- 需准确引用历史事实`,
+
+    combined_science: `### 组合科学DSE特点
+- 涵盖物理、化学、生物三个领域
+- Paper 1 (MC): 选择题
+- Paper 2: 结构题
+- ${grade}重点：跨学科概念应用、实验技能
+- 题目可能整合多个学科知识`
+  }
+
+  return guidanceMap[subject] || `### ${subject}科DSE特点\n- 参考DSE考试局官方课程大纲\n- 题目应符合${grade}程度要求`
+}
+
+/**
  * 构建题目生成提示词
  */
 const buildQuestionPrompt = (config: QuizConfig): string => {
@@ -190,57 +282,88 @@ const buildQuestionPrompt = (config: QuizConfig): string => {
 - 解释题（explanation）: 约20%`
   }
 
-  return `你是一位资深的香港DSE考试命题专家，拥有超过15年的DSE教学和命题经验。请根据以下要求生成DSE考试题目。
+  // 获取科目特定的出题指导
+  const subjectGuidance = getSubjectSpecificGuidance(config.subject, gradeName)
 
-【生成要求】
-1. 科目：${subjectName}
-2. 年级：${gradeName}（${config.grade}）
-3. 难度：${difficultyName}
-4. 题目数量：${config.questionCount}题
-5. 考察知识点范围：${topicsList}
+  return `你是一位资深的香港DSE考试命题专家，曾参与香港考试及评核局(HKEAA)的命题工作，拥有超过15年的DSE教学和命题经验。
+
+## 📋 生成要求
+
+| 项目 | 要求 |
+|------|------|
+| 科目 | ${subjectName} |
+| 年级 | ${gradeName} |
+| 难度 | ${difficultyName} |
+| 题数 | ${config.questionCount}题 |
+| 知识点 | ${topicsList} |
 
 ${questionTypeInstructions}
 
-【题目质量标准】
-- 严格符合香港DSE考试局最新课程标准（2024年版）
-- 参考近五年DSE真题的题型和难度分布
-- 语言表达准确清晰，无歧义
-- 选择题的干扰项要有迷惑性，避免明显错误
-- 计算题需确保数字合理、计算过程可行
-- 每道题必须有详细的解析，解析要包含解题思路和关键知识点
-- 题目之间不能重复或过于相似
+## 📚 DSE考试特点（必须遵循）
 
-【难度说明】
-- 基础：考查基本概念理解，计算简单，大多数学生应能正确回答
-- 标准：需要一定的分析和推理能力，模拟日常考试难度
-- 挑战：需要综合运用多个知识点，考查深层理解
-- 考试难度：完全模拟DSE真题难度，包含高分题型
+${subjectGuidance}
 
-【输出格式要求】
-请严格按照以下JSON格式输出，生成一个包含${config.questionCount}道题目的数组：
+## ✅ 题目质量标准
 
+### 选择题要求：
+- 4个选项必须长度相近，避免过长或过短的选项暴露答案
+- 干扰项(distractors)必须基于学生常见错误设计，不能明显错误
+- 选项按逻辑顺序排列（数值从小到大，或按字母顺序）
+- 正确答案随机分布在A/B/C/D中
+
+### 计算题要求：
+- 数字要合理，避免过于复杂的计算
+- 确保有唯一正确答案
+- 步骤清晰，可用基本方法求解
+
+### 简答题/解释题要求：
+- 问题明确，有标准评分点
+- 答案要点清晰，便于自我评估
+
+### 解析质量要求：
+- 解析必须包含完整的解题步骤
+- 指出关键概念和易错点
+- 提供记忆技巧或解题捷径（如适用）
+
+## 🎯 难度校准
+
+| 难度 | 目标正确率 | 特点 |
+|------|------------|------|
+| 基础 | >80% | 直接考查定义、公式应用 |
+| 标准 | 60-80% | 需要1-2步推理 |
+| 挑战 | 40-60% | 综合多个知识点 |
+| 考试难度 | 30-50% | 模拟DSE Paper难题 |
+
+当前难度为【${difficultyName}】，请严格按此标准出题。
+
+## 📤 输出格式（严格遵守）
+
+返回JSON数组，每题格式如下：
+\`\`\`json
 [
   {
-    "question": "题目正文（如需要可使用Markdown格式，数学公式请用简单文字描述）",
-    "questionType": "multiple_choice 或 short_answer 或 calculation 或 explanation",
-    "options": ["选项A", "选项B", "选项C", "选项D"],  // 仅选择题需要，非选择题不要包含此字段
-    "correctAnswer": "正确答案（选择题为0-3的索引数字，其他题型为文字答案）",
-    "explanation": "详细解析，包含：1.解题思路 2.关键知识点 3.常见错误提醒",
-    "topicTags": ["知识点标签1", "知识点标签2"],
-    "estimatedTime": 60,  // 建议答题时间（秒）
-    "difficultyScore": 5  // 难度评分1-10，1最简单
+    "question": "题目正文，使用清晰的中文表述",
+    "questionType": "multiple_choice",
+    "options": ["A. 选项内容", "B. 选项内容", "C. 选项内容", "D. 选项内容"],
+    "correctAnswer": 0,
+    "explanation": "【解题思路】\\n具体步骤...\\n\\n【关键知识点】\\n要点...\\n\\n【易错提醒】\\n常见错误...",
+    "topicTags": ["知识点1", "知识点2"],
+    "estimatedTime": 60,
+    "difficultyScore": 5
   }
 ]
+\`\`\`
 
-【重要提醒】
-1. 只返回JSON数组，不要有任何其他文字说明
-2. 确保JSON格式正确，可以被程序解析
-3. 选择题必须有4个选项
-4. correctAnswer对于选择题必须是0-3的数字索引
-5. 每道题的知识点标签至少要有1个
-6. 难度评分要与设定的难度级别相符：基础(1-3)、标准(4-6)、挑战(7-8)、考试难度(8-10)
+## ⚠️ 重要提醒
 
-请开始生成${config.questionCount}道高质量的${subjectName}DSE题目。`
+1. **只返回JSON数组**，不要有任何额外文字
+2. 选择题correctAnswer必须是0-3的整数索引
+3. 非选择题不要包含options字段
+4. 解析使用\\n换行，保证可读性
+5. 题目不可重复或过于相似
+6. 确保JSON格式正确无误
+
+请生成${config.questionCount}道高质量${subjectName}题目：`
 }
 
 /**

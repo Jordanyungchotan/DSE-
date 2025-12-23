@@ -178,6 +178,7 @@ interface QuizState {
   resumeQuiz: () => void
   generateReport: () => void
   loadQuizHistory: () => Promise<void>
+  saveWrongQuestion: (question: GeneratedQuestion, userAnswer: string | number) => Promise<void>
   setError: (error: string | null) => void
   clearSession: () => void
 }
@@ -544,6 +545,39 @@ export const useQuizStore = create<QuizState>()(
         } catch (error) {
           const message = error instanceof Error ? error.message : '未知错误'
           set({ loading: false, error: message })
+        }
+      },
+
+      /**
+       * 保存错题到错题本
+       */
+      saveWrongQuestion: async (question: GeneratedQuestion, userAnswer: string | number) => {
+        const token = useAuthStore.getState().token
+        if (!token) return
+
+        const { currentSession } = get()
+        if (!currentSession) return
+
+        try {
+          await apiFetch('/api/quiz/wrong-questions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              questionId: question.id,
+              questionText: question.question,
+              questionType: question.questionType,
+              subject: currentSession.config.subject,
+              topic: question.topicTags?.[0] || '综合',
+              userAnswer: String(userAnswer),
+              correctAnswer: String(question.correctAnswer),
+              explanation: question.explanation
+            })
+          })
+        } catch (error) {
+          console.warn('保存错题失败:', error)
         }
       },
 

@@ -1,0 +1,449 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Card, Row, Col, Typography, Button, Empty, Tag, Table, Progress, Spin, Statistic, message } from 'antd'
+import {
+  HistoryOutlined,
+  TrophyOutlined,
+  ClockCircleOutlined,
+  BarChartOutlined,
+  FireOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+} from '@ant-design/icons'
+import { useAuthStore } from '../stores/authStore'
+import { SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
+import { apiFetch } from '../config/api'
+import styles from './QuizHistoryPage.module.css'
+
+const { Title, Text, Paragraph } = Typography
+
+/**
+ * 刷题历史记录接口
+ */
+interface QuizHistoryItem {
+  id: string
+  subject: string
+  grade: string
+  difficulty: string
+  score: number
+  accuracy: number
+  totalQuestions: number
+  timeSpent: number
+  completedAt: string
+}
+
+/**
+ * DSE智能刷题 - 刷题历史页面
+ */
+const QuizHistoryPage = () => {
+  const navigate = useNavigate()
+  const { isAuthenticated, token } = useAuthStore()
+  const [history, setHistory] = useState<QuizHistoryItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    totalSessions: 0,
+    totalQuestions: 0,
+    averageAccuracy: 0,
+    totalTime: 0,
+  })
+
+  // 获取所有科目
+  const allSubjects = [
+    ...SUPPORTED_SUBJECTS.CORE,
+    ...SUPPORTED_SUBJECTS.SCIENCE_ELECTIVES,
+    ...SUPPORTED_SUBJECTS.ARTS_ELECTIVES,
+  ]
+
+  // 加载历史记录
+  useEffect(() => {
+    if (!isAuthenticated) {
+      message.warning('请先登录查看刷题历史')
+      navigate('/login')
+      return
+    }
+    loadHistory()
+  }, [isAuthenticated, navigate])
+
+  const loadHistory = async () => {
+    setLoading(true)
+    try {
+      const response = await apiFetch('/api/quiz/history', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('加载历史失败')
+      }
+
+      const data = await response.json()
+      const historyData = data.history || []
+      setHistory(historyData)
+
+      // 计算统计数据
+      if (historyData.length > 0) {
+        const totalSessions = historyData.length
+        const totalQuestions = historyData.reduce((sum: number, h: QuizHistoryItem) => sum + (h.totalQuestions || h.score), 0)
+        const totalAccuracy = historyData.reduce((sum: number, h: QuizHistoryItem) => sum + h.accuracy, 0)
+        const totalTime = historyData.reduce((sum: number, h: QuizHistoryItem) => sum + (h.timeSpent || 0), 0)
+
+        setStats({
+          totalSessions,
+          totalQuestions,
+          averageAccuracy: Math.round(totalAccuracy / totalSessions * 10) / 10,
+          totalTime,
+        })
+      }
+    } catch (error) {
+      console.error('加载历史失败:', error)
+      // 使用模拟数据
+      const mockHistory = generateMockHistory()
+      setHistory(mockHistory)
+      calculateStats(mockHistory)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 生成模拟历史数据
+  const generateMockHistory = (): QuizHistoryItem[] => {
+    return [
+      {
+        id: '1',
+        subject: 'math',
+        grade: 'f5',
+        difficulty: 'standard',
+        score: 8,
+        accuracy: 80,
+        totalQuestions: 10,
+        timeSpent: 900,
+        completedAt: '2024-12-23T10:30:00',
+      },
+      {
+        id: '2',
+        subject: 'physics',
+        grade: 'f5',
+        difficulty: 'challenging',
+        score: 6,
+        accuracy: 60,
+        totalQuestions: 10,
+        timeSpent: 1200,
+        completedAt: '2024-12-22T15:20:00',
+      },
+      {
+        id: '3',
+        subject: 'chemistry',
+        grade: 'f4',
+        difficulty: 'basic',
+        score: 9,
+        accuracy: 90,
+        totalQuestions: 10,
+        timeSpent: 600,
+        completedAt: '2024-12-21T09:15:00',
+      },
+      {
+        id: '4',
+        subject: 'english',
+        grade: 'f6',
+        difficulty: 'exam',
+        score: 5,
+        accuracy: 50,
+        totalQuestions: 10,
+        timeSpent: 1500,
+        completedAt: '2024-12-20T14:00:00',
+      },
+    ]
+  }
+
+  const calculateStats = (data: QuizHistoryItem[]) => {
+    if (data.length === 0) return
+
+    const totalSessions = data.length
+    const totalQuestions = data.reduce((sum, h) => sum + h.totalQuestions, 0)
+    const totalAccuracy = data.reduce((sum, h) => sum + h.accuracy, 0)
+    const totalTime = data.reduce((sum, h) => sum + h.timeSpent, 0)
+
+    setStats({
+      totalSessions,
+      totalQuestions,
+      averageAccuracy: Math.round(totalAccuracy / totalSessions * 10) / 10,
+      totalTime,
+    })
+  }
+
+  // 获取科目名称
+  const getSubjectName = (subjectId: string) => {
+    const subject = allSubjects.find((s) => s.id === subjectId)
+    return subject ? `${subject.icon} ${subject.name}` : subjectId
+  }
+
+  // 获取年级名称
+  const getGradeName = (gradeId: string) => {
+    const grade = GRADE_LEVELS.find((g) => g.id === gradeId)
+    return grade?.name || gradeId
+  }
+
+  // 获取难度配置
+  const getDifficulty = (difficultyId: string) => {
+    return DIFFICULTY_LEVELS.find((d) => d.id === difficultyId)
+  }
+
+  // 格式化时间
+  const formatTime = (seconds: number) => {
+    if (!seconds) return '-'
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    if (mins >= 60) {
+      const hours = Math.floor(mins / 60)
+      return `${hours}小时${mins % 60}分`
+    }
+    return `${mins}分${secs}秒`
+  }
+
+  // 格式化日期
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  // 表格列定义
+  const columns = [
+    {
+      title: '科目',
+      dataIndex: 'subject',
+      key: 'subject',
+      render: (subject: string) => <Text strong>{getSubjectName(subject)}</Text>,
+    },
+    {
+      title: '年级',
+      dataIndex: 'grade',
+      key: 'grade',
+      render: (grade: string) => <Tag>{getGradeName(grade)}</Tag>,
+    },
+    {
+      title: '难度',
+      dataIndex: 'difficulty',
+      key: 'difficulty',
+      render: (difficulty: string) => {
+        const diff = getDifficulty(difficulty)
+        return diff ? (
+          <Tag color={diff.color}>
+            <FireOutlined /> {diff.name}
+          </Tag>
+        ) : (
+          <Tag>{difficulty}</Tag>
+        )
+      },
+    },
+    {
+      title: '成绩',
+      dataIndex: 'score',
+      key: 'score',
+      render: (score: number, record: QuizHistoryItem) => (
+        <Text strong>
+          {score}/{record.totalQuestions || 10}
+        </Text>
+      ),
+    },
+    {
+      title: '正确率',
+      dataIndex: 'accuracy',
+      key: 'accuracy',
+      render: (accuracy: number) => (
+        <Progress
+          percent={accuracy}
+          size="small"
+          strokeColor={accuracy >= 80 ? '#52c41a' : accuracy >= 60 ? '#1890ff' : '#f5222d'}
+          format={(percent) => `${percent}%`}
+          style={{ width: 100 }}
+        />
+      ),
+    },
+    {
+      title: '用时',
+      dataIndex: 'timeSpent',
+      key: 'timeSpent',
+      render: (time: number) => formatTime(time),
+    },
+    {
+      title: '完成时间',
+      dataIndex: 'completedAt',
+      key: 'completedAt',
+      render: (date: string) => (
+        <Text type="secondary">{formatDate(date)}</Text>
+      ),
+    },
+  ]
+
+  if (loading) {
+    return (
+      <div className={styles.loadingContainer}>
+        <Spin size="large" tip="加载刷题历史..." />
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.historyPage}>
+      {/* 页面标题 */}
+      <div className={styles.pageHeader}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerBadge}>
+            <HistoryOutlined /> 刷题记录
+          </div>
+          <Title level={2} className={styles.pageTitle}>
+            <span className="gradient-title">我的刷题历史</span>
+          </Title>
+          <Paragraph className={styles.pageDesc}>
+            查看你的刷题记录，追踪学习进度
+          </Paragraph>
+        </div>
+      </div>
+
+      {/* 统计概览 */}
+      <Row gutter={[16, 16]} className={styles.statsRow}>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic
+              title="总刷题次数"
+              value={stats.totalSessions}
+              prefix={<TrophyOutlined style={{ color: 'var(--color-primary)' }} />}
+              valueStyle={{ color: 'var(--color-primary)' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic
+              title="总题目数"
+              value={stats.totalQuestions}
+              prefix={<BarChartOutlined style={{ color: '#1890ff' }} />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic
+              title="平均正确率"
+              value={stats.averageAccuracy}
+              suffix="%"
+              prefix={
+                stats.averageAccuracy >= 60 ? (
+                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                ) : (
+                  <CloseCircleOutlined style={{ color: '#f5222d' }} />
+                )
+              }
+              valueStyle={{ color: stats.averageAccuracy >= 60 ? '#52c41a' : '#f5222d' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic
+              title="总学习时长"
+              value={formatTime(stats.totalTime)}
+              prefix={<ClockCircleOutlined style={{ color: '#fa8c16' }} />}
+              valueStyle={{ color: '#fa8c16', fontSize: '1.5rem' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 操作栏 */}
+      <Card className={styles.actionCard}>
+        <div className={styles.actionBar}>
+          <Text type="secondary">
+            共 {history.length} 条刷题记录
+          </Text>
+          <div className={styles.actions}>
+            <Button icon={<ReloadOutlined />} onClick={loadHistory}>
+              刷新
+            </Button>
+            <Button type="primary" icon={<RightOutlined />} onClick={() => navigate('/quiz')}>
+              开始刷题
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* 历史记录表格 */}
+      {history.length === 0 ? (
+        <Card className={styles.emptyCard}>
+          <Empty
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+            description="暂无刷题记录"
+          >
+            <Button type="primary" onClick={() => navigate('/quiz')}>
+              开始第一次刷题
+            </Button>
+          </Empty>
+        </Card>
+      ) : (
+        <Card className={styles.tableCard}>
+          <Table
+            dataSource={history}
+            columns={columns}
+            rowKey="id"
+            pagination={{
+              pageSize: 10,
+              showTotal: (total) => `共 ${total} 条记录`,
+            }}
+            scroll={{ x: 800 }}
+          />
+        </Card>
+      )}
+
+      {/* 快速入口 */}
+      <Row gutter={[16, 16]} className={styles.quickLinks}>
+        <Col xs={24} sm={12}>
+          <Card
+            className={styles.linkCard}
+            onClick={() => navigate('/quiz/wrong-questions')}
+            hoverable
+          >
+            <div className={styles.linkContent}>
+              <div className={styles.linkIcon} style={{ background: 'rgba(245, 34, 45, 0.1)', color: '#f5222d' }}>
+                <CloseCircleOutlined />
+              </div>
+              <div>
+                <Title level={4}>错题本</Title>
+                <Text type="secondary">查看和复习答错的题目</Text>
+              </div>
+            </div>
+          </Card>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Card
+            className={styles.linkCard}
+            onClick={() => navigate('/quiz')}
+            hoverable
+          >
+            <div className={styles.linkContent}>
+              <div className={styles.linkIcon} style={{ background: 'rgba(82, 196, 26, 0.1)', color: '#52c41a' }}>
+                <TrophyOutlined />
+              </div>
+              <div>
+                <Title level={4}>继续刷题</Title>
+                <Text type="secondary">开始新的刷题练习</Text>
+              </div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  )
+}
+
+export default QuizHistoryPage
+

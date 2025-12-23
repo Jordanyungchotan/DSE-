@@ -322,6 +322,148 @@ quizRouter.get('/stats', authMiddleware, async (req: Request, res: Response, nex
 })
 
 /**
+ * 错题本存储
+ */
+const wrongQuestions = new Map<string, Array<{
+  id: string
+  questionId: string
+  questionText: string
+  questionType: string
+  subject: string
+  topic: string
+  userAnswer: string
+  correctAnswer: string
+  explanation: string
+  wrongCount: number
+  status: 'unreviewed' | 'reviewed' | 'mastered'
+  firstAttemptDate: string
+  lastAttemptDate: string
+}>>()
+
+/**
+ * 获取错题列表
+ * GET /api/quiz/wrong-questions
+ */
+quizRouter.get('/wrong-questions', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as Request & { userId: string }).userId
+    const questions = wrongQuestions.get(userId) || []
+
+    res.json({
+      success: true,
+      questions,
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+/**
+ * 添加错题
+ * POST /api/quiz/wrong-questions
+ */
+quizRouter.post('/wrong-questions', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as Request & { userId: string }).userId
+    const { questionId, questionText, questionType, subject, topic, userAnswer, correctAnswer, explanation } = req.body
+
+    const userQuestions = wrongQuestions.get(userId) || []
+    
+    // 检查是否已存在
+    const existingIndex = userQuestions.findIndex(q => q.questionId === questionId)
+    
+    if (existingIndex >= 0) {
+      // 更新错题次数
+      userQuestions[existingIndex].wrongCount++
+      userQuestions[existingIndex].lastAttemptDate = new Date().toISOString().split('T')[0]
+      userQuestions[existingIndex].status = 'unreviewed'
+    } else {
+      // 添加新错题
+      const newQuestion = {
+        id: uuidv4(),
+        questionId,
+        questionText,
+        questionType,
+        subject,
+        topic: topic || '综合',
+        userAnswer: String(userAnswer),
+        correctAnswer: String(correctAnswer),
+        explanation,
+        wrongCount: 1,
+        status: 'unreviewed' as const,
+        firstAttemptDate: new Date().toISOString().split('T')[0],
+        lastAttemptDate: new Date().toISOString().split('T')[0],
+      }
+      userQuestions.unshift(newQuestion)
+    }
+
+    wrongQuestions.set(userId, userQuestions)
+
+    res.json({
+      success: true,
+      message: '错题已添加',
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+/**
+ * 更新错题状态
+ * PATCH /api/quiz/wrong-questions/:id/status
+ */
+quizRouter.patch('/wrong-questions/:id/status', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as Request & { userId: string }).userId
+    const { id } = req.params
+    const { status } = req.body
+
+    if (!['reviewed', 'mastered', 'unreviewed'].includes(status)) {
+      throw new ApiError('无效的状态值', 400)
+    }
+
+    const userQuestions = wrongQuestions.get(userId) || []
+    const questionIndex = userQuestions.findIndex(q => q.id === id)
+
+    if (questionIndex === -1) {
+      throw new ApiError('错题不存在', 404)
+    }
+
+    userQuestions[questionIndex].status = status
+    wrongQuestions.set(userId, userQuestions)
+
+    res.json({
+      success: true,
+      message: '状态已更新',
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+/**
+ * 删除错题
+ * DELETE /api/quiz/wrong-questions/:id
+ */
+quizRouter.delete('/wrong-questions/:id', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (req as Request & { userId: string }).userId
+    const { id } = req.params
+
+    const userQuestions = wrongQuestions.get(userId) || []
+    const filteredQuestions = userQuestions.filter(q => q.id !== id)
+    wrongQuestions.set(userId, filteredQuestions)
+
+    res.json({
+      success: true,
+      message: '错题已删除',
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+/**
  * 健康检查
  */
 quizRouter.get('/health', (_req: Request, res: Response) => {

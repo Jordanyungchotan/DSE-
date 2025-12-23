@@ -25,6 +25,9 @@ import {
   FileSearchOutlined,
   ScheduleOutlined,
   QuestionCircleOutlined,
+  ExperimentOutlined,
+  BookOutlined,
+  FireOutlined,
 } from '@ant-design/icons'
 import { useLanguageStore } from '../stores/languageStore'
 import { apiFetch } from '../config/api'
@@ -389,6 +392,97 @@ const HomePage = () => {
             </Col>
           ))}
         </Row>
+      </section>
+
+      {/* ===== 智能刷题入口 ===== */}
+      <section className={styles.quizSection}>
+        <Card className={styles.quizCard}>
+          <Row gutter={[32, 32]} align="middle">
+            <Col xs={24} lg={14}>
+              <div className={styles.quizContent}>
+                <div className={styles.quizBadge}>
+                  <ExperimentOutlined /> 全新功能
+                </div>
+                <Title level={2}>
+                  <span className="gradient-title">DSE智能刷题系统</span>
+                </Title>
+                <Paragraph className={styles.quizDesc}>
+                  基于DeepSeek AI的动态题目生成，每次刷题都会根据您的配置实时生成符合DSE考试标准的题目。
+                  支持中四至中六年级，涵盖核心科目和主要选修科目。
+                </Paragraph>
+                <div className={styles.quizFeatures}>
+                  <div className={styles.quizFeatureItem}>
+                    <ThunderboltOutlined style={{ color: '#1890ff' }} />
+                    <span>AI动态生成题目</span>
+                  </div>
+                  <div className={styles.quizFeatureItem}>
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <span>即时批改与解析</span>
+                  </div>
+                  <div className={styles.quizFeatureItem}>
+                    <BookOutlined style={{ color: '#fa8c16' }} />
+                    <span>错题本追踪复习</span>
+                  </div>
+                  <div className={styles.quizFeatureItem}>
+                    <BarChartOutlined style={{ color: '#722ed1' }} />
+                    <span>学习进度报告</span>
+                  </div>
+                </div>
+                <div className={styles.quizButtons}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<FireOutlined />}
+                    onClick={() => navigate('/quiz')}
+                    className={styles.quizPrimaryBtn}
+                  >
+                    立即刷题
+                  </Button>
+                  <Button
+                    size="large"
+                    icon={<BookOutlined />}
+                    onClick={() => navigate('/quiz/wrong-questions')}
+                  >
+                    查看错题本
+                  </Button>
+                </div>
+              </div>
+            </Col>
+            <Col xs={24} lg={10}>
+              <div className={styles.quizVisual}>
+                <div className={styles.quizStatsCard}>
+                  <div className={styles.quizStatItem}>
+                    <div className={styles.quizStatIcon} style={{ background: 'rgba(24, 144, 255, 0.1)', color: '#1890ff' }}>
+                      📚
+                    </div>
+                    <div className={styles.quizStatInfo}>
+                      <span className={styles.quizStatValue}>12+</span>
+                      <span className={styles.quizStatLabel}>支持科目</span>
+                    </div>
+                  </div>
+                  <div className={styles.quizStatItem}>
+                    <div className={styles.quizStatIcon} style={{ background: 'rgba(82, 196, 26, 0.1)', color: '#52c41a' }}>
+                      🎯
+                    </div>
+                    <div className={styles.quizStatInfo}>
+                      <span className={styles.quizStatValue}>4</span>
+                      <span className={styles.quizStatLabel}>难度级别</span>
+                    </div>
+                  </div>
+                  <div className={styles.quizStatItem}>
+                    <div className={styles.quizStatIcon} style={{ background: 'rgba(250, 140, 22, 0.1)', color: '#fa8c16' }}>
+                      ⚡
+                    </div>
+                    <div className={styles.quizStatInfo}>
+                      <span className={styles.quizStatValue}>AI</span>
+                      <span className={styles.quizStatLabel}>智能生成</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </Card>
       </section>
 
       {/* ===== 系统优势 ===== */}

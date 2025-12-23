@@ -33,6 +33,7 @@ const QuizPage = () => {
     pauseQuiz,
     resumeQuiz,
     clearSession,
+    saveWrongQuestion,
   } = useQuizStore()
 
   const [currentAnswer, setCurrentAnswer] = useState<string | number>('')
@@ -101,12 +102,29 @@ const QuizPage = () => {
   }
 
   // 提交当前答案
-  const handleSubmitAnswer = () => {
+  const handleSubmitAnswer = async () => {
     if (currentAnswer === '' || currentAnswer === undefined) {
       message.warning('请先选择或输入答案')
       return
     }
+    
+    const currentQ = currentSession?.questions[currentSession.currentQuestionIndex]
+    
     submitAnswer(currentAnswer)
+    
+    // 检查答案是否正确，如果错误则保存到错题本
+    if (currentQ) {
+      const isCorrect = String(currentAnswer).toLowerCase().trim() === 
+                       String(currentQ.correctAnswer).toLowerCase().trim()
+      
+      if (!isCorrect) {
+        // 异步保存错题，不阻塞UI
+        saveWrongQuestion(currentQ, currentAnswer).catch(() => {
+          // 忽略错误
+        })
+      }
+    }
+    
     message.success('答案已提交')
   }
 
