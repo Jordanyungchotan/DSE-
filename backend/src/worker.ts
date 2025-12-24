@@ -502,10 +502,86 @@ const QUIZ_GRADE_MAP: Record<string, string> = {
 }
 
 const QUIZ_DIFFICULTY_MAP: Record<string, string> = {
-  basic: '基础', standard: '标准', advanced: '进阶', challenge: '挑战',
+  basic: '基础', standard: '标准', advanced: '进阶', challenge: '挑战', challenging: '挑战', exam: 'DSE模拟',
 }
 
-// 生成刷题题目
+// ===== 题目多样性增强系统 =====
+
+// 场景库 - 用于随机化题目背景
+const SCENARIO_LIBRARY: Record<string, string[]> = {
+  math: [
+    '小明在超市购物时', '学校运动会期间', '工程师设计建筑时', '班级郊游活动中',
+    '图书馆整理图书时', '农场收获季节', '餐厅准备食材时', '银行计算利息时',
+    '物流公司配送时', '电影院安排座位', '游乐场设计游戏', '公司分配奖金时',
+    '旅行规划路线时', '装修房屋时', '学校分配教室时', '比赛安排赛程时'
+  ],
+  physics: [
+    '电梯升降过程中', '汽车行驶实验中', '过山车运动分析', '跳伞运动研究',
+    '火箭发射实验', '游泳池水压测量', '电路实验室测试', '太阳能板效率测试',
+    '高铁制动分析', '桥梁承重测试', '风力发电研究'
+  ],
+  chemistry: [
+    '实验室制备气体时', '食品保存研究中', '环境污染物检测', '药物合成实验',
+    '电池效率测试', '水质检测实验', '金属腐蚀分析', '废水处理研究'
+  ]
+}
+
+// 数字生成器 - 避免常见数字
+function generateDiverseNumbers(difficulty: string, count: number): string[] {
+  const ranges: Record<string, { min: number, max: number }[]> = {
+    basic: [{ min: 2, max: 25 }, { min: 15, max: 50 }, { min: 30, max: 100 }],
+    standard: [{ min: 3, max: 60 }, { min: 20, max: 150 }, { min: 50, max: 500 }],
+    challenging: [{ min: 5, max: 100 }, { min: 50, max: 300 }, { min: 100, max: 1000 }],
+    exam: [{ min: 7, max: 150 }, { min: 100, max: 500 }, { min: 200, max: 2000 }]
+  }
+  
+  const diffRanges = ranges[difficulty] || ranges.standard
+  const numbers: string[] = []
+  const usedNumbers = new Set<number>()
+  
+  // 避免的常见数字组合
+  const avoidNumbers = [10, 20, 30, 50, 100, 12, 24, 36, 48, 60]
+  
+  for (let i = 0; i < count; i++) {
+    const range = diffRanges[i % diffRanges.length]
+    let num: number
+    let attempts = 0
+    
+    do {
+      num = Math.floor(Math.random() * (range.max - range.min + 1)) + range.min
+      attempts++
+    } while ((usedNumbers.has(num) || avoidNumbers.includes(num)) && attempts < 20)
+    
+    usedNumbers.add(num)
+    numbers.push(num.toString())
+  }
+  
+  return numbers
+}
+
+// 选择随机场景
+function selectRandomScenario(subject: string): string {
+  const scenarios = SCENARIO_LIBRARY[subject] || SCENARIO_LIBRARY.math
+  return scenarios[Math.floor(Math.random() * scenarios.length)]
+}
+
+// 生成多样性提示词
+function generateDiversityInstructions(recentTopics?: string[]): string[] {
+  const instructions = [
+    '确保每道题目的情境和背景都完全不同',
+    '使用不同的数字组合，避免使用12、24、36、45、60等常见组合',
+    '问题的表述方式要多样化，不要使用相同的句式',
+    '每道题的知识点侧重要有差异'
+  ]
+  
+  if (recentTopics && recentTopics.length > 0) {
+    instructions.push(`避免与以下知识点过于相似：${recentTopics.slice(0, 3).join('、')}`)
+  }
+  
+  return instructions
+}
+
+// 生成刷题题目（增强版 - 带多样性控制）
 async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promise<GeneratedQuestion[]> {
   const subjectName = QUIZ_SUBJECT_MAP[config.subject] || config.subject
   const gradeName = QUIZ_GRADE_MAP[config.grade] || config.grade
@@ -517,31 +593,66 @@ async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promis
   }
 
   try {
-    const prompt = `你是一位专业的香港DSE考试出题专家。请为${gradeName}学生生成${config.questionCount}道${subjectName}${difficultyName}难度的题目。
+    // 生成多样性元素
+    const scenario = selectRandomScenario(config.subject)
+    const suggestedNumbers = generateDiverseNumbers(config.difficulty, 5)
+    const diversityInstructions = generateDiversityInstructions()
+    
+    // 增强版提示词
+    const systemPrompt = `你是一位经验丰富的香港DSE ${subjectName}科教育专家和题目设计师。
 
-要求：
-1. 题目符合DSE考试标准
-2. 包含多种题型（选择题、简答题、计算题等）
-3. 每道题都有详细解析
+【你的专业背景】
+- 拥有超过10年的DSE考试辅导经验
+- 精通DSE ${subjectName}科的课程大纲和考试要求
+- 了解${gradeName}学生的认知水平和常见错误
 
-请严格按以下JSON格式返回（不要有其他文字）：
+【题目设计原则】
+1. 严格遵循DSE考试的题型和难度标准
+2. 确保题目表述清晰、无歧义
+3. 答案必须准确无误
+4. 解释要详细且有教育价值
+
+【多样性要求 - 极其重要】
+${diversityInstructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}
+
+请严格按照JSON格式输出，不要添加任何其他内容。`
+
+    const userPrompt = `请为${gradeName}学生生成${config.questionCount}道${subjectName}${difficultyName}难度的题目。
+
+【场景建议】
+参考场景（请根据此场景创意发挥，不要照搬）："${scenario}"
+建议使用的数字：${suggestedNumbers.join('、')}
+
+【防重复要求】
+⚠️ 不要使用以下常见的数字组合：12和18、24和36、45和60、100和200
+⚠️ 避免使用过于简单的场景如"小明买苹果"、"学校有学生"
+⚠️ 每道题的结构和问法要有明显差异
+⚠️ 尝试使用新颖的现实生活情境
+
+【题型分布】
+- 选择题：约40%
+- 计算题/简答题：约40%
+- 解释说明题：约20%
+
+请严格按以下JSON格式返回（不要有任何其他文字）：
 {
   "questions": [
     {
       "id": "q1",
-      "question": "题目内容",
+      "question": "完整的题目内容（包含情境描述）",
       "questionType": "multiple_choice",
       "options": ["选项A", "选项B", "选项C", "选项D"],
-      "correctAnswer": 0,
-      "explanation": "详细解析",
+      "correctAnswer": "A",
+      "explanation": "详细解析（包含解题步骤）",
       "topicTags": ["知识点1", "知识点2"],
-      "difficultyScore": 3
+      "difficultyScore": 3,
+      "hints": ["提示1", "提示2"]
     }
   ]
 }
 
 questionType可选值：multiple_choice、short_answer、calculation、explanation
-correctAnswer：选择题填选项索引(0-3)，其他题型填答案文本
+correctAnswer：选择题填选项字母(A/B/C/D)，其他题型填答案文本
 difficultyScore：1-5，1最简单5最难`
 
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -553,11 +664,11 @@ difficultyScore：1-5，1最简单5最难`
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [
-          { role: 'system', content: '你是专业的DSE考试出题专家，请用JSON格式回复。' },
-          { role: 'user', content: prompt },
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
         ],
         max_tokens: 4000,
-        temperature: 0.8,
+        temperature: 0.85, // 略微提高温度增加多样性
       }),
     })
 

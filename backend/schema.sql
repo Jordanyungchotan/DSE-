@@ -420,8 +420,140 @@ CREATE TABLE IF NOT EXISTS user_leaderboard_settings (
 );
 
 -- =====================
+-- 题目多样性增强系统
+-- =====================
+
+-- 题目指纹表
+CREATE TABLE IF NOT EXISTS question_fingerprints (
+  id TEXT PRIMARY KEY,
+  question_id TEXT NOT NULL,
+  semantic_hash TEXT NOT NULL,          -- 语义哈希
+  structural_features TEXT NOT NULL,    -- JSON: 结构特征
+  numerical_pattern TEXT NOT NULL,      -- JSON: 数值模式
+  conceptual_signature TEXT NOT NULL,   -- JSON: 概念签名
+  answer_pattern TEXT,                  -- JSON: 答案模式
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(question_id)
+);
+
+-- 题目变体关系表
+CREATE TABLE IF NOT EXISTS question_variants (
+  id TEXT PRIMARY KEY,
+  base_question_id TEXT NOT NULL,
+  variant_question_id TEXT NOT NULL,
+  variant_type TEXT NOT NULL,           -- 'numeric' | 'contextual' | 'structural'
+  similarity_score REAL DEFAULT 0,      -- 相似度 0-1
+  variation_distance REAL DEFAULT 0,    -- 变异距离 0-1
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 知识图谱节点表
+CREATE TABLE IF NOT EXISTS knowledge_nodes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  name_en TEXT,                         -- 英文名称
+  type TEXT NOT NULL,                   -- 'subject' | 'topic' | 'concept' | 'skill'
+  subject TEXT,                         -- 所属科目
+  parent_id TEXT,                       -- 父节点ID
+  metadata TEXT,                        -- JSON: 其他元数据
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 知识图谱关系表
+CREATE TABLE IF NOT EXISTS knowledge_relationships (
+  id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  relationship_type TEXT NOT NULL,      -- 'prerequisite' | 'related_to' | 'part_of' | 'requires_skill' | 'leads_to'
+  strength REAL DEFAULT 1.0,            -- 关系强度 0-1
+  metadata TEXT,                        -- JSON: 其他元数据
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (source_id) REFERENCES knowledge_nodes(id) ON DELETE CASCADE,
+  FOREIGN KEY (target_id) REFERENCES knowledge_nodes(id) ON DELETE CASCADE
+);
+
+-- 题目生成历史表（用于避免重复）
+CREATE TABLE IF NOT EXISTS question_generation_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  session_id TEXT,
+  subject TEXT NOT NULL,
+  topic TEXT,
+  difficulty TEXT,
+  question_fingerprint_id TEXT,
+  question_text TEXT NOT NULL,
+  generated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (question_fingerprint_id) REFERENCES question_fingerprints(id) ON DELETE SET NULL
+);
+
+-- 题目质量反馈表
+CREATE TABLE IF NOT EXISTS question_feedback (
+  id TEXT PRIMARY KEY,
+  question_id TEXT NOT NULL,
+  user_id TEXT,
+  rating INTEGER,                       -- 1-5评分
+  difficulty_perception INTEGER,        -- 用户感知难度 1-5
+  clarity_rating INTEGER,               -- 清晰度评分 1-5
+  feedback_text TEXT,                   -- 文字反馈
+  suggestions TEXT,                     -- 改进建议
+  is_reported INTEGER DEFAULT 0,        -- 是否举报
+  report_reason TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- 题目表现指标表
+CREATE TABLE IF NOT EXISTS question_performance (
+  id TEXT PRIMARY KEY,
+  question_id TEXT NOT NULL,
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  total_attempts INTEGER DEFAULT 0,
+  correct_count INTEGER DEFAULT 0,
+  average_time INTEGER DEFAULT 0,       -- 平均用时（秒）
+  abandonment_count INTEGER DEFAULT 0,  -- 放弃次数
+  actual_difficulty REAL,               -- 实际难度 0-1
+  clarity_score REAL,                   -- 清晰度评分
+  educational_value REAL,               -- 教育价值
+  exposure_count INTEGER DEFAULT 0,     -- 曝光次数
+  metrics TEXT,                         -- JSON: 其他指标
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Agent执行日志表
+CREATE TABLE IF NOT EXISTS agent_execution_logs (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL,
+  task_type TEXT NOT NULL,
+  input_data TEXT,                      -- JSON
+  output_data TEXT,                     -- JSON
+  execution_time INTEGER,               -- 毫秒
+  success INTEGER DEFAULT 1,
+  error_message TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =====================
 -- 索引
 -- =====================
+
+-- 题目指纹相关索引
+CREATE INDEX IF NOT EXISTS idx_fingerprints_question ON question_fingerprints(question_id);
+CREATE INDEX IF NOT EXISTS idx_fingerprints_semantic ON question_fingerprints(semantic_hash);
+CREATE INDEX IF NOT EXISTS idx_variants_base ON question_variants(base_question_id);
+CREATE INDEX IF NOT EXISTS idx_variants_variant ON question_variants(variant_question_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_nodes_type ON knowledge_nodes(type);
+CREATE INDEX IF NOT EXISTS idx_knowledge_nodes_subject ON knowledge_nodes(subject);
+CREATE INDEX IF NOT EXISTS idx_knowledge_rels_source ON knowledge_relationships(source_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_rels_target ON knowledge_relationships(target_id);
+CREATE INDEX IF NOT EXISTS idx_gen_history_user ON question_generation_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_gen_history_subject ON question_generation_history(subject);
+CREATE INDEX IF NOT EXISTS idx_question_feedback_question ON question_feedback(question_id);
+CREATE INDEX IF NOT EXISTS idx_question_perf_question ON question_performance(question_id);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_agent ON agent_execution_logs(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_logs_time ON agent_execution_logs(created_at);
 
 -- 排行榜相关索引
 CREATE INDEX IF NOT EXISTS idx_leaderboards_type ON leaderboards(leaderboard_type);
