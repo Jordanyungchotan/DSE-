@@ -325,13 +325,54 @@ function intelligentAnswerMatch(
   
   // 3. 选择题特殊处理
   if (questionType === 'multiple_choice') {
-    const userChoice = normalizedUser.toUpperCase().charAt(0)
-    let expectedChoice = normalizedExpected.toUpperCase().charAt(0)
-    if (/^\d$/.test(expectedChoice)) {
-      expectedChoice = String.fromCharCode(65 + parseInt(expectedChoice))
+    // 将用户答案转换为统一格式（字母A-D）
+    let userChoice = ''
+    const userTrimmed = userStr.trim()
+    
+    // 情况1: 用户答案是数字索引 (0, 1, 2, 3)
+    if (/^[0-3]$/.test(userTrimmed)) {
+      userChoice = String.fromCharCode(65 + parseInt(userTrimmed))
+    }
+    // 情况2: 用户答案是字母 (A, B, C, D)
+    else if (/^[A-Da-d]$/.test(userTrimmed)) {
+      userChoice = userTrimmed.toUpperCase()
+    }
+    // 情况3: 用户答案是完整选项文本
+    else if (options && options.length > 0) {
+      const matchedIndex = options.findIndex(opt => 
+        normalizeAnswer(opt).toLowerCase() === normalizedUser.toLowerCase()
+      )
+      if (matchedIndex >= 0) {
+        userChoice = String.fromCharCode(65 + matchedIndex)
+      }
     }
     
-    if (/^[A-D]$/.test(userChoice) && userChoice === expectedChoice) {
+    // 将正确答案转换为统一格式（字母A-D）
+    let expectedChoice = ''
+    const expectedTrimmed = expectedStr.trim()
+    
+    // 情况1: 正确答案是数字索引 (0, 1, 2, 3)
+    if (/^[0-3]$/.test(expectedTrimmed)) {
+      expectedChoice = String.fromCharCode(65 + parseInt(expectedTrimmed))
+    }
+    // 情况2: 正确答案是字母 (A, B, C, D)
+    else if (/^[A-Da-d]$/.test(expectedTrimmed)) {
+      expectedChoice = expectedTrimmed.toUpperCase()
+    }
+    // 情况3: 正确答案是完整选项文本
+    else if (options && options.length > 0) {
+      const matchedIndex = options.findIndex(opt => 
+        normalizeAnswer(opt).toLowerCase() === normalizeAnswer(expectedStr).toLowerCase() ||
+        opt.toLowerCase().includes(expectedStr.toLowerCase()) ||
+        expectedStr.toLowerCase().includes(opt.toLowerCase())
+      )
+      if (matchedIndex >= 0) {
+        expectedChoice = String.fromCharCode(65 + matchedIndex)
+      }
+    }
+    
+    // 比较用户答案和正确答案
+    if (userChoice && expectedChoice && userChoice === expectedChoice) {
       return {
         isCorrect: true,
         matchType: 'choice',
@@ -340,13 +381,14 @@ function intelligentAnswerMatch(
       }
     }
     
-    if (options && options.length > 0) {
-      const matchedIndex = options.findIndex(opt => 
+    // 如果无法解析用户答案，尝试直接比较选项内容
+    if (options && options.length > 0 && !userChoice) {
+      const userIndex = options.findIndex(opt => 
         normalizeAnswer(opt).toLowerCase() === normalizedUser.toLowerCase()
       )
-      if (matchedIndex >= 0) {
-        const matchedLetter = String.fromCharCode(65 + matchedIndex)
-        if (matchedLetter === expectedChoice) {
+      if (userIndex >= 0) {
+        const userLetter = String.fromCharCode(65 + userIndex)
+        if (userLetter === expectedChoice) {
           return {
             isCorrect: true,
             matchType: 'choice',
@@ -356,6 +398,12 @@ function intelligentAnswerMatch(
         }
       }
     }
+    
+    // 调试信息
+    console.log('选择题匹配调试:', { 
+      userStr, expectedStr, userChoice, expectedChoice, 
+      userTrimmed, expectedTrimmed 
+    })
   }
   
   // 4. 智能数值匹配 - 核心改进！
