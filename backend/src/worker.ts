@@ -1606,6 +1606,139 @@ export default {
         }, 200, origin)
       }
 
+      // 保存刷题记录（刷题完成时调用）
+      if (path === '/api/quiz/save' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const body = await request.json() as {
+          sessionId: string
+          config: {
+            grade: string
+            subject: string
+            difficulty: string
+            questionCount: number
+          }
+          questions: Array<{
+            id: string
+            question: string
+            correctAnswer: string | number
+            userAnswer?: string | number
+            isCorrect?: boolean
+          }>
+          score: number
+          accuracy: number
+          timeSpent: number
+        }
+
+        try {
+          const now = new Date().toISOString()
+          
+          // 检查是否已存在该session
+          const existingSession = await env.DB.prepare(
+            'SELECT id FROM quiz_sessions WHERE id = ?'
+          ).bind(body.sessionId).first()
+
+          if (existingSession) {
+            // 更新现有记录
+            await env.DB.prepare(`
+              UPDATE quiz_sessions 
+              SET status = 'completed', 
+                  end_time = ?, 
+                  score = ?, 
+                  accuracy = ?, 
+                  total_time = ?
+              WHERE id = ?
+            `).bind(
+              now,
+              body.score,
+              body.accuracy / 100,
+              body.timeSpent,
+              body.sessionId
+            ).run()
+          } else {
+            // 插入新记录
+            await env.DB.prepare(`
+              INSERT INTO quiz_sessions (id, user_id, config, status, questions, start_time, end_time, score, accuracy, total_time, created_at)
+              VALUES (?, ?, ?, 'completed', ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              body.sessionId,
+              tokenData.userId,
+              JSON.stringify(body.config),
+              JSON.stringify(body.questions),
+              now,
+              now,
+              body.score,
+              body.accuracy / 100,
+              body.timeSpent,
+              now
+            ).run()
+          }
+
+          // 同时更新排行榜统计
+          const existingStats = await env.DB.prepare(
+            'SELECT * FROM user_ranking_stats WHERE user_id = ?'
+          ).bind(tokenData.userId).first()
+
+          if (existingStats) {
+            const totalSessions = ((existingStats.total_sessions as number) || 0) + 1
+            const totalQuestions = ((existingStats.total_questions as number) || 0) + body.config.questionCount
+            const correctAnswers = ((existingStats.correct_answers as number) || 0) + body.score
+            
+            await env.DB.prepare(`
+              UPDATE user_ranking_stats 
+              SET total_sessions = ?, 
+                  total_questions = ?, 
+                  correct_answers = ?,
+                  average_accuracy = ?,
+                  last_activity_at = ?,
+                  updated_at = ?
+              WHERE user_id = ?
+            `).bind(
+              totalSessions,
+              totalQuestions,
+              correctAnswers,
+              correctAnswers / totalQuestions,
+              now,
+              now,
+              tokenData.userId
+            ).run()
+          } else {
+            const id = crypto.randomUUID()
+            await env.DB.prepare(`
+              INSERT INTO user_ranking_stats 
+              (id, user_id, total_sessions, total_questions, correct_answers, average_accuracy, last_activity_at, created_at, updated_at)
+              VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              id,
+              tokenData.userId,
+              body.config.questionCount,
+              body.score,
+              body.accuracy / 100,
+              now,
+              now,
+              now
+            ).run()
+          }
+
+          return jsonResponse({ 
+            success: true, 
+            message: '刷题记录已保存',
+            sessionId: body.sessionId
+          }, 200, origin)
+        } catch (dbError) {
+          console.error('Save quiz session error:', dbError)
+          return errorResponse('保存刷题记录失败', 500, origin)
+        }
+      }
+
       // 获取错题列表
       if (path === '/api/quiz/wrong-questions' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
@@ -2153,6 +2286,7 @@ export default {
             'GET /api/trends/employment',
             'POST /api/quiz/start',
             'POST /api/quiz/grade',
+            'POST /api/quiz/save',
             'GET /api/quiz/wrong-questions',
             'POST /api/quiz/wrong-questions',
             'GET /api/quiz/learning-profile',
