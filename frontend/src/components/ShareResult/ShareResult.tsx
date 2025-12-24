@@ -5,7 +5,7 @@ import {
   CopyOutlined,
   DownloadOutlined,
   WechatOutlined,
-  TwitterOutlined,
+  InstagramOutlined,
   FacebookOutlined,
   LinkOutlined,
   TrophyOutlined,
@@ -160,15 +160,17 @@ const ShareResult = ({ visible, onClose, result }: ShareResultProps) => {
   }
 
   // 社交分享
-  const shareToSocial = (platform: 'twitter' | 'facebook' | 'weibo') => {
+  const shareToSocial = (platform: 'instagram' | 'facebook' | 'weibo') => {
     const text = encodeURIComponent(generateShareText())
     const url = encodeURIComponent(`${window.location.origin}/quiz`)
 
     let shareUrl = ''
     switch (platform) {
-      case 'twitter':
-        shareUrl = `https://twitter.com/intent/tweet?text=${text}`
-        break
+      case 'instagram':
+        // Instagram不支持直接分享链接，复制文字后引导用户打开Instagram
+        copyShareText()
+        message.info('文字已复制，请打开Instagram粘贴分享')
+        return
       case 'facebook':
         shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${text}`
         break
@@ -276,11 +278,11 @@ const ShareResult = ({ visible, onClose, result }: ShareResultProps) => {
 
           <Space wrap className={styles.socialButtons}>
             <Button
-              icon={<TwitterOutlined />}
-              onClick={() => shareToSocial('twitter')}
-              className={styles.twitterBtn}
+              icon={<InstagramOutlined />}
+              onClick={() => shareToSocial('instagram')}
+              className={styles.instagramBtn}
             >
-              Twitter
+              Instagram
             </Button>
             <Button
               icon={<FacebookOutlined />}

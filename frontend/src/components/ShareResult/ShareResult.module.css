@@ -132,15 +132,15 @@
   min-width: 100px;
 }
 
-.twitterBtn {
-  background: #1da1f2 !important;
-  border-color: #1da1f2 !important;
+.instagramBtn {
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%) !important;
+  border: none !important;
   color: white !important;
 }
 
-.twitterBtn:hover {
-  background: #0d8cd9 !important;
-  border-color: #0d8cd9 !important;
+.instagramBtn:hover {
+  background: linear-gradient(45deg, #e08830 0%, #d55e38 25%, #c9233c 50%, #b8205c 75%, #a8167a 100%) !important;
+  opacity: 0.9;
 }
 
 .facebookBtn {
