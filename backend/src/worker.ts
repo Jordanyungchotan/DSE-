@@ -127,6 +127,227 @@ async function verifyToken(token: string, secret: string): Promise<{ userId: str
   }
 }
 
+// ===== 智能答案匹配系统 =====
+
+interface AnswerMatchResult {
+  isCorrect: boolean
+  matchType: 'exact' | 'normalized' | 'numeric' | 'equation' | 'choice'
+  confidence: number
+  feedback: string
+}
+
+// 答案规范化
+function normalizeAnswer(answer: string): string {
+  if (!answer) return ''
+  
+  return answer
+    .trim()
+    .replace(/\s+/g, ' ')
+    // 全角转半角
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, char => 
+      String.fromCharCode(char.charCodeAt(0) - 0xFEE0)
+    )
+    // 统一标点
+    .replace(/[，]/g, ',')
+    .replace(/[。]/g, '.')
+    .replace(/[：]/g, ':')
+    .replace(/[（]/g, '(')
+    .replace(/[）]/g, ')')
+    // 统一货币
+    .replace(/[￥＄]/g, '¥')
+    // 统一等号和运算符
+    .replace(/[＝]/g, '=')
+    .replace(/[×✕]/g, '*')
+    .replace(/[÷]/g, '/')
+    .replace(/[−–]/g, '-')
+    // 去除开头词
+    .replace(/^(答|答案|解|结果|等于)[:：]?\s*/i, '')
+    // 去除结尾标点
+    .replace(/[。．!！?？]$/, '')
+}
+
+// 提取数字
+function extractNumber(str: string): number | null {
+  if (!str) return null
+  const cleaned = str.replace(/[¥＄$€£\s]/g, '').toLowerCase()
+  
+  let multiplier = 1
+  if (cleaned.includes('万')) multiplier = 10000
+  else if (cleaned.includes('千')) multiplier = 1000
+  else if (cleaned.includes('亿')) multiplier = 100000000
+
+  const match = cleaned.match(/[-+]?\d*\.?\d+/)
+  if (!match) return null
+
+  const num = parseFloat(match[0])
+  return isNaN(num) ? null : num * multiplier
+}
+
+// 数值相等性判断
+function isNumericEqual(a: number, b: number, precision: number = 0.001): boolean {
+  if (b === 0) return Math.abs(a) < precision
+  return Math.abs(a - b) / Math.abs(b) < precision
+}
+
+// 提取方程解
+function extractEquationSolution(equation: string): number | null {
+  const cleaned = equation.replace(/\s/g, '').toLowerCase()
+  
+  // x=4, X=4
+  const match1 = cleaned.match(/[xy]=?([-+]?\d*\.?\d+)/)
+  if (match1) return parseFloat(match1[1])
+  
+  // 纯数字
+  const match2 = cleaned.match(/^([-+]?\d*\.?\d+)$/)
+  if (match2) return parseFloat(match2[1])
+  
+  // =4
+  const match3 = cleaned.match(/^=([-+]?\d*\.?\d+)/)
+  if (match3) return parseFloat(match3[1])
+  
+  return null
+}
+
+// 智能答案匹配主函数
+function intelligentAnswerMatch(
+  userAnswer: string,
+  expectedAnswer: string,
+  questionType: string,
+  options?: string[]
+): AnswerMatchResult {
+  const userStr = String(userAnswer)
+  const expectedStr = String(expectedAnswer)
+  
+  // 1. 完全匹配
+  if (userStr.trim() === expectedStr.trim()) {
+    return {
+      isCorrect: true,
+      matchType: 'exact',
+      confidence: 1.0,
+      feedback: '答案完全正确！🎉'
+    }
+  }
+  
+  // 规范化
+  const normalizedUser = normalizeAnswer(userStr)
+  const normalizedExpected = normalizeAnswer(expectedStr)
+  
+  // 2. 规范化后匹配
+  if (normalizedUser.toLowerCase() === normalizedExpected.toLowerCase()) {
+    return {
+      isCorrect: true,
+      matchType: 'normalized',
+      confidence: 0.95,
+      feedback: '答案正确！（系统已识别您的答案格式）✅'
+    }
+  }
+  
+  // 3. 选择题特殊处理
+  if (questionType === 'multiple_choice') {
+    const userChoice = normalizedUser.toUpperCase().charAt(0)
+    // 如果答案是数字索引，转换为字母
+    let expectedChoice = normalizedExpected.toUpperCase().charAt(0)
+    if (/^\d$/.test(expectedChoice)) {
+      expectedChoice = String.fromCharCode(65 + parseInt(expectedChoice))
+    }
+    
+    if (/^[A-D]$/.test(userChoice) && userChoice === expectedChoice) {
+      return {
+        isCorrect: true,
+        matchType: 'choice',
+        confidence: 0.95,
+        feedback: '答案正确！✅'
+      }
+    }
+    
+    // 检查用户输入的是选项内容而非字母
+    if (options && options.length > 0) {
+      const matchedIndex = options.findIndex(opt => 
+        normalizeAnswer(opt).toLowerCase() === normalizedUser.toLowerCase()
+      )
+      if (matchedIndex >= 0) {
+        const matchedLetter = String.fromCharCode(65 + matchedIndex)
+        if (matchedLetter === expectedChoice) {
+          return {
+            isCorrect: true,
+            matchType: 'choice',
+            confidence: 0.9,
+            feedback: '答案正确！（系统已识别您选择的选项内容）✅'
+          }
+        }
+      }
+    }
+  }
+  
+  // 4. 数值匹配（计算题）
+  if (questionType === 'calculation' || questionType === 'short_answer') {
+    const userNum = extractNumber(normalizedUser)
+    const expectedNum = extractNumber(normalizedExpected)
+    
+    if (userNum !== null && expectedNum !== null) {
+      if (isNumericEqual(userNum, expectedNum)) {
+        return {
+          isCorrect: true,
+          matchType: 'numeric',
+          confidence: 0.9,
+          feedback: '答案正确！（数值匹配）✅'
+        }
+      }
+    }
+  }
+  
+  // 5. 方程解匹配
+  if (questionType === 'calculation') {
+    const userSolution = extractEquationSolution(normalizedUser)
+    const expectedSolution = extractEquationSolution(normalizedExpected)
+    
+    if (userSolution !== null && expectedSolution !== null) {
+      if (isNumericEqual(userSolution, expectedSolution)) {
+        return {
+          isCorrect: true,
+          matchType: 'equation',
+          confidence: 0.9,
+          feedback: '答案正确！（系统已识别方程解）✅'
+        }
+      }
+    }
+  }
+  
+  // 答案不正确，生成智能反馈
+  let feedback = '答案不正确，请再仔细检查一下。'
+  
+  // 检查是否数值接近
+  const userNum = extractNumber(normalizedUser)
+  const expectedNum = extractNumber(normalizedExpected)
+  if (userNum !== null && expectedNum !== null) {
+    if (isNumericEqual(userNum, expectedNum, 0.1)) {
+      feedback = '数值接近但不够精确，请检查计算过程。'
+    } else if (Math.abs(userNum) === Math.abs(expectedNum)) {
+      feedback = '注意正负号！'
+    }
+  }
+  
+  // 检查是否可能是格式问题
+  if (questionType === 'calculation' && /^\d+$/.test(userStr.trim())) {
+    const solution = extractEquationSolution(expectedStr)
+    if (solution !== null && extractNumber(userStr) === solution) {
+      return {
+        isCorrect: true,
+        matchType: 'numeric',
+        confidence: 0.85,
+        feedback: '答案正确！提示：下次可以写成 x=' + solution + ' 的形式 ✅'
+      }
+    }
+  }
+  
+  return {
+    isCorrect: false,
+    matchType: 'exact',
+    confidence: 0,
+    feedback
+  }
+}
+
 // 刷题题目生成
 interface QuizConfig {
   grade: string
@@ -1358,24 +1579,30 @@ export default {
         }, 200, origin)
       }
 
-      // 评分答案
+      // 评分答案 - 使用智能答案匹配
       if (path === '/api/quiz/grade' && request.method === 'POST') {
         const body = await request.json() as {
           question: string
           questionType: string
           correctAnswer: string | number
           studentAnswer: string | number
+          options?: string[]
         }
 
-        // 简单评分逻辑
-        const isCorrect = String(body.studentAnswer).toLowerCase().trim() === 
-                         String(body.correctAnswer).toLowerCase().trim()
+        const userAnswer = String(body.studentAnswer)
+        const expectedAnswer = String(body.correctAnswer)
+        const questionType = body.questionType || 'short_answer'
+
+        // 智能答案匹配
+        const matchResult = intelligentAnswerMatch(userAnswer, expectedAnswer, questionType, body.options)
 
         return jsonResponse({
-          isCorrect,
-          feedback: isCorrect ? '回答正确！' : '回答错误，请查看解析。',
-          score: isCorrect ? 100 : 0,
+          isCorrect: matchResult.isCorrect,
+          feedback: matchResult.feedback,
+          score: matchResult.isCorrect ? 100 : 0,
           totalScore: 100,
+          matchType: matchResult.matchType,
+          confidence: matchResult.confidence,
         }, 200, origin)
       }
 

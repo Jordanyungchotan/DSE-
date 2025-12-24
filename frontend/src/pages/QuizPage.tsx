@@ -157,23 +157,109 @@ const QuizPage = () => {
     }
     
     const currentQ = currentSession?.questions[currentSession.currentQuestionIndex]
-    
-    submitAnswer(currentAnswer)
-    
-    // 检查答案是否正确，如果错误则保存到错题本
-    if (currentQ) {
-      const isCorrect = String(currentAnswer).toLowerCase().trim() === 
-                       String(currentQ.correctAnswer).toLowerCase().trim()
-      
-      if (!isCorrect) {
-        // 异步保存错题，不阻塞UI
-        saveWrongQuestion(currentQ, currentAnswer).catch(() => {
-          // 忽略错误
+    if (!currentQ) return
+
+    setSubmitting(true)
+
+    try {
+      // 调用后端智能批改API
+      const { apiFetch } = await import('../config/api')
+      const response = await apiFetch('/api/quiz/grade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: currentQ.question,
+          questionType: currentQ.questionType,
+          correctAnswer: currentQ.correctAnswer,
+          studentAnswer: currentAnswer,
+          options: currentQ.options,
         })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        
+        // 使用后端返回的智能匹配结果
+        submitAnswer(currentAnswer, result.isCorrect)
+        
+        // 显示智能反馈
+        if (result.isCorrect) {
+          message.success(result.feedback || '答案正确！✅')
+        } else {
+          message.error(result.feedback || '答案不正确')
+          // 保存到错题本
+          saveWrongQuestion(currentQ, currentAnswer).catch(() => {})
+        }
+      } else {
+        // 后端请求失败，使用本地匹配
+        const isCorrect = localAnswerMatch(currentAnswer, currentQ.correctAnswer, currentQ.questionType)
+        submitAnswer(currentAnswer, isCorrect)
+        
+        if (isCorrect) {
+          message.success('答案正确！✅')
+        } else {
+          message.error('答案不正确')
+          saveWrongQuestion(currentQ, currentAnswer).catch(() => {})
+        }
       }
+    } catch {
+      // 网络错误，使用本地匹配
+      const isCorrect = localAnswerMatch(currentAnswer, currentQ.correctAnswer, currentQ.questionType)
+      submitAnswer(currentAnswer, isCorrect)
+      
+      if (isCorrect) {
+        message.success('答案正确！✅')
+      } else {
+        message.error('答案不正确')
+        saveWrongQuestion(currentQ, currentAnswer).catch(() => {})
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // 本地答案匹配（作为后备方案）
+  const localAnswerMatch = (userAnswer: string | number, correctAnswer: string | number, questionType: string): boolean => {
+    const userStr = String(userAnswer).trim().toLowerCase()
+    const expectedStr = String(correctAnswer).trim().toLowerCase()
+    
+    // 完全匹配
+    if (userStr === expectedStr) return true
+    
+    // 规范化匹配
+    const normalizeStr = (s: string) => s
+      .replace(/\s+/g, '')
+      .replace(/[，。：；]/g, '')
+      .replace(/^(答|答案|解|结果|等于)[:：]?/i, '')
+    
+    if (normalizeStr(userStr) === normalizeStr(expectedStr)) return true
+    
+    // 选择题特殊处理
+    if (questionType === 'multiple_choice') {
+      const userChoice = userStr.charAt(0).toUpperCase()
+      let expectedChoice = expectedStr.charAt(0).toUpperCase()
+      // 如果是数字索引，转换为字母
+      if (/^\d$/.test(expectedChoice)) {
+        expectedChoice = String.fromCharCode(65 + parseInt(expectedChoice))
+      }
+      if (/^[A-D]$/.test(userChoice) && userChoice === expectedChoice) return true
     }
     
-    message.success('答案已提交')
+    // 数值匹配
+    const extractNum = (s: string): number | null => {
+      const match = s.replace(/[¥$€£\s]/g, '').match(/[-+]?\d*\.?\d+/)
+      return match ? parseFloat(match[0]) : null
+    }
+    
+    const userNum = extractNum(userStr)
+    const expectedNum = extractNum(expectedStr)
+    
+    if (userNum !== null && expectedNum !== null) {
+      const tolerance = Math.abs(expectedNum) * 0.001 + 0.001
+      if (Math.abs(userNum - expectedNum) < tolerance) return true
+    }
+    
+    return false
   }
 
   // 下一题

@@ -170,7 +170,7 @@ interface QuizState {
   updateConfig: (config: Partial<QuizConfig>) => void
   resetConfig: () => void
   startQuiz: () => Promise<void>
-  submitAnswer: (answer: string | number) => void
+  submitAnswer: (answer: string | number, isCorrectOverride?: boolean) => void
   nextQuestion: () => void
   previousQuestion: () => void
   finishQuiz: () => Promise<void>
@@ -276,17 +276,20 @@ export const useQuizStore = create<QuizState>()(
 
       /**
        * 提交当前题目答案
+       * @param answer 用户答案
+       * @param isCorrectOverride 可选，由后端智能匹配返回的正确性判断
        */
-      submitAnswer: (answer: string | number) => {
+      submitAnswer: (answer: string | number, isCorrectOverride?: boolean) => {
         const { currentSession } = get()
         if (!currentSession) return
 
         const currentQuestion = currentSession.questions[currentSession.currentQuestionIndex]
         if (!currentQuestion) return
 
-        // 判断答案是否正确
-        const isCorrect = String(answer).toLowerCase().trim() === 
-                         String(currentQuestion.correctAnswer).toLowerCase().trim()
+        // 使用后端返回的结果，或本地判断
+        const isCorrect = isCorrectOverride !== undefined 
+          ? isCorrectOverride 
+          : String(answer).toLowerCase().trim() === String(currentQuestion.correctAnswer).toLowerCase().trim()
 
         // 更新题目状态
         const updatedQuestions = currentSession.questions.map((q, index) => {
