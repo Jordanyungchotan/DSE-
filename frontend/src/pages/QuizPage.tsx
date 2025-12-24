@@ -465,26 +465,53 @@ const QuizPage = () => {
                 className={styles.optionsGroup}
               >
                 <Space direction="vertical" style={{ width: '100%' }}>
-                  {currentQuestion.options.map((option, index) => (
-                    <Radio
-                      key={index}
-                      value={index}
-                      className={`${styles.optionItem} ${
-                        currentQuestion.userAnswer !== undefined
-                          ? index === currentQuestion.correctAnswer
-                            ? styles.correct
-                            : currentQuestion.userAnswer === index
-                            ? styles.incorrect
+                  {currentQuestion.options.map((option, index) => {
+                    // 解析正确答案索引（支持数字、字母、文本格式）
+                    const getCorrectIndex = () => {
+                      const answer = currentQuestion.correctAnswer
+                      if (typeof answer === 'number') return answer
+                      if (typeof answer === 'string') {
+                        const trimmed = answer.trim().toUpperCase()
+                        if (/^[0-3]$/.test(trimmed)) return parseInt(trimmed)
+                        if (/^[A-D]$/.test(trimmed)) return trimmed.charCodeAt(0) - 65
+                        // 尝试匹配选项文本
+                        const matchIdx = currentQuestion.options!.findIndex(
+                          opt => opt.toLowerCase().includes(answer.toLowerCase()) ||
+                                 answer.toLowerCase().includes(opt.toLowerCase())
+                        )
+                        if (matchIdx >= 0) return matchIdx
+                      }
+                      return -1
+                    }
+                    const correctIndex = getCorrectIndex()
+                    const isCorrectOption = index === correctIndex
+                    const isUserSelected = currentQuestion.userAnswer === index
+                    const isAnswered = currentQuestion.userAnswer !== undefined
+                    
+                    return (
+                      <Radio
+                        key={index}
+                        value={index}
+                        className={`${styles.optionItem} ${
+                          isAnswered
+                            ? isCorrectOption
+                              ? styles.correct  // 正确选项显示绿色
+                              : isUserSelected
+                              ? styles.incorrect  // 用户选错的显示红色
+                              : ''
                             : ''
-                          : ''
-                      }`}
-                    >
-                      <span className={styles.optionLabel}>
-                        {String.fromCharCode(65 + index)}.
-                      </span>
-                      <span className={styles.optionText}>{option}</span>
-                    </Radio>
-                  ))}
+                        }`}
+                      >
+                        <span className={styles.optionLabel}>
+                          {String.fromCharCode(65 + index)}.
+                        </span>
+                        <span className={styles.optionText}>{option}</span>
+                        {isAnswered && isCorrectOption && (
+                          <span style={{ marginLeft: 8, color: '#52c41a', fontWeight: 'bold' }}>✓ 正确答案</span>
+                        )}
+                      </Radio>
+                    )
+                  })}
                 </Space>
               </Radio.Group>
             ) : (
@@ -539,45 +566,50 @@ const QuizPage = () => {
                 )}
               </div>
 
-              {!currentQuestion.isCorrect && (
-                <div className={styles.correctAnswer}>
-                  <Text strong>正确答案：</Text>
-                  {currentQuestion.questionType === 'multiple_choice' && currentQuestion.options ? (
-                    <Text>
-                      {(() => {
-                        const answer = currentQuestion.correctAnswer
-                        // 支持多种答案格式：数字索引(0-3)、字母(A-D)、完整选项文本
-                        let answerIndex = -1
-                        if (typeof answer === 'number') {
-                          answerIndex = answer
-                        } else if (typeof answer === 'string') {
-                          const upperAnswer = answer.toUpperCase().trim()
-                          if (/^[A-D]$/.test(upperAnswer)) {
-                            answerIndex = upperAnswer.charCodeAt(0) - 65
-                          } else if (/^[0-3]$/.test(answer)) {
-                            answerIndex = parseInt(answer)
-                          } else {
-                            // 可能是完整选项文本
-                            answerIndex = currentQuestion.options!.findIndex(
-                              opt => opt.toLowerCase().includes(answer.toLowerCase()) || 
-                                     answer.toLowerCase().includes(opt.toLowerCase())
-                            )
-                          }
+              {/* 始终显示正确答案（无论对错） */}
+              <div className={styles.correctAnswer} style={{ 
+                background: currentQuestion.isCorrect ? '#f6ffed' : '#fff2f0',
+                border: `1px solid ${currentQuestion.isCorrect ? '#b7eb8f' : '#ffccc7'}`,
+                borderRadius: 8,
+                padding: '12px 16px',
+                marginTop: 12
+              }}>
+                <Text strong style={{ color: currentQuestion.isCorrect ? '#52c41a' : '#ff4d4f' }}>
+                  {currentQuestion.isCorrect ? '✓ 你选对了！' : '✗ 正确答案：'}
+                </Text>
+                {currentQuestion.questionType === 'multiple_choice' && currentQuestion.options ? (
+                  <Text style={{ marginLeft: 8, color: '#52c41a', fontWeight: 'bold' }}>
+                    {(() => {
+                      const answer = currentQuestion.correctAnswer
+                      let answerIndex = -1
+                      if (typeof answer === 'number') {
+                        answerIndex = answer
+                      } else if (typeof answer === 'string') {
+                        const upperAnswer = answer.toUpperCase().trim()
+                        if (/^[A-D]$/.test(upperAnswer)) {
+                          answerIndex = upperAnswer.charCodeAt(0) - 65
+                        } else if (/^[0-3]$/.test(answer)) {
+                          answerIndex = parseInt(answer)
+                        } else {
+                          answerIndex = currentQuestion.options!.findIndex(
+                            opt => opt.toLowerCase().includes(answer.toLowerCase()) || 
+                                   answer.toLowerCase().includes(opt.toLowerCase())
+                          )
                         }
-                        
-                        if (answerIndex >= 0 && answerIndex < currentQuestion.options!.length) {
-                          return `${String.fromCharCode(65 + answerIndex)}. ${currentQuestion.options![answerIndex]}`
-                        }
-                        return String(answer)
-                      })()}
-                    </Text>
-                  ) : (
-                    <Text style={{ color: '#52c41a', fontWeight: 'bold' }}>
-                      {currentQuestion.correctAnswer}
-                    </Text>
-                  )}
-                </div>
-              )}
+                      }
+                      
+                      if (answerIndex >= 0 && answerIndex < currentQuestion.options!.length) {
+                        return `${String.fromCharCode(65 + answerIndex)}. ${currentQuestion.options![answerIndex]}`
+                      }
+                      return String(answer)
+                    })()}
+                  </Text>
+                ) : (
+                  <Text style={{ marginLeft: 8, color: '#52c41a', fontWeight: 'bold' }}>
+                    {currentQuestion.correctAnswer}
+                  </Text>
+                )}
+              </div>
 
               <div className={styles.explanationBox}>
                 <Title level={5}>解析</Title>
