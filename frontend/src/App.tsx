@@ -18,6 +18,7 @@ const QuizPage = lazy(() => import('./pages/QuizPage'))
 const QuizResultPage = lazy(() => import('./pages/QuizResultPage'))
 const WrongQuestionsPage = lazy(() => import('./pages/WrongQuestionsPage'))
 const QuizHistoryPage = lazy(() => import('./pages/QuizHistoryPage'))
+const LearningProfilePage = lazy(() => import('./pages/LearningProfilePage'))
 
 // 管理员后台页面
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
@@ -73,6 +74,7 @@ function App() {
           <Route path="quiz/result" element={<QuizResultPage />} />
           <Route path="quiz/wrong-questions" element={<WrongQuestionsPage />} />
           <Route path="quiz/history" element={<QuizHistoryPage />} />
+          <Route path="quiz/profile" element={<LearningProfilePage />} />
         </Route>
         
         {/* 404重定向到首页 */}

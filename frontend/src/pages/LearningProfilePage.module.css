@@ -1,0 +1,428 @@
+/* 学习档案页面样式 */
+
+.profilePage {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* 加载和空状态 */
+.loadingContainer,
+.emptyContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 24px;
+}
+
+/* 页面标题 */
+.pageHeader {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.headerContent {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: linear-gradient(135deg, var(--color-primary), #722ed1);
+  color: white;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.pageTitle {
+  margin-bottom: 8px !important;
+}
+
+.pageDesc {
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+/* 统计卡片 */
+.statsRow {
+  margin-bottom: 24px;
+}
+
+.statCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.statCard :global(.ant-statistic-title) {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.statCard :global(.ant-statistic-content) {
+  font-weight: 600;
+}
+
+/* 高亮卡片 */
+.highlightRow {
+  margin-bottom: 24px;
+}
+
+.highlightCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  height: 100%;
+}
+
+/* 连续学习卡片 */
+.streakCard {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  border: none;
+  color: white;
+}
+
+.streakContent {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.streakIcon {
+  font-size: 48px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+.streakInfo {
+  flex: 1;
+}
+
+.streakLabel {
+  display: block;
+  font-size: 14px;
+  opacity: 0.9;
+  margin-bottom: 4px;
+  color: white !important;
+}
+
+.streakValue {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.streakNumber {
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.streakUnit {
+  font-size: 18px;
+  opacity: 0.9;
+}
+
+/* 成就预览 */
+.achievementPreview {
+  padding: 16px;
+}
+
+.achievementHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.achievementIcons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.achievementIcon {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border-radius: 10px;
+  background: var(--bg-tertiary);
+  filter: grayscale(100%);
+  opacity: 0.5;
+  transition: all 0.3s ease;
+}
+
+.achievementIcon.unlocked {
+  filter: grayscale(0%);
+  opacity: 1;
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+}
+
+/* 标签页 */
+.tabs {
+  margin-bottom: 24px;
+}
+
+.tabs :global(.ant-tabs-nav) {
+  margin-bottom: 24px;
+}
+
+/* 科目网格 */
+.subjectGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.subjectCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.subjectCard:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.subjectHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.subjectIcon {
+  font-size: 24px;
+}
+
+.subjectName {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.subjectProgress {
+  margin-bottom: 12px;
+}
+
+.subjectStats {
+  font-size: 12px;
+}
+
+/* 知识点列表 */
+.topicList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.topicCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.topicCard :global(.ant-card-body) {
+  padding: 16px;
+}
+
+.topicHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* 成就网格 */
+.achievementGrid {
+  margin-bottom: 24px;
+}
+
+.achievementCard {
+  text-align: center;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.achievementCard:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.achievementCard.locked {
+  opacity: 0.7;
+}
+
+.achievementCard.locked .achievementBigIcon {
+  filter: grayscale(100%);
+}
+
+.achievementCard.unlocked {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: #fbbf24;
+}
+
+.achievementBigIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.achievementName {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.achievementDesc {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+/* 目标列表 */
+.goalsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.goalCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.goalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.goalTitle {
+  display: flex;
+  align-items: center;
+}
+
+.addGoalCard {
+  background: var(--bg-tertiary);
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+}
+
+/* 活动列表 */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.activityCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.activityCard :global(.ant-card-body) {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 24px;
+}
+
+.activityDate {
+  min-width: 100px;
+}
+
+.activityStats {
+  flex: 1;
+  display: flex;
+  gap: 32px;
+}
+
+.activityStats :global(.ant-statistic) {
+  flex: 1;
+}
+
+.activityStats :global(.ant-statistic-title) {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 快捷操作 */
+.quickActions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .profilePage {
+    padding: 16px;
+  }
+
+  .streakContent {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .streakNumber {
+    font-size: 36px;
+  }
+
+  .subjectGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .activityCard :global(.ant-card-body) {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .activityStats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .quickActions {
+    flex-direction: column;
+  }
+
+  .quickActions button {
+    width: 100%;
+  }
+}
+

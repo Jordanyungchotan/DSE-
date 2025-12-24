@@ -1,0 +1,263 @@
+/* 学习报告组件样式 */
+
+.reportCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  min-height: 300px;
+}
+
+.loadingContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.emptyIcon {
+  font-size: 64px;
+  color: var(--color-primary);
+  margin-bottom: 24px;
+}
+
+/* 报告容器 */
+.reportContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 报告头部 */
+.reportHeader {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #722ed1 100%);
+  border-radius: 16px;
+  color: white;
+}
+
+.reportHeader :global(.ant-card-body) {
+  padding: 24px;
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.headerContent h3 {
+  color: white !important;
+  margin-bottom: 4px;
+}
+
+.headerContent span {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+}
+
+/* 概况卡片 */
+.summaryCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+}
+
+.summaryItem {
+  text-align: center;
+  padding: 16px;
+}
+
+.summaryIcon {
+  font-size: 32px;
+  color: var(--color-primary);
+  margin-bottom: 12px;
+}
+
+.summaryValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.summaryLabel {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.subjectTags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* 科目分析 */
+.analysisCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+}
+
+.subjectList {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.subjectItem {
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.subjectItem:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.subjectHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.subjectInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.accuracyText {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.recommendationList {
+  margin-top: 12px;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.recommendationList li {
+  margin-bottom: 4px;
+}
+
+/* 知识点洞察 */
+.insightsCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+}
+
+.topicItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.topicItem:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.topicItem.strong {
+  border-left: 4px solid #52c41a;
+}
+
+.topicItem.needs_work {
+  border-left: 4px solid #fa8c16;
+}
+
+.topicItem.critical {
+  border-left: 4px solid #f5222d;
+}
+
+/* 建议卡片 */
+.recommendCard,
+.nextStepsCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  height: 100%;
+}
+
+.tipsList {
+  padding-left: 0;
+  list-style: none;
+}
+
+.tipsList li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.tipsList li:last-child {
+  border-bottom: none;
+}
+
+.stepsList {
+  padding-left: 0;
+  list-style: none;
+  counter-reset: step-counter;
+}
+
+.stepsList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.stepsList li:last-child {
+  border-bottom: none;
+}
+
+.stepNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: var(--color-primary);
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .headerContent {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .summaryValue {
+    font-size: 22px;
+  }
+}
+

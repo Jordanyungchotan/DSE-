@@ -11,6 +11,8 @@ import {
   LoginOutlined,
   ExperimentOutlined,
   BookOutlined,
+  LineChartOutlined,
+  TrophyOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import { useLanguageStore } from '../../stores/languageStore'
@@ -62,6 +64,11 @@ const MainLayout = () => {
           icon: <HistoryOutlined />,
           label: '刷题记录',
         },
+        {
+          key: '/quiz/profile',
+          icon: <LineChartOutlined />,
+          label: '学习档案',
+        },
       ],
     },
     {
@@ -73,6 +80,18 @@ const MainLayout = () => {
 
   // 用户下拉菜单
   const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <LineChartOutlined />,
+      label: '学习档案',
+      onClick: () => navigate('/quiz/profile'),
+    },
+    {
+      key: 'achievements',
+      icon: <TrophyOutlined />,
+      label: '我的成就',
+      onClick: () => navigate('/quiz/profile?tab=achievements'),
+    },
     {
       key: 'history',
       icon: <HistoryOutlined />,
