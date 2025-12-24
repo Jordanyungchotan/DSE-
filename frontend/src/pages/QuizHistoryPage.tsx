@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Typography, Button, Empty, Tag, Spin, Statistic, message, Tooltip } from 'antd'
+import { Card, Row, Col, Typography, Button, Empty, Tag, Spin, Statistic, message, Tooltip, Modal, Collapse, Badge } from 'antd'
 import {
   HistoryOutlined,
   TrophyOutlined,
@@ -11,6 +11,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   ShareAltOutlined,
+  EyeOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import { SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
@@ -19,6 +20,21 @@ import ShareResult from '../components/ShareResult/ShareResult'
 import styles from './QuizHistoryPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
+
+/**
+ * 题目接口
+ */
+interface QuestionItem {
+  id: string
+  question: string
+  questionType: string
+  options?: string[]
+  correctAnswer: string | number
+  userAnswer?: string | number
+  isCorrect?: boolean
+  explanation?: string
+  topicTags?: string[]
+}
 
 /**
  * 刷题历史记录接口
@@ -33,6 +49,7 @@ interface QuizHistoryItem {
   totalQuestions: number
   timeSpent: number
   completedAt: string
+  questions?: QuestionItem[]
 }
 
 /**
@@ -49,6 +66,10 @@ const QuizHistoryPage = () => {
     averageAccuracy: 0,
     totalTime: 0,
   })
+  // 详情弹窗状态
+  const [detailModalVisible, setDetailModalVisible] = useState(false)
+  const [selectedRecord, setSelectedRecord] = useState<QuizHistoryItem | null>(null)
+
   // 分享状态
   const [shareModalVisible, setShareModalVisible] = useState(false)
   const [shareData, setShareData] = useState<{
@@ -226,6 +247,20 @@ const QuizHistoryPage = () => {
     })
   }
 
+  // 查看详情
+  const handleViewDetail = (record: QuizHistoryItem) => {
+    setSelectedRecord(record)
+    setDetailModalVisible(true)
+  }
+
+  // 清理选项前缀
+  const cleanOptionPrefix = (option: string): string => {
+    return option
+      .replace(/^[A-Da-d][.、．。]\s+/, '')
+      .replace(/^[（(][A-Da-d][)）]\s*/, '')
+      .trim()
+  }
+
   // 分享单条记录
   const handleShare = (record: QuizHistoryItem) => {
     const subject = allSubjects.find((s) => s.id === record.subject)
@@ -306,18 +341,30 @@ const QuizHistoryPage = () => {
             <Text type="secondary" className={styles.dateText}>
               {formatDate(record.completedAt)}
             </Text>
-            <Tooltip title="分享成绩">
-              <Button
-                type="primary"
-                ghost
-                size="small"
-                icon={<ShareAltOutlined />}
-                onClick={() => handleShare(record)}
-                className={styles.shareBtn}
-              >
-                分享
-              </Button>
-            </Tooltip>
+            <div className={styles.cardActions}>
+              <Tooltip title="查看详情">
+                <Button
+                  size="small"
+                  icon={<EyeOutlined />}
+                  onClick={() => handleViewDetail(record)}
+                  className={styles.detailBtn}
+                >
+                  详情
+                </Button>
+              </Tooltip>
+              <Tooltip title="分享成绩">
+                <Button
+                  type="primary"
+                  ghost
+                  size="small"
+                  icon={<ShareAltOutlined />}
+                  onClick={() => handleShare(record)}
+                  className={styles.shareBtn}
+                >
+                  分享
+                </Button>
+              </Tooltip>
+            </div>
           </div>
         </div>
       </Card>
@@ -472,6 +519,151 @@ const QuizHistoryPage = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* 详情弹窗 */}
+      <Modal
+        title={
+          <div className={styles.detailModalTitle}>
+            <HistoryOutlined /> 刷题详情
+            {selectedRecord && (
+              <Tag color="blue" style={{ marginLeft: 12 }}>
+                {allSubjects.find(s => s.id === selectedRecord.subject)?.name || selectedRecord.subject}
+              </Tag>
+            )}
+          </div>
+        }
+        open={detailModalVisible}
+        onCancel={() => {
+          setDetailModalVisible(false)
+          setSelectedRecord(null)
+        }}
+        footer={null}
+        width={700}
+        className={styles.detailModal}
+      >
+        {selectedRecord && (
+          <div className={styles.detailContent}>
+            {/* 概览信息 */}
+            <div className={styles.detailSummary}>
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>正确率</span>
+                <span 
+                  className={styles.summaryValue}
+                  style={{ color: selectedRecord.accuracy >= 60 ? '#52c41a' : '#f5222d' }}
+                >
+                  {selectedRecord.accuracy}%
+                </span>
+              </div>
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>成绩</span>
+                <span className={styles.summaryValue}>
+                  {selectedRecord.score}/{selectedRecord.totalQuestions}
+                </span>
+              </div>
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>用时</span>
+                <span className={styles.summaryValue}>
+                  {formatTime(selectedRecord.timeSpent)}
+                </span>
+              </div>
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>日期</span>
+                <span className={styles.summaryValue}>
+                  {formatDate(selectedRecord.completedAt)}
+                </span>
+              </div>
+            </div>
+
+            {/* 题目列表 */}
+            <div className={styles.questionList}>
+              <Title level={5}>答题详情</Title>
+              {selectedRecord.questions && selectedRecord.questions.length > 0 ? (
+                <Collapse accordion>
+                  {selectedRecord.questions.map((q, index) => (
+                    <Collapse.Panel
+                      key={q.id || index}
+                      header={
+                        <div className={styles.questionHeader}>
+                          <Badge
+                            status={q.isCorrect ? 'success' : 'error'}
+                            text={
+                              <span>
+                                <strong>第 {index + 1} 题</strong>
+                                {q.isCorrect ? (
+                                  <Tag color="success" style={{ marginLeft: 8 }}>正确</Tag>
+                                ) : (
+                                  <Tag color="error" style={{ marginLeft: 8 }}>错误</Tag>
+                                )}
+                              </span>
+                            }
+                          />
+                        </div>
+                      }
+                    >
+                      <div className={styles.questionDetail}>
+                        <div className={styles.questionText}>
+                          <Text strong>题目：</Text>
+                          <Text>{q.question}</Text>
+                        </div>
+
+                        {q.questionType === 'multiple_choice' && q.options && (
+                          <div className={styles.optionsList}>
+                            {q.options.map((opt, optIndex) => {
+                              const optionLetter = String.fromCharCode(65 + optIndex)
+                              const isCorrect = String(q.correctAnswer).toUpperCase() === optionLetter ||
+                                              Number(q.correctAnswer) === optIndex
+                              const isUserAnswer = q.userAnswer !== undefined && (
+                                String(q.userAnswer).toUpperCase() === optionLetter ||
+                                Number(q.userAnswer) === optIndex
+                              )
+                              
+                              return (
+                                <div
+                                  key={optIndex}
+                                  className={`${styles.optionItem} ${
+                                    isCorrect ? styles.correctOption : ''
+                                  } ${isUserAnswer && !isCorrect ? styles.wrongOption : ''}`}
+                                >
+                                  <span className={styles.optionLetter}>{optionLetter}.</span>
+                                  <span>{cleanOptionPrefix(opt)}</span>
+                                  {isCorrect && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 8 }} />}
+                                  {isUserAnswer && !isCorrect && <CloseCircleOutlined style={{ color: '#f5222d', marginLeft: 8 }} />}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+
+                        {q.questionType !== 'multiple_choice' && (
+                          <div className={styles.answerSection}>
+                            <div>
+                              <Text type="secondary">你的答案：</Text>
+                              <Text>{q.userAnswer || '-'}</Text>
+                            </div>
+                            <div>
+                              <Text type="secondary">正确答案：</Text>
+                              <Text strong style={{ color: '#52c41a' }}>{q.correctAnswer}</Text>
+                            </div>
+                          </div>
+                        )}
+
+                        {q.explanation && (
+                          <div className={styles.explanationBox}>
+                            <Text type="secondary">解析：</Text>
+                            <Text>{q.explanation}</Text>
+                          </div>
+                        )}
+                      </div>
+                    </Collapse.Panel>
+                  ))}
+                </Collapse>
+              ) : (
+                <Empty description="题目详情暂不可用" />
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* 分享弹窗 */}
       {shareData && (

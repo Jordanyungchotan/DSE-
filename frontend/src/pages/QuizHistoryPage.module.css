@@ -299,7 +299,24 @@
   margin-bottom: 4px !important;
 }
 
-/* ===== 分享按钮 ===== */
+/* ===== 操作按钮 ===== */
+.cardActions {
+  display: flex;
+  gap: 8px;
+}
+
+.detailBtn {
+  border-radius: 8px;
+  font-size: 0.8rem;
+  transition: all 0.3s;
+}
+
+.detailBtn:hover {
+  transform: scale(1.05);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .shareBtn {
   border-radius: 8px;
   font-size: 0.8rem;
@@ -308,6 +325,116 @@
 
 .shareBtn:hover {
   transform: scale(1.05);
+}
+
+/* ===== 详情弹窗 ===== */
+.detailModalTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detailContent {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.detailSummary {
+  display: flex;
+  justify-content: space-around;
+  background: linear-gradient(135deg, rgba(43, 108, 176, 0.05), rgba(82, 196, 26, 0.05));
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.summaryItem {
+  text-align: center;
+}
+
+.summaryLabel {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.summaryValue {
+  display: block;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.questionList h5 {
+  margin-bottom: 16px !important;
+}
+
+.questionHeader {
+  font-size: 0.9rem;
+}
+
+.questionDetail {
+  padding: 8px 0;
+}
+
+.questionText {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.optionsList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.optionItem {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.optionItem.correctOption {
+  background: rgba(82, 196, 26, 0.1);
+  border-color: #52c41a;
+}
+
+.optionItem.wrongOption {
+  background: rgba(245, 34, 45, 0.1);
+  border-color: #f5222d;
+}
+
+.optionLetter {
+  font-weight: 600;
+  margin-right: 8px;
+  color: var(--text-secondary);
+}
+
+.answerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.explanationBox {
+  padding: 12px;
+  background: rgba(250, 140, 22, 0.05);
+  border-left: 3px solid #fa8c16;
+  border-radius: 0 8px 8px 0;
+}
+
+.explanationBox span:first-child {
+  display: block;
+  margin-bottom: 4px;
 }
 
 /* ===== 响应式设计 ===== */
