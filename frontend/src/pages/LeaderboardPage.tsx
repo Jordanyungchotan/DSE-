@@ -16,7 +16,6 @@ import {
 } from 'antd'
 import {
   TrophyOutlined,
-  CrownOutlined,
   FireOutlined,
   ThunderboltOutlined,
   RiseOutlined,
