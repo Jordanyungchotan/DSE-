@@ -1741,7 +1741,7 @@ export default {
           return errorResponse('登录已过期', 401, origin)
         }
 
-        const body = await request.json() as {
+        let body: {
           sessionId: string
           config: {
             grade: string
@@ -1760,6 +1760,17 @@ export default {
           accuracy: number
           timeSpent: number
         }
+        
+        try {
+          body = await request.json()
+        } catch (parseError) {
+          return errorResponse('请求数据格式错误', 400, origin)
+        }
+
+        // 验证必要字段
+        if (!body.sessionId || !body.config || !body.questions) {
+          return errorResponse('缺少必要字段', 400, origin)
+        }
 
         try {
           const now = new Date().toISOString()
@@ -1769,21 +1780,26 @@ export default {
             'SELECT id FROM quiz_sessions WHERE id = ?'
           ).bind(body.sessionId).first()
 
+          let operation = 'insert'
+          
           if (existingSession) {
             // 更新现有记录
+            operation = 'update'
             await env.DB.prepare(`
               UPDATE quiz_sessions 
               SET status = 'completed', 
                   end_time = ?, 
                   score = ?, 
                   accuracy = ?, 
-                  total_time = ?
+                  total_time = ?,
+                  questions = ?
               WHERE id = ?
             `).bind(
               now,
               body.score,
               body.accuracy / 100,
               body.timeSpent,
+              JSON.stringify(body.questions),
               body.sessionId
             ).run()
           } else {
@@ -1804,6 +1820,8 @@ export default {
               now
             ).run()
           }
+          
+          console.log(`Quiz session saved: ${body.sessionId}, operation: ${operation}, user: ${tokenData.userId}`)
 
           // 同时更新排行榜统计
           const existingStats = await env.DB.prepare(
@@ -1866,12 +1884,12 @@ export default {
       if (path === '/api/quiz/history' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
-          return jsonResponse({ history: [] }, 200, origin)
+          return jsonResponse({ history: [], debug: 'no auth header' }, 200, origin)
         }
 
         const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
         if (!tokenData) {
-          return jsonResponse({ history: [] }, 200, origin)
+          return jsonResponse({ history: [], debug: 'invalid token' }, 200, origin)
         }
 
         try {
@@ -1879,6 +1897,7 @@ export default {
             SELECT 
               id,
               config,
+              questions,
               status,
               score,
               accuracy,
@@ -1893,10 +1912,19 @@ export default {
           const results = await env.DB.prepare(query).bind(tokenData.userId).all()
 
           const history = (results.results || []).map((row: Record<string, unknown>) => {
-            let config = { subject: 'math', grade: 'f5', difficulty: 'standard' }
+            let config = { subject: 'math', grade: 'f5', difficulty: 'standard', questionCount: 10 }
+            let questionsArray: unknown[] = []
+            
             try {
               config = JSON.parse(row.config as string || '{}')
             } catch {}
+            
+            try {
+              questionsArray = JSON.parse(row.questions as string || '[]')
+            } catch {}
+
+            // totalQuestions 优先从题目数组长度获取，其次从config获取
+            const totalQuestions = questionsArray.length || config.questionCount || 10
 
             return {
               id: row.id,
@@ -1904,16 +1932,17 @@ export default {
               grade: config.grade || 'f5',
               difficulty: config.difficulty || 'standard',
               score: row.score || 0,
+              totalQuestions,
               accuracy: Math.round((row.accuracy as number || 0) * 100),
               timeSpent: row.timeSpent || 0,
               completedAt: row.completedAt
             }
           })
 
-          return jsonResponse({ history }, 200, origin)
+          return jsonResponse({ history, count: history.length }, 200, origin)
         } catch (dbError) {
           console.error('Load quiz history error:', dbError)
-          return jsonResponse({ history: [] }, 200, origin)
+          return jsonResponse({ history: [], error: String(dbError) }, 200, origin)
         }
       }
 
