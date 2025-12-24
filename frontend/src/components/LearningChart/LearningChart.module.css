@@ -1,0 +1,374 @@
+/* 学习数据可视化图表样式 */
+
+.chartsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 趋势卡片 */
+.trendCard {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #4a5568 100%);
+  border-radius: 16px;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.trendCard :global(.ant-card-body) {
+  padding: 20px 24px;
+}
+
+.trendHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.trendHeader h5 {
+  color: white !important;
+  margin-bottom: 0 !important;
+}
+
+.trendIcon {
+  font-size: 20px;
+}
+
+.trendContent {
+  display: flex;
+  justify-content: space-around;
+}
+
+.trendValue,
+.trendAvg {
+  text-align: center;
+}
+
+.trendNumber {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.trendNumber.positive {
+  color: #68d391;
+}
+
+.trendNumber.negative {
+  color: #fc8181;
+}
+
+.avgNumber {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.trendValue span:last-child,
+.trendAvg span:last-child {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* 图表卡片通用样式 */
+.chartCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  height: 100%;
+}
+
+.chartCard :global(.ant-card-body) {
+  padding: 20px;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.chartHeader h5 {
+  margin-bottom: 0 !important;
+  color: var(--text-primary);
+}
+
+.chartIcon {
+  font-size: 18px;
+  color: var(--color-primary);
+}
+
+/* 柱状图 */
+.barChart {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  height: 180px;
+  padding: 0 8px;
+}
+
+.barItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  max-width: 50px;
+}
+
+.barWrapper {
+  height: 150px;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar {
+  width: 24px;
+  min-height: 4px;
+  border-radius: 4px 4px 0 0;
+  position: relative;
+  transition: height 0.3s ease;
+}
+
+.barValue {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.barLabel {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* 折线图 */
+.lineChart {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lineChartArea {
+  flex: 1;
+  display: flex;
+  position: relative;
+}
+
+.yAxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 40px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-align: right;
+  padding-right: 8px;
+}
+
+.lineChartContent {
+  flex: 1;
+  position: relative;
+}
+
+.lineSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.gridLine {
+  stroke: var(--border-color);
+  stroke-width: 0.5;
+  stroke-dasharray: 2;
+}
+
+.dataLine {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dataPoint {
+  fill: var(--color-primary);
+  stroke: white;
+  stroke-width: 1.5;
+}
+
+.xAxis {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 40px;
+  padding-top: 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+/* 饼图 */
+.pieChart {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.pieWrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
+}
+
+.pieSvg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.pieSegment {
+  transition: stroke-dasharray 0.3s ease;
+}
+
+.pieCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.pieTotalNumber {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pieTotalLabel {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.pieLegend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legendColor {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.legendName {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.legendValue {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 水平条形图 */
+.horizontalBarChart {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.horizontalBarItem {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.horizontalBarLabel {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.horizontalBarLabel span:first-child {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.horizontalBarValue {
+  color: var(--text-secondary);
+}
+
+.horizontalBarTrack {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.horizontalBarFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .trendContent {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .trendNumber,
+  .avgNumber {
+    font-size: 1.5rem;
+  }
+
+  .barChart {
+    height: 150px;
+  }
+
+  .barWrapper {
+    height: 120px;
+  }
+
+  .bar {
+    width: 20px;
+  }
+
+  .pieChart {
+    flex-direction: column;
+  }
+
+  .pieWrapper {
+    width: 100px;
+    height: 100px;
+  }
+
+  .pieLegend {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .legendItem {
+    width: auto;
+  }
+}
+

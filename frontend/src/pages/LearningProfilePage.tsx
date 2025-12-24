@@ -14,11 +14,14 @@ import {
   RocketOutlined,
   AimOutlined,
   LineChartOutlined,
+  BulbOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import { SUPPORTED_SUBJECTS } from '../stores/quizStore'
 import { apiFetch } from '../config/api'
 import LearningReport from '../components/LearningReport/LearningReport'
+import LearningChart from '../components/LearningChart/LearningChart'
+import SmartRecommendation from '../components/SmartRecommendation/SmartRecommendation'
 import styles from './LearningProfilePage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -94,7 +97,7 @@ const LearningProfilePage = () => {
   const { isAuthenticated, user, token } = useAuthStore()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<LearningProfile | null>(null)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('recommendations')
 
   // 获取所有科目
   const allSubjects = [
@@ -347,6 +350,22 @@ const LearningProfilePage = () => {
 
       {/* 标签页 */}
       <Tabs activeKey={activeTab} onChange={setActiveTab} className={styles.tabs}>
+        <TabPane tab={<span><BulbOutlined /> 智能推荐</span>} key="recommendations">
+          <SmartRecommendation
+            subjectMastery={profile.subjectMastery}
+            topicMastery={profile.topicMastery}
+            wrongQuestions={[]}
+            totalQuizzes={profile.totalQuizzes}
+          />
+        </TabPane>
+
+        <TabPane tab={<span><LineChartOutlined /> 数据统计</span>} key="charts">
+          <LearningChart
+            recentActivity={profile.recentActivity}
+            subjectMastery={profile.subjectMastery}
+          />
+        </TabPane>
+
         <TabPane tab={<span><BookOutlined /> 科目掌握</span>} key="subjects">
           <div className={styles.subjectGrid}>
             {profile.subjectMastery.map((subject) => (

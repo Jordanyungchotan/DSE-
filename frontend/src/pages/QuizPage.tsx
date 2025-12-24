@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Button, Progress, Typography, Modal, Radio, Input, Space, Tag, message } from 'antd'
+import { Card, Button, Progress, Typography, Modal, Radio, Input, Space, Tag, message, Tooltip } from 'antd'
 import {
   LeftOutlined,
   RightOutlined,
@@ -12,6 +12,9 @@ import {
   QuestionCircleOutlined,
   BulbOutlined,
   FireOutlined,
+  StarOutlined,
+  StarFilled,
+  WarningOutlined,
 } from '@ant-design/icons'
 import { useQuizStore, SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
 import styles from './QuizPage.module.css'
@@ -41,6 +44,20 @@ const QuizPage = () => {
   const [showExitModal, setShowExitModal] = useState(false)
   const [showHint, setShowHint] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [favoriteQuestions, setFavoriteQuestions] = useState<Set<string>>(new Set())
+  const [showTimeWarning, setShowTimeWarning] = useState(false)
+
+  // 计算时间限制（秒）
+  const timeLimit = useMemo(() => {
+    if (!currentSession?.config.timeLimit) return null
+    return currentSession.config.timeLimit * 60 // 转换为秒
+  }, [currentSession?.config.timeLimit])
+
+  // 计算剩余时间
+  const remainingTime = useMemo(() => {
+    if (!timeLimit) return null
+    return Math.max(0, timeLimit - timer)
+  }, [timeLimit, timer])
 
   // 如果没有会话，重定向到设置页面
   useEffect(() => {
@@ -60,6 +77,22 @@ const QuizPage = () => {
     return () => clearInterval(interval)
   }, [currentSession])
 
+  // 时间警告检测
+  useEffect(() => {
+    if (remainingTime !== null && remainingTime <= 60 && remainingTime > 0 && !showTimeWarning) {
+      setShowTimeWarning(true)
+      message.warning('⏰ 剩余时间不足1分钟！')
+    }
+  }, [remainingTime, showTimeWarning])
+
+  // 时间到自动提交
+  useEffect(() => {
+    if (remainingTime === 0) {
+      message.error('时间到！自动提交答案...')
+      handleFinishQuiz()
+    }
+  }, [remainingTime])
+
   // 当切换题目时，重置当前答案
   useEffect(() => {
     if (currentSession) {
@@ -74,6 +107,21 @@ const QuizPage = () => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+  }, [])
+
+  // 切换收藏
+  const toggleFavorite = useCallback((questionId: string) => {
+    setFavoriteQuestions((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(questionId)) {
+        newSet.delete(questionId)
+        message.info('已取消收藏')
+      } else {
+        newSet.add(questionId)
+        message.success('已收藏题目')
+      }
+      return newSet
+    })
   }, [])
 
   // 获取科目名称
@@ -209,8 +257,24 @@ const QuizPage = () => {
           )}
         </div>
         <div className={styles.statusCenter}>
-          <ClockCircleOutlined />
-          <span className={styles.timer}>{formatTime(timer)}</span>
+          {timeLimit ? (
+            // 倒计时模式
+            <div className={`${styles.countdown} ${remainingTime && remainingTime <= 60 ? styles.warning : ''}`}>
+              {remainingTime && remainingTime <= 60 && <WarningOutlined className={styles.warningIcon} />}
+              <ClockCircleOutlined />
+              <span className={styles.timer}>
+                {remainingTime !== null ? formatTime(remainingTime) : '--:--'}
+              </span>
+              <Text type="secondary" className={styles.timerLabel}>剩余</Text>
+            </div>
+          ) : (
+            // 正计时模式
+            <div className={styles.stopwatch}>
+              <ClockCircleOutlined />
+              <span className={styles.timer}>{formatTime(timer)}</span>
+              <Text type="secondary" className={styles.timerLabel}>用时</Text>
+            </div>
+          )}
         </div>
         <div className={styles.statusRight}>
           <Button
@@ -274,19 +338,29 @@ const QuizPage = () => {
         <Card className={styles.questionCard}>
           {/* 题目类型标签 */}
           <div className={styles.questionMeta}>
-            <Tag color="blue">
-              <QuestionCircleOutlined />{' '}
-              {currentQuestion.questionType === 'multiple_choice'
-                ? '选择题'
-                : currentQuestion.questionType === 'short_answer'
-                ? '简答题'
-                : currentQuestion.questionType === 'calculation'
-                ? '计算题'
-                : '解释题'}
-            </Tag>
-            {currentQuestion.topicTags?.map((tag, index) => (
-              <Tag key={index}>{tag}</Tag>
-            ))}
+            <div className={styles.questionTags}>
+              <Tag color="blue">
+                <QuestionCircleOutlined />{' '}
+                {currentQuestion.questionType === 'multiple_choice'
+                  ? '选择题'
+                  : currentQuestion.questionType === 'short_answer'
+                  ? '简答题'
+                  : currentQuestion.questionType === 'calculation'
+                  ? '计算题'
+                  : '解释题'}
+              </Tag>
+              {currentQuestion.topicTags?.map((tag, index) => (
+                <Tag key={index}>{tag}</Tag>
+              ))}
+            </div>
+            <Tooltip title={favoriteQuestions.has(currentQuestion.id) ? '取消收藏' : '收藏题目'}>
+              <Button
+                type="text"
+                icon={favoriteQuestions.has(currentQuestion.id) ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />}
+                onClick={() => toggleFavorite(currentQuestion.id)}
+                className={styles.favoriteBtn}
+              />
+            </Tooltip>
           </div>
 
           {/* 题目内容 */}

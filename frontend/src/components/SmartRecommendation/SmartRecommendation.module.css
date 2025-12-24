@@ -1,0 +1,187 @@
+/* 智能推荐组件样式 */
+
+.recommendationContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* 头部 */
+.header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.headerIcon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  background: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
+  color: white;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.header h4 {
+  margin-bottom: 4px !important;
+}
+
+/* 推荐卡片 */
+.recommendCard {
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  height: 100%;
+}
+
+.recommendCard:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+.recommendCard.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(43, 108, 176, 0.15);
+}
+
+.recommendCard :global(.ant-card-body) {
+  padding: 0;
+}
+
+.recommendCard :global(.ant-ribbon) {
+  top: 8px;
+}
+
+.cardContent {
+  padding: 20px;
+  padding-top: 32px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.iconWrapper {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.cardInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitle {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.cardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.cardTags :global(.ant-tag) {
+  margin: 0;
+  font-size: 11px;
+}
+
+.cardDesc {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 12px !important;
+  line-height: 1.5;
+}
+
+.cardMeta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.cardMeta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.startButton {
+  margin-top: 16px;
+  height: 40px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+/* 快速开始卡片 */
+.quickStartCard {
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+  border-radius: 16px;
+  margin-top: 8px;
+}
+
+.quickStartContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.quickStartContent h5 {
+  margin-bottom: 4px !important;
+  color: var(--text-primary);
+}
+
+.quickStartContent button {
+  border-radius: 10px;
+  height: 44px;
+  padding: 0 24px;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
+
+  .quickStartContent {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .quickStartContent button {
+    width: 100%;
+  }
+
+  .cardMeta {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+  }
+}
+

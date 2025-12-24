@@ -346,6 +346,21 @@
   border-radius: 14px;
 }
 
+.shareButton {
+  height: 52px;
+  padding: 0 32px;
+  font-size: 1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  color: white;
+}
+
+.shareButton:hover {
+  background: linear-gradient(135deg, #5a6fd6 0%, #6a4190 100%);
+  color: white;
+}
+
 .restartButton {
   height: 52px;
   padding: 0 48px;
@@ -408,6 +423,7 @@
   }
 
   .homeButton,
+  .shareButton,
   .restartButton {
     width: 100%;
   }

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Row, Col, Typography, Button, Progress, Collapse, Tag, Divider } from 'antd'
 import {
@@ -12,8 +12,10 @@ import {
   BulbOutlined,
   RightOutlined,
   FireOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons'
 import { useQuizStore, SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
+import ShareResult from '../components/ShareResult/ShareResult'
 import styles from './QuizResultPage.module.css'
 
 const { Title, Paragraph, Text } = Typography
@@ -25,6 +27,7 @@ const { Panel } = Collapse
 const QuizResultPage = () => {
   const navigate = useNavigate()
   const { currentSession, currentReport, generateReport, clearSession } = useQuizStore()
+  const [showShareModal, setShowShareModal] = useState(false)
 
   // 如果没有会话或报告，生成报告或重定向
   useEffect(() => {
@@ -304,6 +307,14 @@ const QuizResultPage = () => {
           返回首页
         </Button>
         <Button
+          size="large"
+          icon={<ShareAltOutlined />}
+          onClick={() => setShowShareModal(true)}
+          className={styles.shareButton}
+        >
+          分享成绩
+        </Button>
+        <Button
           type="primary"
           size="large"
           icon={<ReloadOutlined />}
@@ -313,6 +324,26 @@ const QuizResultPage = () => {
           再来一次
         </Button>
       </div>
+
+      {/* 分享弹窗 */}
+      <ShareResult
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        result={{
+          subject: currentSession.config.subject,
+          subjectName: getSubjectName().replace(/^[^\s]+\s/, ''),
+          grade: currentSession.config.grade,
+          gradeName: getGradeName(),
+          difficulty: currentSession.config.difficulty,
+          difficultyName: difficulty?.name || '',
+          questionCount: scores.totalQuestions,
+          correctCount: scores.correctAnswers,
+          accuracy: scores.accuracy,
+          score: scores.accuracy,
+          timeSpent: currentSession.timeSpent,
+          date: new Date().toLocaleDateString('zh-CN'),
+        }}
+      />
     </div>
   )
 }
