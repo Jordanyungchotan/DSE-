@@ -25,6 +25,12 @@ const { TextArea } = Input
 /**
  * DSE智能刷题 - 答题页面
  */
+// 清理选项中的字母前缀（如 "A. ", "A、", "A.", "A " 等）
+const cleanOptionPrefix = (option: string): string => {
+  // 匹配开头的字母前缀模式：A. / A、/ A. / A  / (A) 等
+  return option.replace(/^[A-Da-d][.、．\s)\]】]*\s*/i, '').trim()
+}
+
 const QuizPage = () => {
   const navigate = useNavigate()
   const {
@@ -505,7 +511,7 @@ const QuizPage = () => {
                         <span className={styles.optionLabel}>
                           {String.fromCharCode(65 + index)}.
                         </span>
-                        <span className={styles.optionText}>{option}</span>
+                        <span className={styles.optionText}>{cleanOptionPrefix(option)}</span>
                         {isAnswered && isCorrectOption && (
                           <span style={{ marginLeft: 8, color: '#52c41a', fontWeight: 'bold' }}>✓ 正确答案</span>
                         )}
@@ -599,7 +605,7 @@ const QuizPage = () => {
                       }
                       
                       if (answerIndex >= 0 && answerIndex < currentQuestion.options!.length) {
-                        return `${String.fromCharCode(65 + answerIndex)}. ${currentQuestion.options![answerIndex]}`
+                        return `${String.fromCharCode(65 + answerIndex)}. ${cleanOptionPrefix(currentQuestion.options![answerIndex])}`
                       }
                       return String(answer)
                     })()}
