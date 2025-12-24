@@ -13,6 +13,7 @@ import {
   BookOutlined,
   LineChartOutlined,
   TrophyOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import { useLanguageStore } from '../../stores/languageStore'
@@ -104,6 +105,12 @@ const MainLayout = () => {
       onClick: () => navigate('/history'),
     },
     {
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: '账户设置',
+      onClick: () => navigate('/settings'),
+    },
+    {
       type: 'divider' as const,
     },
     {
@@ -154,6 +161,7 @@ const MainLayout = () => {
                 <div className={styles.userInfo}>
                   <Avatar
                     size="small"
+                    src={user?.avatar}
                     icon={<UserOutlined />}
                     style={{ backgroundColor: 'var(--color-primary)' }}
                   />

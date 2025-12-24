@@ -1,0 +1,187 @@
+/* ===== 用户设置页面 ===== */
+
+.settingsPage {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  min-height: 80vh;
+}
+
+/* ===== 页面标题 ===== */
+.pageHeader {
+  margin-bottom: 24px;
+}
+
+.pageHeader h2 {
+  margin-bottom: 8px !important;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ===== 设置卡片 ===== */
+.settingsCard {
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: none;
+}
+
+.settingsCard :global(.ant-card-body) {
+  padding: 0;
+}
+
+.settingsTabs {
+  min-height: 500px;
+}
+
+.settingsTabs :global(.ant-tabs-nav) {
+  width: 200px;
+  padding: 24px 0;
+  background: var(--bg-secondary);
+  border-radius: 16px 0 0 16px;
+}
+
+.settingsTabs :global(.ant-tabs-tab) {
+  padding: 12px 24px !important;
+  margin: 0 !important;
+  justify-content: flex-start;
+}
+
+.settingsTabs :global(.ant-tabs-tab-active) {
+  background: white;
+}
+
+.settingsTabs :global(.ant-tabs-content-holder) {
+  padding: 32px;
+}
+
+/* ===== Tab内容 ===== */
+.tabContent {
+  max-width: 500px;
+}
+
+/* ===== 头像区域 ===== */
+.avatarSection {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.avatarWrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar {
+  border: 4px solid white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.uploadBtn {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: white !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.uploadBtn:hover {
+  transform: scale(1.1);
+}
+
+.avatarInfo {
+  flex: 1;
+}
+
+.avatarInfo h4 {
+  margin-bottom: 4px !important;
+}
+
+.avatarTip {
+  margin-top: 8px !important;
+  font-size: 0.85rem;
+}
+
+/* ===== 表单样式 ===== */
+.profileForm,
+.passwordForm {
+  margin-top: 24px;
+}
+
+.profileForm :global(.ant-form-item-label),
+.passwordForm :global(.ant-form-item-label) {
+  font-weight: 500;
+}
+
+/* ===== 密码区域 ===== */
+.passwordSection {
+  text-align: center;
+  padding: 24px 0;
+  margin-bottom: 24px;
+}
+
+.passwordIcon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(43, 108, 176, 0.1), rgba(82, 196, 26, 0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 2rem;
+  color: var(--color-primary);
+}
+
+.passwordSection h4 {
+  margin-bottom: 8px !important;
+}
+
+/* ===== 危险操作区域 ===== */
+.dangerSection {
+  padding: 24px;
+  background: rgba(245, 34, 45, 0.05);
+  border: 1px solid rgba(245, 34, 45, 0.2);
+  border-radius: 12px;
+}
+
+.dangerSection h4 {
+  margin-bottom: 12px !important;
+}
+
+/* ===== 响应式设计 ===== */
+@media (max-width: 768px) {
+  .settingsPage {
+    padding: 16px;
+  }
+
+  .settingsTabs :global(.ant-tabs-nav) {
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .settingsTabs :global(.ant-tabs-content-holder) {
+    padding: 20px;
+  }
+
+  .avatarSection {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .tabContent {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .settingsTabs :global(.ant-tabs-tab) {
+    padding: 10px 16px !important;
+    font-size: 0.9rem;
+  }
+}
+

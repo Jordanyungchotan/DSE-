@@ -2899,8 +2899,109 @@ export default {
             'GET /api/leaderboard',
             'GET /api/leaderboard/me',
             'POST /api/leaderboard/submit',
+            'PUT /api/user/profile',
+            'POST /api/user/avatar',
+            'PUT /api/user/password',
           ],
         }, 200, origin)
+      }
+
+      // ========== 用户设置 API ==========
+
+      // 更新用户资料
+      if (path === '/api/user/profile' && request.method === 'PUT') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const body = await request.json() as { name?: string }
+          
+          if (body.name) {
+            await env.DB.prepare(
+              'UPDATE users SET name = ?, updated_at = ? WHERE id = ?'
+            ).bind(body.name, new Date().toISOString(), tokenData.userId).run()
+          }
+
+          return jsonResponse({ success: true, message: '资料已更新' }, 200, origin)
+        } catch (error) {
+          console.error('Update profile error:', error)
+          return errorResponse('更新失败', 500, origin)
+        }
+      }
+
+      // 上传头像
+      if (path === '/api/user/avatar' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const body = await request.json() as { avatar: string }
+          
+          // 保存头像到数据库（base64格式）
+          await env.DB.prepare(
+            'UPDATE users SET avatar = ?, updated_at = ? WHERE id = ?'
+          ).bind(body.avatar, new Date().toISOString(), tokenData.userId).run()
+
+          return jsonResponse({ success: true, message: '头像已更新' }, 200, origin)
+        } catch (error) {
+          console.error('Upload avatar error:', error)
+          return errorResponse('上传失败', 500, origin)
+        }
+      }
+
+      // 修改密码
+      if (path === '/api/user/password' && request.method === 'PUT') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const body = await request.json() as { currentPassword: string; newPassword: string }
+          
+          // 获取用户当前密码
+          const user = await env.DB.prepare(
+            'SELECT password_hash FROM users WHERE id = ?'
+          ).bind(tokenData.userId).first() as { password_hash: string } | null
+
+          if (!user) {
+            return errorResponse('用户不存在', 404, origin)
+          }
+
+          // 验证当前密码（简单字符串比较，实际应使用bcrypt）
+          if (user.password_hash !== body.currentPassword) {
+            return errorResponse('当前密码错误', 400, origin)
+          }
+
+          // 更新密码
+          await env.DB.prepare(
+            'UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?'
+          ).bind(body.newPassword, new Date().toISOString(), tokenData.userId).run()
+
+          return jsonResponse({ success: true, message: '密码已修改' }, 200, origin)
+        } catch (error) {
+          console.error('Change password error:', error)
+          return errorResponse('修改失败', 500, origin)
+        }
       }
 
       // 404

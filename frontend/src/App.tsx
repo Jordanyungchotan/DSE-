@@ -23,6 +23,9 @@ const LearningProfilePage = lazy(() => import('./pages/LearningProfilePage'))
 // 排行榜页面
 const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'))
 
+// 用户设置页面
+const UserSettingsPage = lazy(() => import('./pages/UserSettingsPage'))
+
 // 管理员后台页面
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
@@ -85,6 +88,9 @@ function App() {
           
           {/* 排行榜 */}
           <Route path="leaderboard" element={<LeaderboardPage />} />
+          
+          {/* 用户设置 */}
+          <Route path="settings" element={<UserSettingsPage />} />
         </Route>
         
         {/* 404重定向到首页 */}
