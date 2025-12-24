@@ -573,9 +573,9 @@ const SCENARIO_LIBRARY: Record<string, string[]> = {
     '电池效率测试', '水质检测实验', '金属腐蚀分析', '废水处理研究'
   ],
   english: [
-    '阅读理解段落', '语法填空练习', '词汇选择题', '句子改错练习',
-    '完形填空训练', '短文写作指导', '同义词辨析', '时态语态运用',
-    '从句结构分析', '口语表达情景', '书信写作格式', '文章主旨理解'
+    'Reading comprehension passage', 'Grammar fill-in-the-blank', 'Vocabulary multiple choice', 'Sentence error correction',
+    'Cloze test practice', 'Essay writing guidance', 'Synonym identification', 'Tense and voice usage',
+    'Clause structure analysis', 'Speaking scenario', 'Letter writing format', 'Main idea comprehension'
   ],
   chinese: [
     '文言文阅读', '白话文理解', '成语运用情境', '修辞手法分析',
@@ -687,12 +687,16 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 
 // 各科目题目类型指导
 const SUBJECT_QUESTION_GUIDANCE: Record<string, string> = {
-  english: `【英国语文题目要求】
-- 语法题：时态、语态、从句、介词、冠词等
-- 词汇题：同义词、反义词、词性转换、短语搭配
-- 阅读理解：段落大意、细节理解、推断题
-- 句子改错：语法错误识别与纠正
-⚠️ 禁止出数学计算题！只出英语语言相关题目！`,
+  english: `【IMPORTANT: English Subject Requirements】
+- ALL questions, options, and explanations MUST be written in ENGLISH!
+- Question types: grammar (tenses, prepositions, articles), vocabulary, reading comprehension, error correction
+- Do NOT write questions in Chinese!
+- Example format:
+  Question: "Choose the correct word: She _____ to school every day."
+  Options: ["goes", "go", "going", "went"]
+  Explanation: "The subject 'She' is third person singular, so we use 'goes'."
+⚠️ NO math questions! English language questions ONLY!
+⚠️ ALL content must be in ENGLISH!`,
   
   chinese: `【中国语文题目要求】
 - 阅读理解：白话文/文言文理解
@@ -779,10 +783,44 @@ async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promis
       // 判断是否为非数学科目（不需要数字参考）
       const isNonMathSubject = ['english', 'chinese', 'liberal', 'history'].includes(config.subject)
       
+      // 判断是否为英语科目（需要用英文出题）
+      const isEnglishSubject = config.subject === 'english'
+      
       // 简化提示词以加快响应
-      const systemPrompt = `你是DSE ${subjectName}考试专家。你必须生成${subjectName}科目的题目，不能生成其他科目的题目！用简体中文生成题目，严格按JSON格式输出。`
+      const systemPrompt = isEnglishSubject
+        ? `You are a DSE English Language exam expert. Generate questions in ENGLISH ONLY. Output in strict JSON format.`
+        : `你是DSE ${subjectName}考试专家。你必须生成${subjectName}科目的题目，不能生成其他科目的题目！用简体中文生成题目，严格按JSON格式输出。`
 
-      const userPrompt = `【重要】生成${config.questionCount}道${gradeName}【${subjectName}】${difficultyName}题目。
+      const userPrompt = isEnglishSubject
+        ? `Generate ${config.questionCount} DSE English Language ${difficultyName} questions for ${gradeName} students.
+
+${subjectGuidance}
+
+Topic reference: "${scenario}"
+
+⚠️ ALL questions, options, and explanations MUST be in ENGLISH!
+⚠️ Use letters A/B/C/D for multiple choice answers!
+⚠️ This is ENGLISH LANGUAGE subject - test grammar, vocabulary, reading comprehension!
+
+JSON format:
+{
+  "questions": [
+    {
+      "id": "q1",
+      "question": "Question in English",
+      "questionType": "multiple_choice",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctAnswer": "A",
+      "explanation": "Explanation in English",
+      "topicTags": ["Grammar", "Vocabulary"],
+      "difficultyScore": 3
+    }
+  ]
+}
+
+questionType: multiple_choice/short_answer
+Return JSON only, no other text.`
+        : `【重要】生成${config.questionCount}道${gradeName}【${subjectName}】${difficultyName}题目。
 
 ⚠️⚠️⚠️ 这是【${subjectName}】科目！不是数学！⚠️⚠️⚠️
 
@@ -1001,8 +1039,8 @@ const FALLBACK_QUESTIONS: Record<string, GeneratedQuestion[]> = {
       questionType: 'multiple_choice',
       options: ['goes', 'go', 'going', 'gone'],
       correctAnswer: 'A',
-      explanation: '主语是第三人称单数 "She"，一般现在时态下动词需要加 s/es，所以用 "goes"。',
-      topicTags: ['语法', '时态', '主谓一致'],
+      explanation: 'The subject "She" is third person singular. In present simple tense, verbs need to add -s/-es, so we use "goes".',
+      topicTags: ['Grammar', 'Tenses', 'Subject-Verb Agreement'],
       difficultyScore: 1,
     },
     {
@@ -1011,8 +1049,8 @@ const FALLBACK_QUESTIONS: Record<string, GeneratedQuestion[]> = {
       questionType: 'multiple_choice',
       options: ['joyful', 'sad', 'angry', 'tired'],
       correctAnswer: 'A',
-      explanation: '"Joyful" 意为充满快乐的，是 "happy"（快乐的）的同义词。',
-      topicTags: ['词汇', '同义词'],
+      explanation: '"Joyful" means full of joy or happiness, making it a synonym for "happy". The other options have opposite or unrelated meanings.',
+      topicTags: ['Vocabulary', 'Synonyms'],
       difficultyScore: 1,
     },
     {
@@ -1021,8 +1059,8 @@ const FALLBACK_QUESTIONS: Record<string, GeneratedQuestion[]> = {
       questionType: 'multiple_choice',
       options: ['on', 'in', 'at', 'by'],
       correctAnswer: 'A',
-      explanation: '书在桌子"上面"用介词 "on"。"in" 表示在...里面，"at" 表示在某点，"by" 表示在...旁边。',
-      topicTags: ['语法', '介词'],
+      explanation: 'We use "on" to indicate something is on the surface of another object. "In" means inside, "at" indicates a point, and "by" means beside.',
+      topicTags: ['Grammar', 'Prepositions'],
       difficultyScore: 1,
     },
     {
@@ -1031,8 +1069,8 @@ const FALLBACK_QUESTIONS: Record<string, GeneratedQuestion[]> = {
       questionType: 'multiple_choice',
       options: ['"don\'t" should be "doesn\'t"', '"like" should be "likes"', '"He" should be "Him"', 'No error'],
       correctAnswer: 'A',
-      explanation: '主语 "He" 是第三人称单数，助动词应该用 "doesn\'t" 而不是 "don\'t"。正确句子是 "He doesn\'t like apples."',
-      topicTags: ['语法', '主谓一致', '句子改错'],
+      explanation: 'The subject "He" is third person singular, so the auxiliary verb should be "doesn\'t" instead of "don\'t". The correct sentence is "He doesn\'t like apples."',
+      topicTags: ['Grammar', 'Subject-Verb Agreement', 'Error Correction'],
       difficultyScore: 2,
     },
     {
@@ -1041,8 +1079,8 @@ const FALLBACK_QUESTIONS: Record<string, GeneratedQuestion[]> = {
       questionType: 'multiple_choice',
       options: ['will have graduated', 'graduated', 'am graduating', 'have graduated'],
       correctAnswer: 'A',
-      explanation: '"By next year" 表示到明年为止，需要用将来完成时 "will have + 过去分词"。',
-      topicTags: ['语法', '时态', '将来完成时'],
+      explanation: '"By next year" indicates a point in the future, so we need the future perfect tense "will have + past participle" to show an action completed before that time.',
+      topicTags: ['Grammar', 'Tenses', 'Future Perfect'],
       difficultyScore: 3,
     },
   ],
