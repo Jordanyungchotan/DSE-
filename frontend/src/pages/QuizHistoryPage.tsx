@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Typography, Button, Empty, Tag, Table, Progress, Spin, Statistic, message } from 'antd'
+import { Card, Row, Col, Typography, Button, Empty, Tag, Table, Progress, Spin, Statistic, message, Tooltip } from 'antd'
 import {
   HistoryOutlined,
   TrophyOutlined,
@@ -11,10 +11,12 @@ import {
   RightOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
+  ShareAltOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import { SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
 import { apiFetch } from '../config/api'
+import ShareResult from '../components/ShareResult/ShareResult'
 import styles from './QuizHistoryPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -48,6 +50,22 @@ const QuizHistoryPage = () => {
     averageAccuracy: 0,
     totalTime: 0,
   })
+  // 分享状态
+  const [shareModalVisible, setShareModalVisible] = useState(false)
+  const [shareData, setShareData] = useState<{
+    subject: string
+    subjectName: string
+    grade: string
+    gradeName: string
+    difficulty: string
+    difficultyName: string
+    questionCount: number
+    correctCount: number
+    accuracy: number
+    score: number
+    timeSpent: number
+    date: string
+  } | null>(null)
 
   // 获取所有科目
   const allSubjects = [
@@ -215,6 +233,29 @@ const QuizHistoryPage = () => {
     })
   }
 
+  // 分享单条记录
+  const handleShare = (record: QuizHistoryItem) => {
+    const subject = allSubjects.find((s) => s.id === record.subject)
+    const grade = GRADE_LEVELS.find((g) => g.id === record.grade)
+    const difficulty = DIFFICULTY_LEVELS.find((d) => d.id === record.difficulty)
+    
+    setShareData({
+      subject: record.subject,
+      subjectName: subject?.name || record.subject,
+      grade: record.grade,
+      gradeName: grade?.name || record.grade,
+      difficulty: record.difficulty,
+      difficultyName: difficulty?.name || record.difficulty,
+      questionCount: record.totalQuestions || 10,
+      correctCount: record.score,
+      accuracy: record.accuracy,
+      score: record.score,
+      timeSpent: record.timeSpent,
+      date: formatDate(record.completedAt).split(' ')[0], // 只要日期部分
+    })
+    setShareModalVisible(true)
+  }
+
   // 表格列定义
   const columns = [
     {
@@ -280,6 +321,21 @@ const QuizHistoryPage = () => {
       key: 'completedAt',
       render: (date: string) => (
         <Text type="secondary">{formatDate(date)}</Text>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 80,
+      render: (_: unknown, record: QuizHistoryItem) => (
+        <Tooltip title="分享成绩">
+          <Button
+            type="text"
+            icon={<ShareAltOutlined />}
+            onClick={() => handleShare(record)}
+            className={styles.shareBtn}
+          />
+        </Tooltip>
       ),
     },
   ]
@@ -441,6 +497,18 @@ const QuizHistoryPage = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* 分享弹窗 */}
+      {shareData && (
+        <ShareResult
+          visible={shareModalVisible}
+          onClose={() => {
+            setShareModalVisible(false)
+            setShareData(null)
+          }}
+          result={shareData}
+        />
+      )}
     </div>
   )
 }

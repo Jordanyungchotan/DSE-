@@ -193,6 +193,18 @@
   margin-bottom: 4px !important;
 }
 
+/* ===== 分享按钮 ===== */
+.shareBtn {
+  color: var(--color-primary);
+  transition: all 0.3s;
+}
+
+.shareBtn:hover {
+  color: var(--color-primary-dark);
+  background: rgba(43, 108, 176, 0.1);
+  transform: scale(1.1);
+}
+
 /* ===== 响应式设计 ===== */
 @media (max-width: 768px) {
   .pageHeader {
