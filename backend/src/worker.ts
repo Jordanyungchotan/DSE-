@@ -2370,6 +2370,35 @@ export default {
               break
           }
 
+          // 构建筛选条件
+          let whereConditions = [
+            "qs.status = 'completed'",
+            "qs.user_id IS NOT NULL",
+            "qs.created_at >= ?"
+          ]
+          const bindParams: (string | number)[] = [periodStart.toISOString()]
+
+          // 科目筛选
+          if (subject && subject !== 'all') {
+            whereConditions.push("json_extract(qs.config, '$.subject') = ?")
+            bindParams.push(subject)
+          }
+
+          // 年级筛选
+          if (grade && grade !== 'all') {
+            whereConditions.push("json_extract(qs.config, '$.grade') = ?")
+            bindParams.push(grade)
+          }
+
+          // 难度筛选
+          if (difficulty && difficulty !== 'all') {
+            whereConditions.push("json_extract(qs.config, '$.difficulty') = ?")
+            bindParams.push(difficulty)
+          }
+
+          // 添加分页参数
+          bindParams.push(limit, (page - 1) * limit)
+
           // 构建查询 - 从quiz_sessions获取排名数据
           const query = `
             SELECT 
@@ -2379,19 +2408,20 @@ export default {
               SUM(json_array_length(qs.questions)) as total_questions,
               AVG(COALESCE(qs.accuracy, 0)) as avg_accuracy,
               AVG(COALESCE(qs.total_time, 60)) as avg_time,
-              AVG(COALESCE(qs.total_time * 1.0 / NULLIF(json_array_length(qs.questions), 0), 30)) as avg_time_per_question
+              AVG(COALESCE(qs.total_time * 1.0 / NULLIF(json_array_length(qs.questions), 0), 30)) as avg_time_per_question,
+              json_extract(qs.config, '$.subject') as session_subject,
+              json_extract(qs.config, '$.grade') as session_grade,
+              json_extract(qs.config, '$.difficulty') as session_difficulty
             FROM quiz_sessions qs
             LEFT JOIN users u ON qs.user_id = u.id
-            WHERE qs.status = 'completed'
-              AND qs.user_id IS NOT NULL
-              AND qs.created_at >= ?
+            WHERE ${whereConditions.join(' AND ')}
             GROUP BY qs.user_id
             ORDER BY ${orderClause}
             LIMIT ? OFFSET ?
           `
           
           const results = await env.DB.prepare(query)
-            .bind(periodStart.toISOString(), limit, (page - 1) * limit)
+            .bind(...bindParams)
             .all()
 
           // 计算综合得分并生成排名
@@ -2435,7 +2465,9 @@ export default {
               userId: row.user_id,
               displayName: row.display_name || '匿名用户',
               avatar: null,
-              grade: grade !== 'all' ? grade : null,
+              grade: row.session_grade || (grade !== 'all' ? grade : null),
+              subject: row.session_subject || (subject !== 'all' ? subject : null),
+              difficulty: row.session_difficulty || (difficulty !== 'all' ? difficulty : null),
               totalScore: Math.round(totalScore * 10) / 10,
               accuracyScore: Math.round(accuracyScore * 10) / 10,
               speedScore,
@@ -2452,15 +2484,16 @@ export default {
             }
           })
 
-          // 获取总参与人数
+          // 获取总参与人数（使用相同的筛选条件）
+          const countWhereConditions = [...whereConditions]
+          const countBindParams = bindParams.slice(0, -2) // 移除分页参数
+          
           const countQuery = `
             SELECT COUNT(DISTINCT user_id) as count
-            FROM quiz_sessions
-            WHERE status = 'completed'
-              AND user_id IS NOT NULL
-              AND created_at >= ?
+            FROM quiz_sessions qs
+            WHERE ${countWhereConditions.join(' AND ')}
           `
-          const countResult = await env.DB.prepare(countQuery).bind(periodStart.toISOString()).first() as { count: number } | null
+          const countResult = await env.DB.prepare(countQuery).bind(...countBindParams).first() as { count: number } | null
           const totalParticipants = countResult?.count || 0
 
           // 获取当前用户排名
