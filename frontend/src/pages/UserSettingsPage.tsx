@@ -88,13 +88,14 @@ const UserSettingsPage = () => {
 
         if (response.ok) {
           setAvatarUrl(compressedBase64)
-          updateUser({ ...user!, avatar: compressedBase64 })
+          // 只传递需要更新的字段，确保 store 正确更新
+          updateUser({ avatar: compressedBase64 })
           message.success('头像上传成功')
           onSuccess?.(null)
         } else {
           // 如果API不存在，暂时保存到本地
           setAvatarUrl(compressedBase64)
-          updateUser({ ...user!, avatar: compressedBase64 })
+          updateUser({ avatar: compressedBase64 })
           message.success('头像已更新')
           onSuccess?.(null)
         }
@@ -154,17 +155,17 @@ const UserSettingsPage = () => {
       })
 
       if (response.ok) {
-        updateUser({ ...user!, name: values.name, email: values.email })
+        updateUser({ name: values.name })
         message.success('个人资料已保存')
       } else {
         // 如果API不存在，暂时保存到本地
-        updateUser({ ...user!, name: values.name })
+        updateUser({ name: values.name })
         message.success('个人资料已更新')
       }
     } catch (error) {
       console.error('Save profile error:', error)
       // 暂时保存到本地
-      updateUser({ ...user!, name: values.name })
+      updateUser({ name: values.name })
       message.success('个人资料已更新')
     } finally {
       setLoading(false)

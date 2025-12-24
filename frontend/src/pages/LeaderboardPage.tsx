@@ -43,7 +43,7 @@ const { TabPane } = Tabs
 /**
  * 前三名领奖台组件
  */
-const TopThreePodium: React.FC<{ rankings: RankingEntry[] }> = ({ rankings }) => {
+const TopThreePodium: React.FC<{ rankings: RankingEntry[], currentUserAvatar?: string }> = ({ rankings, currentUserAvatar }) => {
   const [first, second, third] = rankings
 
   if (!first) return null
@@ -55,13 +55,17 @@ const TopThreePodium: React.FC<{ rankings: RankingEntry[] }> = ({ rankings }) =>
     const icons = { 1: '👑', 2: '🥈', 3: '🥉' }
     const heights = { 1: 120, 2: 90, 3: 70 }
 
+    // 如果是当前用户，使用 auth store 中的头像（确保实时更新）
+    const avatarSrc = user.isCurrentUser && currentUserAvatar ? currentUserAvatar : user.avatar
+
     return (
       <div className={styles.podiumUser}>
         <div className={styles.podiumAvatar}>
           <Avatar 
+            key={avatarSrc || 'default'}
             size={position === 1 ? 80 : 64} 
             icon={<UserOutlined />}
-            src={user.avatar}
+            src={avatarSrc}
             style={{ border: `3px solid ${colors[position]}` }}
           />
           <span className={styles.podiumCrown}>{icons[position]}</span>
@@ -218,6 +222,9 @@ const LeaderboardPage: React.FC = () => {
     updateFilters 
   } = useLeaderboardStore()
   
+  // 获取当前用户信息（用于显示实时头像）
+  const { user: currentUser } = useAuthStore()
+  
   const [activeTab, setActiveTab] = useState<'overall' | 'subject' | 'speed'>('overall')
 
   // Tab到criteria的映射
@@ -284,22 +291,26 @@ const LeaderboardPage: React.FC = () => {
       title: '用户',
       dataIndex: 'displayName',
       key: 'displayName',
-      render: (name: string, record: RankingEntry) => (
-        <div className={`${styles.userCell} ${record.isCurrentUser ? styles.currentUser : ''}`}>
-          <Avatar size={36} icon={<UserOutlined />} src={record.avatar} />
-          <div className={styles.userInfo}>
-            <span className={styles.userName}>
-              {record.isAnonymous ? '匿名用户' : name}
-              {record.isCurrentUser && <Tag color="blue" className={styles.meTag}>我</Tag>}
-            </span>
-            {record.grade && (
-              <span className={styles.userGrade}>
-                {GRADE_LEVELS.find(g => g.id === record.grade)?.name || record.grade}
+      render: (name: string, record: RankingEntry) => {
+        // 如果是当前用户，使用 auth store 中的头像（确保实时更新）
+        const avatarSrc = record.isCurrentUser && currentUser?.avatar ? currentUser.avatar : record.avatar
+        return (
+          <div className={`${styles.userCell} ${record.isCurrentUser ? styles.currentUser : ''}`}>
+            <Avatar key={avatarSrc || 'default'} size={36} icon={<UserOutlined />} src={avatarSrc} />
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>
+                {record.isAnonymous ? '匿名用户' : name}
+                {record.isCurrentUser && <Tag color="blue" className={styles.meTag}>我</Tag>}
               </span>
-            )}
+              {record.grade && (
+                <span className={styles.userGrade}>
+                  {GRADE_LEVELS.find(g => g.id === record.grade)?.name || record.grade}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
-      )
+        )
+      }
     },
     {
       title: (
@@ -482,7 +493,10 @@ const LeaderboardPage: React.FC = () => {
           ) : (
             <>
               {/* 前三名领奖台 */}
-              <TopThreePodium rankings={currentLeaderboard.rankings.slice(0, 3)} />
+              <TopThreePodium 
+                rankings={currentLeaderboard.rankings.slice(0, 3)} 
+                currentUserAvatar={currentUser?.avatar}
+              />
 
               {/* 排行榜表格 */}
               <Card className={styles.rankingTable}>

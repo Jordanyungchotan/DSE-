@@ -160,6 +160,7 @@ const MainLayout = () => {
               >
                 <div className={styles.userInfo}>
                   <Avatar
+                    key={user?.avatar || 'default-avatar'}
                     size="small"
                     src={user?.avatar}
                     icon={<UserOutlined />}
