@@ -564,5 +564,50 @@
     flex-direction: column;
     text-align: center;
   }
+
+  .paginationWrapper {
+    justify-content: center;
+  }
+}
+
+/* ===== 分页样式 ===== */
+.paginationWrapper {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+  margin-top: 16px;
+  background: var(--card-background);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+}
+
+.paginationWrapper :global(.ant-pagination) {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.paginationWrapper :global(.ant-pagination-item) {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.paginationWrapper :global(.ant-pagination-item-active) {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.paginationWrapper :global(.ant-pagination-item-active a) {
+  color: white;
+}
+
+@media (max-width: 576px) {
+  .paginationWrapper {
+    padding: 16px 8px;
+  }
+  
+  .paginationWrapper :global(.ant-pagination-total-text) {
+    display: none;
+  }
 }
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Typography, Button, Empty, Tag, Spin, Statistic, message, Tooltip, Badge } from 'antd'
+import { Card, Row, Col, Typography, Button, Empty, Tag, Spin, Statistic, message, Tooltip, Badge, Pagination } from 'antd'
 import {
   HistoryOutlined,
   TrophyOutlined,
@@ -67,6 +67,10 @@ const QuizHistoryPage = () => {
   })
   // 展开的记录ID
   const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  // 分页状态
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 5 // 每页显示5条记录
 
   // 分享状态
   const [shareModalVisible, setShareModalVisible] = useState(false)
@@ -574,9 +578,33 @@ const QuizHistoryPage = () => {
           </Empty>
         </Card>
       ) : (
-        <div className={styles.historyList}>
-          {history.map(renderHistoryCard)}
-        </div>
+        <>
+          <div className={styles.historyList}>
+            {/* 只显示当前页的记录 */}
+            {history
+              .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+              .map(renderHistoryCard)}
+          </div>
+          
+          {/* 分页控件 */}
+          {history.length > pageSize && (
+            <div className={styles.paginationWrapper}>
+              <Pagination
+                current={currentPage}
+                total={history.length}
+                pageSize={pageSize}
+                onChange={(page) => {
+                  setCurrentPage(page)
+                  setExpandedId(null) // 换页时收起展开的记录
+                  window.scrollTo({ top: 0, behavior: 'smooth' }) // 滚动到顶部
+                }}
+                showTotal={(total, range) => `第 ${range[0]}-${range[1]} 条，共 ${total} 条`}
+                showQuickJumper={history.length > pageSize * 3}
+                showSizeChanger={false}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {/* 快速入口 */}
