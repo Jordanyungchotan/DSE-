@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Typography, Button, Empty, Tag, Table, Progress, Spin, Statistic, message, Tooltip } from 'antd'
+import { Card, Row, Col, Typography, Button, Empty, Tag, Spin, Statistic, message, Tooltip } from 'antd'
 import {
   HistoryOutlined,
   TrophyOutlined,
@@ -256,89 +256,80 @@ const QuizHistoryPage = () => {
     setShareModalVisible(true)
   }
 
-  // 表格列定义
-  const columns = [
-    {
-      title: '科目',
-      dataIndex: 'subject',
-      key: 'subject',
-      render: (subject: string) => <Text strong>{getSubjectName(subject)}</Text>,
-    },
-    {
-      title: '年级',
-      dataIndex: 'grade',
-      key: 'grade',
-      render: (grade: string) => <Tag>{getGradeName(grade)}</Tag>,
-    },
-    {
-      title: '难度',
-      dataIndex: 'difficulty',
-      key: 'difficulty',
-      render: (difficulty: string) => {
-        const diff = getDifficulty(difficulty)
-        return diff ? (
-          <Tag color={diff.color}>
-            <FireOutlined /> {diff.name}
-          </Tag>
-        ) : (
-          <Tag>{difficulty}</Tag>
-        )
-      },
-    },
-    {
-      title: '成绩',
-      dataIndex: 'score',
-      key: 'score',
-      render: (score: number, record: QuizHistoryItem) => (
-        <Text strong>
-          {score}/{record.totalQuestions || 10}
-        </Text>
-      ),
-    },
-    {
-      title: '正确率',
-      dataIndex: 'accuracy',
-      key: 'accuracy',
-      render: (accuracy: number) => (
-        <Progress
-          percent={accuracy}
-          size="small"
-          strokeColor={accuracy >= 80 ? '#52c41a' : accuracy >= 60 ? '#1890ff' : '#f5222d'}
-          format={(percent) => `${percent}%`}
-          style={{ width: 100 }}
-        />
-      ),
-    },
-    {
-      title: '用时',
-      dataIndex: 'timeSpent',
-      key: 'timeSpent',
-      render: (time: number) => formatTime(time),
-    },
-    {
-      title: '完成时间',
-      dataIndex: 'completedAt',
-      key: 'completedAt',
-      render: (date: string) => (
-        <Text type="secondary">{formatDate(date)}</Text>
-      ),
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 80,
-      render: (_: unknown, record: QuizHistoryItem) => (
-        <Tooltip title="分享成绩">
-          <Button
-            type="text"
-            icon={<ShareAltOutlined />}
-            onClick={() => handleShare(record)}
-            className={styles.shareBtn}
-          />
-        </Tooltip>
-      ),
-    },
-  ]
+  // 获取正确率对应的颜色和状态
+  const getAccuracyStatus = (accuracy: number) => {
+    if (accuracy >= 80) return { color: '#52c41a', status: '优秀', icon: '🏆' }
+    if (accuracy >= 60) return { color: '#1890ff', status: '良好', icon: '👍' }
+    if (accuracy >= 40) return { color: '#fa8c16', status: '一般', icon: '💪' }
+    return { color: '#f5222d', status: '加油', icon: '📚' }
+  }
+
+  // 渲染单条记录卡片
+  const renderHistoryCard = (record: QuizHistoryItem) => {
+    const subject = allSubjects.find((s) => s.id === record.subject)
+    const difficulty = getDifficulty(record.difficulty)
+    const accuracyStatus = getAccuracyStatus(record.accuracy)
+
+    return (
+      <Card key={record.id} className={styles.historyCard}>
+        <div className={styles.cardMain}>
+          {/* 左侧：科目和基本信息 */}
+          <div className={styles.cardLeft}>
+            <div className={styles.subjectIcon}>
+              {subject?.icon || '📚'}
+            </div>
+            <div className={styles.subjectInfo}>
+              <Text strong className={styles.subjectName}>
+                {subject?.name || record.subject}
+              </Text>
+              <div className={styles.tagRow}>
+                <Tag>{getGradeName(record.grade)}</Tag>
+                {difficulty && (
+                  <Tag color={difficulty.color}>{difficulty.name}</Tag>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 中间：成绩 */}
+          <div className={styles.cardCenter}>
+            <div className={styles.scoreSection}>
+              <div className={styles.scoreMain}>
+                <span className={styles.scoreValue} style={{ color: accuracyStatus.color }}>
+                  {record.accuracy}%
+                </span>
+                <span className={styles.scoreLabel}>{accuracyStatus.icon} {accuracyStatus.status}</span>
+              </div>
+              <div className={styles.scoreDetail}>
+                <span>{record.score}/{record.totalQuestions || 10} 题</span>
+                <span className={styles.divider}>·</span>
+                <span>{formatTime(record.timeSpent)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 右侧：时间和操作 */}
+          <div className={styles.cardRight}>
+            <Text type="secondary" className={styles.dateText}>
+              {formatDate(record.completedAt)}
+            </Text>
+            <Tooltip title="分享成绩">
+              <Button
+                type="primary"
+                ghost
+                size="small"
+                icon={<ShareAltOutlined />}
+                onClick={() => handleShare(record)}
+                className={styles.shareBtn}
+              >
+                分享
+              </Button>
+            </Tooltip>
+          </div>
+        </div>
+      </Card>
+    )
+  }
 
   if (loading) {
     return (
@@ -433,7 +424,7 @@ const QuizHistoryPage = () => {
         </div>
       </Card>
 
-      {/* 历史记录表格 */}
+      {/* 历史记录列表 */}
       {history.length === 0 ? (
         <Card className={styles.emptyCard}>
           <Empty
@@ -446,18 +437,9 @@ const QuizHistoryPage = () => {
           </Empty>
         </Card>
       ) : (
-        <Card className={styles.tableCard}>
-          <Table
-            dataSource={history}
-            columns={columns}
-            rowKey="id"
-            pagination={{
-              pageSize: 10,
-              showTotal: (total) => `共 ${total} 条记录`,
-            }}
-            scroll={{ x: 800 }}
-          />
-        </Card>
+        <div className={styles.historyList}>
+          {history.map(renderHistoryCard)}
+        </div>
       )}
 
       {/* 快速入口 */}

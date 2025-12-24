@@ -124,30 +124,136 @@
   padding: 48px 24px;
 }
 
-/* ===== 表格卡片 ===== */
-.tableCard {
-  border-radius: 20px;
-  border: none;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+/* ===== 历史记录列表 ===== */
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 24px;
+}
+
+.historyCard {
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
   overflow: hidden;
 }
 
-.tableCard :global(.ant-card-body) {
-  padding: 0;
+.historyCard:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
-.tableCard :global(.ant-table-thead > tr > th) {
-  background: var(--bg-secondary);
-  font-weight: 600;
+.historyCard :global(.ant-card-body) {
+  padding: 16px 20px;
 }
 
-.tableCard :global(.ant-table-tbody > tr:hover > td) {
-  background: rgba(43, 108, 176, 0.04);
+/* 卡片主体布局 */
+.cardMain {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
-.tableCard :global(.ant-pagination) {
-  padding: 16px;
+/* 左侧：科目信息 */
+.cardLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  min-width: 180px;
+}
+
+.subjectIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(43, 108, 176, 0.1), rgba(82, 196, 26, 0.1));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.subjectInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subjectName {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.tagRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tagRow :global(.ant-tag) {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+/* 中间：成绩区域 */
+.cardCenter {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.scoreSection {
+  text-align: center;
+}
+
+.scoreMain {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.scoreValue {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.scoreLabel {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.scoreDetail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.scoreDetail .divider {
+  color: var(--border-color);
+}
+
+/* 右侧：时间和操作 */
+.cardRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 140px;
+}
+
+.dateText {
+  font-size: 0.8rem;
 }
 
 /* ===== 快速入口 ===== */
@@ -195,17 +301,42 @@
 
 /* ===== 分享按钮 ===== */
 .shareBtn {
-  color: var(--color-primary);
+  border-radius: 8px;
+  font-size: 0.8rem;
   transition: all 0.3s;
 }
 
 .shareBtn:hover {
-  color: var(--color-primary-dark);
-  background: rgba(43, 108, 176, 0.1);
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
 /* ===== 响应式设计 ===== */
+@media (max-width: 992px) {
+  .cardMain {
+    flex-wrap: wrap;
+  }
+
+  .cardLeft {
+    flex: 1 1 50%;
+    min-width: auto;
+  }
+
+  .cardCenter {
+    flex: 1 1 50%;
+    justify-content: flex-end;
+  }
+
+  .cardRight {
+    flex: 1 1 100%;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 12px;
+    margin-top: 12px;
+    border-top: 1px solid var(--border-color);
+  }
+}
+
 @media (max-width: 768px) {
   .pageHeader {
     padding: 32px 0 24px;
@@ -228,9 +359,41 @@
   .statCard :global(.ant-statistic-content-value) {
     font-size: 1.25rem !important;
   }
+
+  .cardLeft {
+    flex: 1 1 100%;
+  }
+
+  .cardCenter {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    padding-top: 12px;
+  }
+
+  .scoreMain {
+    justify-content: flex-start;
+  }
+
+  .scoreDetail {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 480px) {
+  .historyCard :global(.ant-card-body) {
+    padding: 12px 16px;
+  }
+
+  .subjectIcon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+
+  .scoreValue {
+    font-size: 1.5rem;
+  }
+
   .actions {
     flex-direction: column;
   }
