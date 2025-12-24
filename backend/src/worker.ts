@@ -1929,11 +1929,34 @@ export default {
           return jsonResponse({ questions: [] }, 200, origin)
         }
 
-        const records = await env.DB.prepare(
-          'SELECT * FROM wrong_questions WHERE user_id = ? ORDER BY created_at DESC LIMIT 100'
-        ).bind(tokenData.userId).all()
+        try {
+          const records = await env.DB.prepare(
+            `SELECT 
+              id,
+              question_id as questionId,
+              question_text as questionText,
+              question_type as questionType,
+              subject,
+              topic,
+              user_answer as userAnswer,
+              correct_answer as correctAnswer,
+              explanation,
+              wrong_count as wrongCount,
+              status,
+              first_attempt_date as firstAttemptDate,
+              last_attempt_date as lastAttemptDate,
+              created_at as createdAt
+            FROM wrong_questions 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC 
+            LIMIT 100`
+          ).bind(tokenData.userId).all()
 
-        return jsonResponse({ questions: records.results || [] }, 200, origin)
+          return jsonResponse({ questions: records.results || [] }, 200, origin)
+        } catch (error) {
+          console.error('获取错题列表失败:', error)
+          return jsonResponse({ questions: [] }, 200, origin)
+        }
       }
 
       // 添加错题
