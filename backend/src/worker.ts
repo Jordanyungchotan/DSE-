@@ -555,7 +555,7 @@ const QUIZ_DIFFICULTY_MAP: Record<string, string> = {
 
 // ===== 题目多样性增强系统 =====
 
-// 场景库 - 用于随机化题目背景
+// 场景库 - 用于随机化题目背景（各科目独立）
 const SCENARIO_LIBRARY: Record<string, string[]> = {
   math: [
     '小明在超市购物时', '学校运动会期间', '工程师设计建筑时', '班级郊游活动中',
@@ -571,6 +571,44 @@ const SCENARIO_LIBRARY: Record<string, string[]> = {
   chemistry: [
     '实验室制备气体时', '食品保存研究中', '环境污染物检测', '药物合成实验',
     '电池效率测试', '水质检测实验', '金属腐蚀分析', '废水处理研究'
+  ],
+  english: [
+    '阅读理解段落', '语法填空练习', '词汇选择题', '句子改错练习',
+    '完形填空训练', '短文写作指导', '同义词辨析', '时态语态运用',
+    '从句结构分析', '口语表达情景', '书信写作格式', '文章主旨理解'
+  ],
+  chinese: [
+    '文言文阅读', '白话文理解', '成语运用情境', '修辞手法分析',
+    '诗词鉴赏题目', '作文审题立意', '古诗文默写', '阅读理解分析',
+    '语病修改练习', '文学常识考查', '标点符号运用', '词语辨析题'
+  ],
+  liberal: [
+    '社会议题讨论', '公共政策分析', '环境保护议题', '科技发展影响',
+    '全球化现象探讨', '人权法治问题', '可持续发展目标', '香港社会时事'
+  ],
+  biology: [
+    '细胞结构观察', '遗传实验分析', '生态系统研究', '人体系统功能',
+    '植物生理实验', '动物行为研究', '微生物培养', '进化论证据'
+  ],
+  economics: [
+    '市场供需分析', '价格机制运作', '国际贸易情境', '货币政策影响',
+    '企业成本核算', '消费者行为研究', '经济周期分析', '香港经济发展'
+  ],
+  geography: [
+    '地形地貌分析', '气候变化研究', '人口分布特征', '城市规划案例',
+    '自然灾害防治', '资源开发利用', '环境可持续发展', '地图判读技巧'
+  ],
+  history: [
+    '历史事件分析', '史料解读练习', '历史人物评价', '文明发展比较',
+    '近代史事件', '香港历史发展', '世界大战影响', '社会变革研究'
+  ],
+  ict: [
+    '程序设计基础', '数据结构应用', '网络安全案例', '系统开发流程',
+    '数据库设计', '人工智能应用', '软件测试方法', '信息处理技术'
+  ],
+  bafs: [
+    '财务报表分析', '成本会计计算', '企业管理案例', '投资决策分析',
+    '预算编制方法', '现金流量管理', '审计程序应用', '税务筹划方案'
   ]
 }
 
@@ -647,6 +685,75 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   }
 }
 
+// 各科目题目类型指导
+const SUBJECT_QUESTION_GUIDANCE: Record<string, string> = {
+  english: `【英国语文题目要求】
+- 语法题：时态、语态、从句、介词、冠词等
+- 词汇题：同义词、反义词、词性转换、短语搭配
+- 阅读理解：段落大意、细节理解、推断题
+- 句子改错：语法错误识别与纠正
+⚠️ 禁止出数学计算题！只出英语语言相关题目！`,
+  
+  chinese: `【中国语文题目要求】
+- 阅读理解：白话文/文言文理解
+- 语文知识：成语、修辞、语病、标点
+- 文学常识：作家作品、文体知识
+- 写作技巧：审题立意、结构分析
+⚠️ 禁止出数学计算题！只出语文相关题目！`,
+  
+  math: `【数学题目要求】
+- 可出计算题、应用题、几何题
+- 使用提供的数字参考
+- 包含详细解题步骤`,
+  
+  physics: `【物理题目要求】
+- 力学、电学、热学、光学、波动等
+- 可包含计算和概念题
+- 需要物理公式应用`,
+  
+  chemistry: `【化学题目要求】
+- 化学方程式、反应类型
+- 物质结构、元素性质
+- 实验操作和现象分析`,
+  
+  biology: `【生物题目要求】
+- 细胞结构、遗传变异
+- 生态系统、人体生理
+- 实验设计与分析`,
+  
+  liberal: `【公民与社会发展题目要求】
+- 社会议题分析
+- 公共政策评价
+- 时事热点讨论
+⚠️ 禁止出数学计算题！`,
+  
+  economics: `【经济题目要求】
+- 供需分析、市场结构
+- 宏观经济政策
+- 国际贸易理论`,
+  
+  geography: `【地理题目要求】
+- 自然地理：地形、气候、水文
+- 人文地理：人口、城市、产业
+- 地图判读与分析`,
+  
+  history: `【历史题目要求】
+- 史料分析与解读
+- 历史事件因果
+- 历史评价与比较
+⚠️ 禁止出数学计算题！`,
+  
+  ict: `【资讯及通讯科技题目要求】
+- 程序设计基础
+- 数据结构与算法
+- 网络与系统安全`,
+  
+  bafs: `【企业会计与财务概论题目要求】
+- 财务报表分析
+- 成本与管理会计
+- 企业管理概念`
+}
+
 // 生成刷题题目（增强版 - 带多样性控制和重试机制）
 async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promise<GeneratedQuestion[]> {
   const subjectName = QUIZ_SUBJECT_MAP[config.subject] || config.subject
@@ -665,18 +772,28 @@ async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promis
       // 生成多样性元素
       const scenario = selectRandomScenario(config.subject)
       const suggestedNumbers = generateDiverseNumbers(config.difficulty, 5)
-      const diversityInstructions = generateDiversityInstructions()
+      
+      // 获取科目特定的题目指导
+      const subjectGuidance = SUBJECT_QUESTION_GUIDANCE[config.subject] || ''
+      
+      // 判断是否为非数学科目（不需要数字参考）
+      const isNonMathSubject = ['english', 'chinese', 'liberal', 'history'].includes(config.subject)
       
       // 简化提示词以加快响应
-      const systemPrompt = `你是DSE ${subjectName}考试专家。用简体中文生成题目，严格按JSON格式输出。`
+      const systemPrompt = `你是DSE ${subjectName}考试专家。你必须生成${subjectName}科目的题目，不能生成其他科目的题目！用简体中文生成题目，严格按JSON格式输出。`
 
-      const userPrompt = `生成${config.questionCount}道${gradeName}${subjectName}${difficultyName}题目。
+      const userPrompt = `【重要】生成${config.questionCount}道${gradeName}【${subjectName}】${difficultyName}题目。
+
+⚠️⚠️⚠️ 这是【${subjectName}】科目！不是数学！⚠️⚠️⚠️
+
+${subjectGuidance}
 
 场景参考："${scenario}"
-数字参考：${suggestedNumbers.join('、')}
+${isNonMathSubject ? '' : `数字参考：${suggestedNumbers.join('、')}`}
 
 ⚠️ 必须使用简体中文！
 ⚠️ 选择题答案用字母A/B/C/D！
+⚠️ 题目必须是【${subjectName}】相关内容！
 
 JSON格式：
 {
@@ -688,13 +805,13 @@ JSON格式：
       "options": ["A选项", "B选项", "C选项", "D选项"],
       "correctAnswer": "A",
       "explanation": "解析",
-      "topicTags": ["知识点"],
+      "topicTags": ["${subjectName}知识点"],
       "difficultyScore": 3
     }
   ]
 }
 
-questionType: multiple_choice/short_answer/calculation
+questionType: multiple_choice/short_answer${isNonMathSubject ? '' : '/calculation'}
 只返回JSON，无其他文字。`
 
       const response = await fetchWithTimeout('https://api.deepseek.com/v1/chat/completions', {
@@ -874,6 +991,122 @@ const FALLBACK_QUESTIONS: Record<string, GeneratedQuestion[]> = {
       correctAnswer: 'A',
       explanation: '中和反应是指酸和碱反应生成盐和水的反应。例如：HCl + NaOH → NaCl + H₂O',
       topicTags: ['化学反应', '中和反应'],
+      difficultyScore: 2,
+    },
+  ],
+  english: [
+    {
+      id: 'fb_eng_1',
+      question: 'Choose the correct form of the verb: She _____ to school every day.',
+      questionType: 'multiple_choice',
+      options: ['goes', 'go', 'going', 'gone'],
+      correctAnswer: 'A',
+      explanation: '主语是第三人称单数 "She"，一般现在时态下动词需要加 s/es，所以用 "goes"。',
+      topicTags: ['语法', '时态', '主谓一致'],
+      difficultyScore: 1,
+    },
+    {
+      id: 'fb_eng_2',
+      question: 'Which word is a synonym for "happy"?',
+      questionType: 'multiple_choice',
+      options: ['joyful', 'sad', 'angry', 'tired'],
+      correctAnswer: 'A',
+      explanation: '"Joyful" 意为充满快乐的，是 "happy"（快乐的）的同义词。',
+      topicTags: ['词汇', '同义词'],
+      difficultyScore: 1,
+    },
+    {
+      id: 'fb_eng_3',
+      question: 'Choose the correct preposition: The book is _____ the table.',
+      questionType: 'multiple_choice',
+      options: ['on', 'in', 'at', 'by'],
+      correctAnswer: 'A',
+      explanation: '书在桌子"上面"用介词 "on"。"in" 表示在...里面，"at" 表示在某点，"by" 表示在...旁边。',
+      topicTags: ['语法', '介词'],
+      difficultyScore: 1,
+    },
+    {
+      id: 'fb_eng_4',
+      question: 'Find the error in this sentence: "He don\'t like apples."',
+      questionType: 'multiple_choice',
+      options: ['"don\'t" should be "doesn\'t"', '"like" should be "likes"', '"He" should be "Him"', 'No error'],
+      correctAnswer: 'A',
+      explanation: '主语 "He" 是第三人称单数，助动词应该用 "doesn\'t" 而不是 "don\'t"。正确句子是 "He doesn\'t like apples."',
+      topicTags: ['语法', '主谓一致', '句子改错'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_eng_5',
+      question: 'Choose the correct tense: By next year, I _____ from university.',
+      questionType: 'multiple_choice',
+      options: ['will have graduated', 'graduated', 'am graduating', 'have graduated'],
+      correctAnswer: 'A',
+      explanation: '"By next year" 表示到明年为止，需要用将来完成时 "will have + 过去分词"。',
+      topicTags: ['语法', '时态', '将来完成时'],
+      difficultyScore: 3,
+    },
+  ],
+  chinese: [
+    {
+      id: 'fb_chi_1',
+      question: '下列哪个成语使用正确？',
+      questionType: 'multiple_choice',
+      options: ['他学习刻苦，成绩突飞猛进。', '这道题很简单，真是难以置信。', '他跑步很慢，健步如飞。', '天气炎热，我们瑟瑟发抖。'],
+      correctAnswer: 'A',
+      explanation: '"突飞猛进"形容进步很快，用来形容学习进步是正确的。其他选项成语使用不当。',
+      topicTags: ['成语', '语言运用'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_chi_2',
+      question: '"床前明月光，疑是地上霜"出自哪位诗人？',
+      questionType: 'multiple_choice',
+      options: ['李白', '杜甫', '白居易', '王维'],
+      correctAnswer: 'A',
+      explanation: '这两句诗出自唐代诗人李白的《静夜思》。',
+      topicTags: ['诗词', '文学常识'],
+      difficultyScore: 1,
+    },
+    {
+      id: 'fb_chi_3',
+      question: '下列句子没有语病的是：',
+      questionType: 'multiple_choice',
+      options: ['同学们认真听取并讨论了校长的报告。', '通过这次活动，使我受益匪浅。', '他的写作水平有了明显的改进。', '为了防止这类事故不再发生，我们必须加强管理。'],
+      correctAnswer: 'A',
+      explanation: 'A句语序正确，先"听取"后"讨论"符合逻辑。B句滥用介词导致主语缺失；C句"水平"应与"提高"搭配；D句"防止...不再"否定不当。',
+      topicTags: ['语法', '病句辨析'],
+      difficultyScore: 3,
+    },
+    {
+      id: 'fb_chi_4',
+      question: '"比喻"是一种常见的修辞手法，下列哪句使用了比喻？',
+      questionType: 'multiple_choice',
+      options: ['弯弯的月亮像小船。', '春天来了，花儿开了。', '他高兴得跳了起来。', '这本书很有趣。'],
+      correctAnswer: 'A',
+      explanation: '"月亮像小船"将月亮比作小船，是明喻。其他句子没有使用比喻修辞。',
+      topicTags: ['修辞手法', '比喻'],
+      difficultyScore: 2,
+    },
+  ],
+  liberal: [
+    {
+      id: 'fb_lib_1',
+      question: '以下哪项是可持续发展的核心理念？',
+      questionType: 'multiple_choice',
+      options: ['满足当代需求又不损害后代满足需求的能力', '只关注经济增长', '只关注环境保护', '只关注社会发展'],
+      correctAnswer: 'A',
+      explanation: '可持续发展强调在满足当代人需求的同时，不损害后代满足其需求的能力，需要平衡经济、社会和环境三个方面。',
+      topicTags: ['可持续发展', '环境保护'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_lib_2',
+      question: '以下哪项最能体现公民责任？',
+      questionType: 'multiple_choice',
+      options: ['遵守法律法规，积极参与社区服务', '只关注个人利益', '逃避纳税义务', '不参与公共事务'],
+      correctAnswer: 'A',
+      explanation: '公民责任包括遵守法律、履行义务、参与公共事务和社区服务等方面。',
+      topicTags: ['公民责任', '社会参与'],
       difficultyScore: 2,
     },
   ],
