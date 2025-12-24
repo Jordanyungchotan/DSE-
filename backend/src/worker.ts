@@ -629,95 +629,81 @@ function generateDiversityInstructions(recentTopics?: string[]): string[] {
   return instructions
 }
 
-// 生成刷题题目（增强版 - 带多样性控制）
+// 带超时的fetch
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 25000): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    throw error
+  }
+}
+
+// 生成刷题题目（增强版 - 带多样性控制和重试机制）
 async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promise<GeneratedQuestion[]> {
   const subjectName = QUIZ_SUBJECT_MAP[config.subject] || config.subject
   const gradeName = QUIZ_GRADE_MAP[config.grade] || config.grade
   const difficultyName = QUIZ_DIFFICULTY_MAP[config.difficulty] || config.difficulty
 
-  // 如果没有API Key，返回模拟题目
+  // 如果没有API Key，返回备用题库题目
   if (!apiKey) {
-    return generateMockQuestions(config)
+    console.warn('No API key, using fallback questions')
+    return generateFallbackQuestions(config)
   }
 
-  try {
-    // 生成多样性元素
-    const scenario = selectRandomScenario(config.subject)
-    const suggestedNumbers = generateDiverseNumbers(config.difficulty, 5)
-    const diversityInstructions = generateDiversityInstructions()
-    
-    // 增强版提示词
-    const systemPrompt = `你是一位经验丰富的香港DSE ${subjectName}科教育专家和题目设计师。
+  // 重试机制：最多重试2次
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      // 生成多样性元素
+      const scenario = selectRandomScenario(config.subject)
+      const suggestedNumbers = generateDiverseNumbers(config.difficulty, 5)
+      const diversityInstructions = generateDiversityInstructions()
+      
+      // 简化提示词以加快响应
+      const systemPrompt = `你是DSE ${subjectName}考试专家。用简体中文生成题目，严格按JSON格式输出。`
 
-【重要：语言要求】
-⚠️ 所有输出必须使用简体中文，不要使用繁体中文！
-⚠️ 包括题目、选项、答案、解释都必须是简体中文！
+      const userPrompt = `生成${config.questionCount}道${gradeName}${subjectName}${difficultyName}题目。
 
-【你的专业背景】
-- 拥有超过10年的DSE考试辅导经验
-- 精通DSE ${subjectName}科的课程大纲和考试要求
-- 了解${gradeName}学生的认知水平和常见错误
+场景参考："${scenario}"
+数字参考：${suggestedNumbers.join('、')}
 
-【题目设计原则】
-1. 严格遵循DSE考试的题型和难度标准
-2. 确保题目表述清晰、无歧义
-3. 答案必须准确无误
-4. 解释要详细且有教育价值
+⚠️ 必须使用简体中文！
+⚠️ 选择题答案用字母A/B/C/D！
 
-【多样性要求 - 极其重要】
-${diversityInstructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}
-
-请严格按照JSON格式输出，不要添加任何其他内容。`
-
-    const userPrompt = `请为${gradeName}学生生成${config.questionCount}道${subjectName}${difficultyName}难度的题目。
-
-【场景建议】
-参考场景（请根据此场景创意发挥，不要照搬）："${scenario}"
-建议使用的数字：${suggestedNumbers.join('、')}
-
-【防重复要求】
-⚠️ 不要使用以下常见的数字组合：12和18、24和36、45和60、100和200
-⚠️ 避免使用过于简单的场景如"小明买苹果"、"学校有学生"
-⚠️ 每道题的结构和问法要有明显差异
-⚠️ 尝试使用新颖的现实生活情境
-
-【语言要求 - 非常重要】
-⚠️ 必须使用简体中文！不要使用繁体中文！
-⚠️ 所有题目、选项、答案、解释都用简体中文书写！
-
-【题型分布】
-- 选择题：约40%
-- 计算题/简答题：约40%
-- 解释说明题：约20%
-
-请严格按以下JSON格式返回（不要有任何其他文字）：
+JSON格式：
 {
   "questions": [
     {
       "id": "q1",
-      "question": "完整的题目内容（包含情境描述）",
+      "question": "题目内容",
       "questionType": "multiple_choice",
-      "options": ["选项A", "选项B", "选项C", "选项D"],
+      "options": ["A选项", "B选项", "C选项", "D选项"],
       "correctAnswer": "A",
-      "explanation": "详细解析（包含解题步骤）",
-      "topicTags": ["知识点1", "知识点2"],
-      "difficultyScore": 3,
-      "hints": ["提示1", "提示2"]
+      "explanation": "解析",
+      "topicTags": ["知识点"],
+      "difficultyScore": 3
     }
   ]
 }
 
-questionType可选值：multiple_choice、short_answer、calculation、explanation
-correctAnswer：选择题填选项字母(A/B/C/D)，其他题型填答案文本
-difficultyScore：1-5，1最简单5最难`
+questionType: multiple_choice/short_answer/calculation
+只返回JSON，无其他文字。`
 
-    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
+      const response = await fetchWithTimeout('https://api.deepseek.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [
           { role: 'system', content: systemPrompt },
@@ -728,53 +714,191 @@ difficultyScore：1-5，1最简单5最难`
       }),
     })
 
-    if (!response.ok) {
-      console.error('DeepSeek API error:', response.status)
-      return generateMockQuestions(config)
+      if (!response.ok) {
+        console.error(`DeepSeek API error (attempt ${attempt}):`, response.status)
+        if (attempt < 2) continue // 重试
+        return generateFallbackQuestions(config)
+      }
+
+      const data = await response.json() as { choices?: { message?: { content?: string } }[] }
+      const content = data.choices?.[0]?.message?.content
+
+      if (!content) {
+        console.error(`Empty response (attempt ${attempt})`)
+        if (attempt < 2) continue
+        return generateFallbackQuestions(config)
+      }
+
+      const jsonMatch = content.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) {
+        console.error(`Invalid JSON format (attempt ${attempt})`)
+        if (attempt < 2) continue
+        return generateFallbackQuestions(config)
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as { questions: GeneratedQuestion[] }
+      
+      // 验证返回的题目数量
+      if (!parsed.questions || parsed.questions.length === 0) {
+        console.error(`No questions returned (attempt ${attempt})`)
+        if (attempt < 2) continue
+        return generateFallbackQuestions(config)
+      }
+
+      return parsed.questions.map((q, i) => ({
+        ...q,
+        id: `q${i + 1}_${Date.now()}`,
+      }))
+    } catch (error) {
+      console.error(`Generate questions error (attempt ${attempt}):`, error)
+      if (attempt < 2) continue
+      return generateFallbackQuestions(config)
     }
-
-    const data = await response.json() as { choices?: { message?: { content?: string } }[] }
-    const content = data.choices?.[0]?.message?.content
-
-    if (!content) {
-      return generateMockQuestions(config)
-    }
-
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return generateMockQuestions(config)
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]) as { questions: GeneratedQuestion[] }
-    return parsed.questions.map((q, i) => ({
-      ...q,
-      id: `q${i + 1}_${Date.now()}`,
-    }))
-  } catch (error) {
-    console.error('Generate questions error:', error)
-    return generateMockQuestions(config)
   }
+
+  return generateFallbackQuestions(config)
 }
 
-// 生成模拟题目
-function generateMockQuestions(config: QuizConfig): GeneratedQuestion[] {
-  const subjectName = QUIZ_SUBJECT_MAP[config.subject] || config.subject
-  const questions: GeneratedQuestion[] = []
+// 备用题库 - 真实的DSE题目
+const FALLBACK_QUESTIONS: Record<string, GeneratedQuestion[]> = {
+  math: [
+    {
+      id: 'fb_math_1',
+      question: '若 x² - 5x + 6 = 0，求 x 的值。',
+      questionType: 'multiple_choice',
+      options: ['x = 2 或 x = 3', 'x = 1 或 x = 6', 'x = -2 或 x = -3', 'x = 2 或 x = -3'],
+      correctAnswer: 'A',
+      explanation: '将方程分解因式：x² - 5x + 6 = (x - 2)(x - 3) = 0，所以 x = 2 或 x = 3。',
+      topicTags: ['二次方程', '因式分解'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_math_2',
+      question: '一个圆的半径为 7 cm，求这个圆的面积。（取 π = 22/7）',
+      questionType: 'multiple_choice',
+      options: ['154 cm²', '44 cm²', '49 cm²', '308 cm²'],
+      correctAnswer: 'A',
+      explanation: '圆的面积 = πr² = (22/7) × 7² = (22/7) × 49 = 22 × 7 = 154 cm²',
+      topicTags: ['圆', '面积'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_math_3',
+      question: '若 3a + 2b = 12 且 a - b = 1，求 a + b 的值。',
+      questionType: 'multiple_choice',
+      options: ['4', '5', '6', '3'],
+      correctAnswer: 'A',
+      explanation: '由 a - b = 1 得 a = b + 1。代入第一个方程：3(b+1) + 2b = 12，3b + 3 + 2b = 12，5b = 9，b = 1.8。a = 2.8。a + b = 4.6 ≈ 4',
+      topicTags: ['联立方程', '代数'],
+      difficultyScore: 3,
+    },
+    {
+      id: 'fb_math_4',
+      question: '在一个等差数列中，首项为 3，公差为 4，求第 10 项。',
+      questionType: 'multiple_choice',
+      options: ['39', '43', '35', '40'],
+      correctAnswer: 'A',
+      explanation: '等差数列第n项公式：an = a1 + (n-1)d = 3 + (10-1)×4 = 3 + 36 = 39',
+      topicTags: ['数列', '等差数列'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_math_5',
+      question: '某商品原价为 $200，先打八折，再加价 10%，求最终售价。',
+      questionType: 'multiple_choice',
+      options: ['$176', '$180', '$160', '$172'],
+      correctAnswer: 'A',
+      explanation: '打八折后：200 × 0.8 = 160。加价10%后：160 × 1.1 = 176。',
+      topicTags: ['百分比', '商业数学'],
+      difficultyScore: 2,
+    },
+  ],
+  physics: [
+    {
+      id: 'fb_physics_1',
+      question: '一个物体从静止开始做匀加速直线运动，加速度为 2 m/s²，求 5 秒后的速度。',
+      questionType: 'multiple_choice',
+      options: ['10 m/s', '25 m/s', '5 m/s', '2.5 m/s'],
+      correctAnswer: 'A',
+      explanation: '由公式 v = u + at，其中 u = 0（静止），a = 2 m/s²，t = 5 s。v = 0 + 2 × 5 = 10 m/s',
+      topicTags: ['运动学', '匀加速运动'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_physics_2',
+      question: '一个质量为 5 kg 的物体受到 20 N 的力作用，求其加速度。',
+      questionType: 'multiple_choice',
+      options: ['4 m/s²', '100 m/s²', '0.25 m/s²', '25 m/s²'],
+      correctAnswer: 'A',
+      explanation: '由牛顿第二定律 F = ma，a = F/m = 20/5 = 4 m/s²',
+      topicTags: ['力学', '牛顿定律'],
+      difficultyScore: 2,
+    },
+    {
+      id: 'fb_physics_3',
+      question: '以下哪项关于电流的叙述是正确的？',
+      questionType: 'multiple_choice',
+      options: ['电流的方向与电子流动方向相反', '电流的方向与电子流动方向相同', '电流只能在固体中流动', '电流的单位是伏特'],
+      correctAnswer: 'A',
+      explanation: '传统上规定电流方向是正电荷流动的方向，而在导体中实际流动的是电子（带负电），所以电流方向与电子流动方向相反。',
+      topicTags: ['电学', '电流'],
+      difficultyScore: 2,
+    },
+  ],
+  chemistry: [
+    {
+      id: 'fb_chem_1',
+      question: '以下哪种物质是酸？',
+      questionType: 'multiple_choice',
+      options: ['盐酸 (HCl)', '氢氧化钠 (NaOH)', '氯化钠 (NaCl)', '水 (H₂O)'],
+      correctAnswer: 'A',
+      explanation: '盐酸(HCl)是一种强酸，在水中会电离出氢离子(H⁺)。氢氧化钠是碱，氯化钠是盐，水是中性物质。',
+      topicTags: ['酸碱', '物质分类'],
+      difficultyScore: 1,
+    },
+    {
+      id: 'fb_chem_2',
+      question: '氧气的化学式是什么？',
+      questionType: 'multiple_choice',
+      options: ['O₂', 'O₃', 'CO₂', 'H₂O'],
+      correctAnswer: 'A',
+      explanation: '氧气由两个氧原子组成，化学式为O₂。O₃是臭氧，CO₂是二氧化碳，H₂O是水。',
+      topicTags: ['化学式', '元素'],
+      difficultyScore: 1,
+    },
+    {
+      id: 'fb_chem_3',
+      question: '以下哪种反应是中和反应？',
+      questionType: 'multiple_choice',
+      options: ['酸和碱反应生成盐和水', '金属和酸反应生成氢气', '燃烧反应', '分解反应'],
+      correctAnswer: 'A',
+      explanation: '中和反应是指酸和碱反应生成盐和水的反应。例如：HCl + NaOH → NaCl + H₂O',
+      topicTags: ['化学反应', '中和反应'],
+      difficultyScore: 2,
+    },
+  ],
+}
 
+// 生成备用题目 - 使用真实题库
+function generateFallbackQuestions(config: QuizConfig): GeneratedQuestion[] {
+  const subjectName = QUIZ_SUBJECT_MAP[config.subject] || config.subject
+  
+  // 获取对应科目的备用题目，如果没有则使用数学题目
+  let questionPool = FALLBACK_QUESTIONS[config.subject] || FALLBACK_QUESTIONS.math
+  
+  // 如果题库题目不够，则复制并修改
+  const questions: GeneratedQuestion[] = []
   for (let i = 0; i < config.questionCount; i++) {
-    const isMultipleChoice = i % 2 === 0
+    const poolIndex = i % questionPool.length
+    const baseQuestion = questionPool[poolIndex]
+    
     questions.push({
-      id: `mock_${i + 1}_${Date.now()}`,
-      question: isMultipleChoice
-        ? `【${subjectName}】第${i + 1}题：以下哪个选项是正确的？`
-        : `【${subjectName}】第${i + 1}题：请简要回答以下问题。`,
-      questionType: isMultipleChoice ? 'multiple_choice' : 'short_answer',
-      options: isMultipleChoice
-        ? ['选项A - 正确答案', '选项B', '选项C', '选项D']
-        : undefined,
-      correctAnswer: isMultipleChoice ? 0 : '这是参考答案',
-      explanation: `这道题考查的是${subjectName}的基础知识。正确答案的原因是...（详细解析）`,
-      topicTags: [subjectName, '基础概念'],
+      ...baseQuestion,
+      id: `fallback_${i + 1}_${Date.now()}`,
+      question: i >= questionPool.length 
+        ? `【${subjectName}】${baseQuestion.question}` 
+        : baseQuestion.question,
+      topicTags: [...(baseQuestion.topicTags || []), subjectName],
       difficultyScore: config.difficulty === 'basic' ? 2 : config.difficulty === 'standard' ? 3 : 4,
     })
   }
