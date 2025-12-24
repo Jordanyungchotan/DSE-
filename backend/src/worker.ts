@@ -1739,6 +1739,61 @@ export default {
         }
       }
 
+      // 获取刷题历史记录
+      if (path === '/api/quiz/history' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return jsonResponse({ history: [] }, 200, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return jsonResponse({ history: [] }, 200, origin)
+        }
+
+        try {
+          const query = `
+            SELECT 
+              id,
+              config,
+              status,
+              score,
+              accuracy,
+              total_time as timeSpent,
+              created_at as completedAt
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed'
+            ORDER BY created_at DESC
+            LIMIT 50
+          `
+          
+          const results = await env.DB.prepare(query).bind(tokenData.userId).all()
+
+          const history = (results.results || []).map((row: Record<string, unknown>) => {
+            let config = { subject: 'math', grade: 'f5', difficulty: 'standard' }
+            try {
+              config = JSON.parse(row.config as string || '{}')
+            } catch {}
+
+            return {
+              id: row.id,
+              subject: config.subject || 'math',
+              grade: config.grade || 'f5',
+              difficulty: config.difficulty || 'standard',
+              score: row.score || 0,
+              accuracy: Math.round((row.accuracy as number || 0) * 100),
+              timeSpent: row.timeSpent || 0,
+              completedAt: row.completedAt
+            }
+          })
+
+          return jsonResponse({ history }, 200, origin)
+        } catch (dbError) {
+          console.error('Load quiz history error:', dbError)
+          return jsonResponse({ history: [] }, 200, origin)
+        }
+      }
+
       // 获取错题列表
       if (path === '/api/quiz/wrong-questions' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
@@ -2287,6 +2342,7 @@ export default {
             'POST /api/quiz/start',
             'POST /api/quiz/grade',
             'POST /api/quiz/save',
+            'GET /api/quiz/history',
             'GET /api/quiz/wrong-questions',
             'POST /api/quiz/wrong-questions',
             'GET /api/quiz/learning-profile',
