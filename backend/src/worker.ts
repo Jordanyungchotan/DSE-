@@ -1549,6 +1549,354 @@ export default {
         return jsonResponse({ status: 'ok', service: 'quiz' }, 200, origin)
       }
 
+      // =====================
+      // 排行榜 API
+      // =====================
+
+      // 获取排行榜
+      if (path === '/api/leaderboard' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const type = url.searchParams.get('type') || 'weekly'
+        const criteria = url.searchParams.get('criteria') || 'composite'
+        const subject = url.searchParams.get('subject')
+        const grade = url.searchParams.get('grade')
+        const difficulty = url.searchParams.get('difficulty')
+        const page = parseInt(url.searchParams.get('page') || '1')
+        const limit = parseInt(url.searchParams.get('limit') || '50')
+
+        // 获取当前用户（如果已登录）
+        let currentUserId: string | null = null
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          currentUserId = tokenData?.userId || null
+        }
+
+        // 构建查询条件
+        const now = new Date()
+        let periodStart: Date
+        let periodEnd = now
+
+        switch (type) {
+          case 'daily':
+            periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+            break
+          case 'weekly':
+            const dayOfWeek = now.getDay()
+            periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek)
+            break
+          case 'monthly':
+            periodStart = new Date(now.getFullYear(), now.getMonth(), 1)
+            break
+          default:
+            periodStart = new Date(0) // all_time
+        }
+
+        // 从quiz_sessions获取排名数据
+        let query = `
+          SELECT 
+            qs.user_id,
+            u.name as display_name,
+            COUNT(*) as total_sessions,
+            SUM(json_array_length(qs.questions)) as total_questions,
+            AVG(qs.accuracy) as avg_accuracy,
+            AVG(qs.total_time * 1.0 / json_array_length(qs.questions)) as avg_time_per_question,
+            MAX(qs.accuracy) as best_accuracy
+          FROM quiz_sessions qs
+          JOIN users u ON qs.user_id = u.id
+          WHERE qs.status = 'completed'
+            AND qs.user_id IS NOT NULL
+            AND datetime(qs.created_at) >= datetime(?)
+        `
+        const params: (string | number)[] = [periodStart.toISOString()]
+
+        if (subject && subject !== 'all') {
+          query += ` AND json_extract(qs.config, '$.subject') = ?`
+          params.push(subject)
+        }
+        if (grade && grade !== 'all') {
+          query += ` AND json_extract(qs.config, '$.grade') = ?`
+          params.push(grade)
+        }
+        if (difficulty && difficulty !== 'all') {
+          query += ` AND json_extract(qs.config, '$.difficulty') = ?`
+          params.push(difficulty)
+        }
+
+        query += ` GROUP BY qs.user_id ORDER BY avg_accuracy DESC, avg_time_per_question ASC`
+        query += ` LIMIT ? OFFSET ?`
+        params.push(limit, (page - 1) * limit)
+
+        const results = await env.DB.prepare(query).bind(...params).all()
+
+        // 计算综合得分并生成排名
+        const rankings = (results.results || []).map((row: Record<string, unknown>, index: number) => {
+          const accuracy = (row.avg_accuracy as number) || 0
+          const avgTime = (row.avg_time_per_question as number) || 60
+          
+          // 计算各项得分
+          const accuracyScore = Math.min(accuracy * 0.4, 40)
+          const speedScore = avgTime <= 30 ? 20 : avgTime <= 45 ? 15 : avgTime <= 60 ? 10 : 5
+          const difficultyBonus = difficulty === 'exam' ? 20 : difficulty === 'challenging' ? 10 : difficulty === 'standard' ? 5 : 0
+          const totalScore = accuracyScore + speedScore + difficultyBonus
+
+          return {
+            rank: (page - 1) * limit + index + 1,
+            userId: row.user_id,
+            displayName: row.display_name || '匿名用户',
+            avatar: null,
+            grade: grade !== 'all' ? grade : null,
+            totalScore: Math.round(totalScore * 10) / 10,
+            accuracyScore: Math.round(accuracyScore * 10) / 10,
+            speedScore,
+            difficultyBonus,
+            consistencyBonus: 0,
+            activityBonus: 0,
+            accuracy: Math.round((accuracy * 100) * 10) / 10,
+            avgTimePerQuestion: Math.round(avgTime * 10) / 10,
+            totalSessions: row.total_sessions,
+            totalQuestions: row.total_questions,
+            isCurrentUser: row.user_id === currentUserId
+          }
+        })
+
+        // 获取总参与人数
+        let countQuery = `
+          SELECT COUNT(DISTINCT user_id) as count
+          FROM quiz_sessions
+          WHERE status = 'completed'
+            AND user_id IS NOT NULL
+            AND datetime(created_at) >= datetime(?)
+        `
+        const countParams: string[] = [periodStart.toISOString()]
+        const countResult = await env.DB.prepare(countQuery).bind(...countParams).first() as { count: number } | null
+        const totalParticipants = countResult?.count || 0
+
+        // 获取当前用户排名
+        let userRank = null
+        let userPosition = null
+        if (currentUserId) {
+          const userEntry = rankings.find(r => r.isCurrentUser)
+          if (userEntry) {
+            userRank = userEntry
+            userPosition = userEntry.rank
+          }
+        }
+
+        // 计算统计信息
+        const scores = rankings.map(r => r.totalScore)
+        const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+
+        const leaderboard = {
+          id: `lb_${type}_${criteria}_${Date.now()}`,
+          type,
+          name: type === 'daily' ? '今日排行榜' : type === 'weekly' ? '本周排行榜' : type === 'monthly' ? '本月排行榜' : '总排行榜',
+          description: `基于${criteria === 'composite' ? '综合评分' : criteria === 'accuracy' ? '正确率' : criteria === 'speed' ? '速度' : '科目'}的排名`,
+          icon: type === 'daily' ? '☀️' : type === 'weekly' ? '📅' : type === 'monthly' ? '🗓️' : '🏆',
+          filters: { subject, grade, difficulty },
+          rankings,
+          totalParticipants,
+          userPosition,
+          statistics: {
+            averageScore: Math.round(avgScore * 10) / 10,
+            medianScore: scores.length > 0 ? scores[Math.floor(scores.length / 2)] : 0,
+            top10Average: scores.slice(0, 10).reduce((a, b) => a + b, 0) / Math.min(10, scores.length) || 0,
+            scoreDistribution: []
+          },
+          lastUpdated: new Date().toISOString(),
+          pagination: {
+            currentPage: page,
+            totalPages: Math.ceil(totalParticipants / limit),
+            pageSize: limit,
+            totalItems: totalParticipants
+          }
+        }
+
+        return jsonResponse({ leaderboard, userRank }, 200, origin)
+      }
+
+      // 获取当前用户排名详情
+      if (path === '/api/leaderboard/me' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        // 获取用户统计数据
+        const statsQuery = `
+          SELECT 
+            COUNT(*) as total_sessions,
+            SUM(json_array_length(questions)) as total_questions,
+            SUM(CASE WHEN accuracy >= 1.0 THEN 1 ELSE 0 END) as perfect_sessions,
+            AVG(accuracy) as avg_accuracy,
+            AVG(total_time * 1.0 / json_array_length(questions)) as avg_time
+          FROM quiz_sessions
+          WHERE user_id = ? AND status = 'completed'
+        `
+        const stats = await env.DB.prepare(statsQuery).bind(tokenData.userId).first() as Record<string, unknown> | null
+
+        if (!stats || !stats.total_sessions) {
+          return jsonResponse({
+            userRank: null,
+            userStats: {
+              totalSessions: 0,
+              totalQuestions: 0,
+              correctAnswers: 0,
+              totalTimeSpent: 0,
+              averageAccuracy: 0,
+              averageTimePerQuestion: 0,
+              currentStreak: 0,
+              longestStreak: 0,
+              perfectSessions: 0,
+              activityLevel: 'low',
+              recentScores: []
+            }
+          }, 200, origin)
+        }
+
+        // 计算活跃度
+        const last7DaysQuery = `
+          SELECT COUNT(*) as count FROM quiz_sessions
+          WHERE user_id = ? AND status = 'completed'
+          AND datetime(created_at) >= datetime('now', '-7 days')
+        `
+        const last7Days = await env.DB.prepare(last7DaysQuery).bind(tokenData.userId).first() as { count: number } | null
+        
+        let activityLevel: 'low' | 'medium' | 'high' | 'excellent' = 'low'
+        const sessionCount = last7Days?.count || 0
+        if (sessionCount >= 20) activityLevel = 'excellent'
+        else if (sessionCount >= 10) activityLevel = 'high'
+        else if (sessionCount >= 5) activityLevel = 'medium'
+
+        // 获取最近成绩
+        const recentQuery = `
+          SELECT accuracy FROM quiz_sessions
+          WHERE user_id = ? AND status = 'completed'
+          ORDER BY created_at DESC LIMIT 5
+        `
+        const recentResults = await env.DB.prepare(recentQuery).bind(tokenData.userId).all()
+        const recentScores = (recentResults.results || []).map((r: Record<string, unknown>) => 
+          Math.round(((r.accuracy as number) || 0) * 100)
+        )
+
+        const userStats = {
+          totalSessions: stats.total_sessions as number,
+          totalQuestions: (stats.total_questions as number) || 0,
+          correctAnswers: Math.round(((stats.avg_accuracy as number) || 0) * ((stats.total_questions as number) || 0)),
+          totalTimeSpent: 0,
+          averageAccuracy: Math.round(((stats.avg_accuracy as number) || 0) * 100),
+          averageTimePerQuestion: Math.round(((stats.avg_time as number) || 0) * 10) / 10,
+          currentStreak: 0,
+          longestStreak: 0,
+          perfectSessions: (stats.perfect_sessions as number) || 0,
+          activityLevel,
+          recentScores
+        }
+
+        // 计算用户综合得分
+        const accuracyScore = Math.min(userStats.averageAccuracy * 0.4, 40)
+        const speedScore = userStats.averageTimePerQuestion <= 30 ? 20 : userStats.averageTimePerQuestion <= 45 ? 15 : 10
+        const activityBonus = activityLevel === 'excellent' ? 10 : activityLevel === 'high' ? 6 : activityLevel === 'medium' ? 3 : 0
+        const totalScore = accuracyScore + speedScore + activityBonus
+
+        const userRank = {
+          rank: 0, // 需要单独计算
+          userId: tokenData.userId,
+          displayName: '',
+          totalScore: Math.round(totalScore * 10) / 10,
+          accuracyScore: Math.round(accuracyScore * 10) / 10,
+          speedScore,
+          difficultyBonus: 0,
+          consistencyBonus: 0,
+          activityBonus,
+          accuracy: userStats.averageAccuracy,
+          avgTimePerQuestion: userStats.averageTimePerQuestion,
+          totalSessions: userStats.totalSessions,
+          totalQuestions: userStats.totalQuestions,
+          isCurrentUser: true
+        }
+
+        return jsonResponse({ userRank, userStats }, 200, origin)
+      }
+
+      // 提交刷题结果更新排行榜（刷题完成时调用）
+      if (path === '/api/leaderboard/submit' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const body = await request.json() as {
+          sessionId: string
+          accuracy: number
+          totalTime: number
+          questionCount: number
+          difficulty: string
+        }
+
+        // 更新或创建用户排名统计
+        const existingStats = await env.DB.prepare(
+          'SELECT * FROM user_ranking_stats WHERE user_id = ?'
+        ).bind(tokenData.userId).first()
+
+        const now = new Date().toISOString()
+
+        if (existingStats) {
+          // 更新现有统计
+          const totalSessions = ((existingStats.total_sessions as number) || 0) + 1
+          const totalQuestions = ((existingStats.total_questions as number) || 0) + body.questionCount
+          const correctAnswers = ((existingStats.correct_answers as number) || 0) + Math.round(body.accuracy * body.questionCount)
+          
+          await env.DB.prepare(`
+            UPDATE user_ranking_stats 
+            SET total_sessions = ?, 
+                total_questions = ?, 
+                correct_answers = ?,
+                average_accuracy = ?,
+                last_activity_at = ?,
+                updated_at = ?
+            WHERE user_id = ?
+          `).bind(
+            totalSessions,
+            totalQuestions,
+            correctAnswers,
+            correctAnswers / totalQuestions,
+            now,
+            now,
+            tokenData.userId
+          ).run()
+        } else {
+          // 创建新统计
+          const id = crypto.randomUUID()
+          await env.DB.prepare(`
+            INSERT INTO user_ranking_stats 
+            (id, user_id, total_sessions, total_questions, correct_answers, average_accuracy, last_activity_at, created_at, updated_at)
+            VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            id,
+            tokenData.userId,
+            body.questionCount,
+            Math.round(body.accuracy * body.questionCount),
+            body.accuracy,
+            now,
+            now,
+            now
+          ).run()
+        }
+
+        return jsonResponse({ message: '排名已更新' }, 200, origin)
+      }
+
       // 根路径 - 显示 API 状态
       if (path === '/' || path === '') {
         return jsonResponse({
@@ -1576,6 +1924,9 @@ export default {
             'POST /api/quiz/wrong-questions',
             'GET /api/quiz/learning-profile',
             'POST /api/quiz/generate-report',
+            'GET /api/leaderboard',
+            'GET /api/leaderboard/me',
+            'POST /api/leaderboard/submit',
           ],
         }, 200, origin)
       }

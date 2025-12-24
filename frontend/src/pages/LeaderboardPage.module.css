@@ -1,0 +1,599 @@
+/* DSE刷题排行榜页面样式 */
+
+.leaderboardPage {
+  min-height: 100vh;
+  padding: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* 页面头部 */
+.pageHeader {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 24px 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.headerLeft h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerLeft p {
+  color: #666;
+  margin: 0;
+  font-size: 14px;
+}
+
+.headerRight {
+  display: flex;
+  gap: 12px;
+}
+
+/* 筛选栏 */
+.filterBar {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.tabSelector :global(.ant-tabs-nav) {
+  margin: 0;
+}
+
+.tabSelector :global(.ant-tabs-tab) {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filterSelect {
+  min-width: 120px;
+}
+
+/* 主内容区 */
+.mainContent {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+}
+
+/* 排行榜区域 */
+.rankingSection {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.loadingContainer,
+.errorContainer,
+.emptyContainer {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  padding: 60px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* 领奖台 */
+.podiumContainer {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 40px 24px 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.95) 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.podiumUser {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.podiumAvatar {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.podiumCrown {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 24px;
+}
+
+.podiumName {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podiumScore {
+  margin-bottom: 4px;
+}
+
+.podiumScore .scoreValue {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fa8c16;
+}
+
+.podiumScore .scoreLabel {
+  font-size: 12px;
+  color: #999;
+  margin-left: 2px;
+}
+
+.podiumStats {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.podiumBase {
+  width: 100px;
+  border-radius: 8px 8px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.podiumRank {
+  font-size: 36px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.emptyPodium {
+  width: 100px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ccc;
+  font-size: 24px;
+}
+
+/* 排行榜表格 */
+.rankingTable {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.rankCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topRank {
+  font-size: 24px;
+}
+
+.rank1 {
+  filter: drop-shadow(0 2px 4px rgba(255, 215, 0, 0.5));
+}
+
+.rank2 {
+  filter: drop-shadow(0 2px 4px rgba(192, 192, 192, 0.5));
+}
+
+.rank3 {
+  filter: drop-shadow(0 2px 4px rgba(205, 127, 50, 0.5));
+}
+
+.normalRank {
+  font-size: 16px;
+  font-weight: 600;
+  color: #666;
+  width: 28px;
+  text-align: center;
+}
+
+.changeIndicator {
+  font-size: 12px;
+}
+
+.changeIndicator.up {
+  color: #52c41a;
+}
+
+.changeIndicator.down {
+  color: #f5222d;
+}
+
+.userCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.userCell.currentUser {
+  background: linear-gradient(90deg, rgba(24, 144, 255, 0.1) 0%, transparent 100%);
+  margin: -8px -12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.userName {
+  font-weight: 500;
+  color: #1a1a2e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meTag {
+  font-size: 10px;
+  padding: 0 4px;
+  line-height: 16px;
+}
+
+.userGrade {
+  font-size: 12px;
+  color: #999;
+}
+
+.scoreCell {
+  font-weight: 600;
+  color: #fa8c16;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.speedCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.currentUserRow {
+  background: linear-gradient(90deg, rgba(24, 144, 255, 0.08) 0%, rgba(24, 144, 255, 0.02) 100%) !important;
+}
+
+/* 侧边栏 */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 用户排名卡片 */
+.userRankCard {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.cardHeader h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.noRank {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.noRankIcon {
+  font-size: 48px;
+  color: #ccc;
+  margin-bottom: 16px;
+}
+
+.noRankHint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.rankDisplay {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.rankNumber {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.rankNumber .rank {
+  font-size: 36px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.rankNumber .total {
+  font-size: 14px;
+  color: #999;
+}
+
+.rankChange {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.rankChange.up {
+  background: rgba(82, 196, 26, 0.1);
+  color: #52c41a;
+}
+
+.rankChange.down {
+  background: rgba(245, 34, 45, 0.1);
+  color: #f5222d;
+}
+
+.progressSection {
+  margin-bottom: 16px;
+}
+
+.progressLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.scoreDetails {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.scoreItem {
+  text-align: center;
+}
+
+.scoreItem .label {
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+}
+
+.scoreItem .value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 12px;
+}
+
+.actionButtons button {
+  flex: 1;
+}
+
+/* 统计卡片 */
+.statsCard {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.statItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.statItem:last-child {
+  border-bottom: none;
+}
+
+.statItem span:first-child {
+  color: #666;
+}
+
+.statItem span:last-child {
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+/* 提示卡片 */
+.tipsCard {
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.tipsCard ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.tipsCard li {
+  color: #666;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.tipsCard li:last-child {
+  margin-bottom: 0;
+}
+
+/* 防作弊声明 */
+.antiCheatNotice {
+  text-align: center;
+  padding: 16px;
+  margin-top: 24px;
+}
+
+.antiCheatNotice p {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 1024px) {
+  .mainContent {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    order: -1;
+  }
+
+  .userRankCard {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .leaderboardPage {
+    padding: 16px;
+  }
+
+  .pageHeader {
+    padding: 16px;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerLeft h1 {
+    font-size: 22px;
+  }
+
+  .filterBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters {
+    justify-content: center;
+  }
+
+  .podiumContainer {
+    gap: 12px;
+    padding: 24px 12px 0;
+  }
+
+  .podiumBase {
+    width: 80px;
+  }
+
+  .podiumName {
+    font-size: 14px;
+    max-width: 80px;
+  }
+
+  .podiumScore .scoreValue {
+    font-size: 20px;
+  }
+
+  .podiumStats {
+    display: none;
+  }
+
+  .scoreDetails {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .scoreItem .value {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .podiumContainer {
+    gap: 8px;
+  }
+
+  .podiumBase {
+    width: 70px;
+  }
+
+  .podiumRank {
+    font-size: 28px;
+  }
+
+  .rankNumber .rank {
+    font-size: 28px;
+  }
+}
+

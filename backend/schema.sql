@@ -259,8 +259,189 @@ CREATE TABLE IF NOT EXISTS wrong_questions (
 );
 
 -- =====================
+-- 排行榜系统相关表
+-- =====================
+
+-- 排行榜主表
+CREATE TABLE IF NOT EXISTS leaderboards (
+  id TEXT PRIMARY KEY,
+  leaderboard_type TEXT NOT NULL, -- 'daily' | 'weekly' | 'monthly' | 'all_time'
+  ranking_criteria TEXT NOT NULL, -- 'composite' | 'accuracy' | 'speed' | 'subject'
+  subject TEXT,                   -- 科目（科目排行榜时使用）
+  grade TEXT,                     -- 年级（年级排行榜时使用）
+  difficulty TEXT,                -- 难度（难度排行榜时使用）
+  
+  -- 统计信息
+  total_participants INTEGER DEFAULT 0,
+  average_score REAL,
+  last_calculated_at TEXT NOT NULL,
+  valid_until TEXT NOT NULL,
+  
+  -- 时间范围
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 排行榜条目表
+CREATE TABLE IF NOT EXISTS leaderboard_entries (
+  id TEXT PRIMARY KEY,
+  leaderboard_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  
+  -- 排名信息
+  rank_position INTEGER NOT NULL,
+  previous_rank INTEGER,
+  rank_change INTEGER DEFAULT 0,
+  
+  -- 分数信息
+  total_score REAL NOT NULL,
+  accuracy_score REAL,        -- 正确率得分（0-40）
+  speed_score REAL,           -- 速度得分（0-20）
+  difficulty_bonus REAL,      -- 难度加成（0-20）
+  consistency_bonus REAL,     -- 稳定性加成（0-10）
+  activity_bonus REAL,        -- 活跃度加成（0-10）
+  
+  -- 统计信息
+  accuracy REAL,              -- 正确率
+  avg_time_per_question REAL, -- 平均每题时间（秒）
+  total_sessions INTEGER,     -- 总场次
+  total_questions INTEGER,    -- 总题目数
+  best_session_score REAL,    -- 单场最高分
+  
+  -- 时间信息
+  last_activity_at TEXT NOT NULL,
+  
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 用户排名统计表（用于快速查询用户排名数据）
+CREATE TABLE IF NOT EXISTS user_ranking_stats (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
+  
+  -- 总体统计
+  total_sessions INTEGER DEFAULT 0,
+  total_questions INTEGER DEFAULT 0,
+  correct_answers INTEGER DEFAULT 0,
+  total_time_spent INTEGER DEFAULT 0,  -- 总用时（秒）
+  
+  -- 各难度统计
+  basic_sessions INTEGER DEFAULT 0,
+  standard_sessions INTEGER DEFAULT 0,
+  challenging_sessions INTEGER DEFAULT 0,
+  exam_sessions INTEGER DEFAULT 0,
+  
+  -- 连续记录
+  current_streak INTEGER DEFAULT 0,    -- 当前连胜
+  longest_streak INTEGER DEFAULT 0,    -- 历史最长连胜
+  perfect_sessions INTEGER DEFAULT 0,  -- 满分场次
+  
+  -- 活跃度
+  activity_level TEXT DEFAULT 'low',   -- 'low' | 'medium' | 'high' | 'excellent'
+  last_7_days_sessions INTEGER DEFAULT 0,
+  last_30_days_sessions INTEGER DEFAULT 0,
+  
+  -- 平均表现
+  average_accuracy REAL DEFAULT 0,
+  average_time_per_question REAL DEFAULT 0,
+  
+  -- 最近5次成绩（用于计算稳定性）
+  recent_scores TEXT,  -- JSON array of recent scores
+  
+  last_activity_at TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 用户排名历史表（用于追踪排名变化）
+CREATE TABLE IF NOT EXISTS user_rank_history (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  leaderboard_type TEXT NOT NULL,
+  ranking_criteria TEXT NOT NULL,
+  
+  rank_position INTEGER NOT NULL,
+  score REAL NOT NULL,
+  
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  
+  recorded_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 防作弊监测表
+CREATE TABLE IF NOT EXISTS anti_cheat_monitor (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  
+  behavior_type TEXT NOT NULL, -- 'speed_hacking' | 'pattern_repeat' | 'multi_account'
+  suspicion_level INTEGER DEFAULT 1,
+  evidence TEXT,  -- JSON
+  action_taken TEXT,
+  
+  detected_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  resolved_at TEXT,
+  
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 用户排行榜设置表
+CREATE TABLE IF NOT EXISTS user_leaderboard_settings (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
+  
+  is_anonymous INTEGER DEFAULT 0,     -- 是否匿名
+  hide_school INTEGER DEFAULT 0,      -- 是否隐藏学校
+  display_name TEXT,                  -- 显示名称
+  avatar TEXT,                        -- 头像URL
+  grade TEXT,                         -- 年级
+  school TEXT,                        -- 学校
+  
+  -- 排行榜资格
+  is_eligible INTEGER DEFAULT 1,      -- 是否有排名资格
+  banned_until TEXT,                  -- 禁榜截止时间
+  ban_reason TEXT,
+  
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- =====================
 -- 索引
 -- =====================
+
+-- 排行榜相关索引
+CREATE INDEX IF NOT EXISTS idx_leaderboards_type ON leaderboards(leaderboard_type);
+CREATE INDEX IF NOT EXISTS idx_leaderboards_criteria ON leaderboards(ranking_criteria);
+CREATE INDEX IF NOT EXISTS idx_leaderboards_subject_grade ON leaderboards(subject, grade);
+CREATE INDEX IF NOT EXISTS idx_leaderboards_valid ON leaderboards(valid_until);
+
+CREATE INDEX IF NOT EXISTS idx_entries_leaderboard ON leaderboard_entries(leaderboard_id);
+CREATE INDEX IF NOT EXISTS idx_entries_user ON leaderboard_entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_entries_rank ON leaderboard_entries(rank_position);
+CREATE INDEX IF NOT EXISTS idx_entries_score ON leaderboard_entries(total_score);
+
+CREATE INDEX IF NOT EXISTS idx_ranking_stats_user ON user_ranking_stats(user_id);
+CREATE INDEX IF NOT EXISTS idx_ranking_stats_accuracy ON user_ranking_stats(average_accuracy);
+
+CREATE INDEX IF NOT EXISTS idx_rank_history_user ON user_rank_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_rank_history_period ON user_rank_history(period_start, period_end);
+
+CREATE INDEX IF NOT EXISTS idx_anti_cheat_user ON anti_cheat_monitor(user_id);
+CREATE INDEX IF NOT EXISTS idx_anti_cheat_type ON anti_cheat_monitor(behavior_type);
 
 CREATE INDEX IF NOT EXISTS idx_analysis_user_id ON analysis_records(user_id);
 CREATE INDEX IF NOT EXISTS idx_analysis_created_at ON analysis_records(created_at);

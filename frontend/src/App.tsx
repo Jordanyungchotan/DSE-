@@ -20,6 +20,9 @@ const WrongQuestionsPage = lazy(() => import('./pages/WrongQuestionsPage'))
 const QuizHistoryPage = lazy(() => import('./pages/QuizHistoryPage'))
 const LearningProfilePage = lazy(() => import('./pages/LearningProfilePage'))
 
+// 排行榜页面
+const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'))
+
 // 管理员后台页面
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
@@ -49,6 +52,10 @@ const LoadingFallback = () => (
  * - /quiz : 智能刷题配置页
  * - /quiz/practice : 答题页面
  * - /quiz/result : 刷题结果页
+ * - /quiz/wrong-questions : 错题本
+ * - /quiz/history : 刷题历史
+ * - /quiz/profile : 学习档案
+ * - /leaderboard : 排行榜
  */
 function App() {
   return (
@@ -75,6 +82,9 @@ function App() {
           <Route path="quiz/wrong-questions" element={<WrongQuestionsPage />} />
           <Route path="quiz/history" element={<QuizHistoryPage />} />
           <Route path="quiz/profile" element={<LearningProfilePage />} />
+          
+          {/* 排行榜 */}
+          <Route path="leaderboard" element={<LeaderboardPage />} />
         </Route>
         
         {/* 404重定向到首页 */}

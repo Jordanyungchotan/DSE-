@@ -72,6 +72,11 @@ const MainLayout = () => {
       ],
     },
     {
+      key: '/leaderboard',
+      icon: <TrophyOutlined />,
+      label: '🏆 排行榜',
+    },
+    {
       key: '/history',
       icon: <HistoryOutlined />,
       label: t('nav.history'),
