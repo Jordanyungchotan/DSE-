@@ -240,16 +240,21 @@ CREATE TABLE IF NOT EXISTS wrong_questions (
   user_id TEXT NOT NULL,
   question_id TEXT NOT NULL,
   question_text TEXT NOT NULL,
+  question_type TEXT DEFAULT 'multiple_choice', -- 'multiple_choice' | 'short_answer' | 'calculation' | 'explanation'
   subject TEXT NOT NULL,
   topic TEXT,
+  options TEXT, -- JSON array for multiple choice
   user_answer TEXT,
   correct_answer TEXT,
   explanation TEXT,
+  difficulty_score INTEGER DEFAULT 3,
+  feedback TEXT,
   first_attempt_date TEXT DEFAULT CURRENT_TIMESTAMP,
   last_attempt_date TEXT,
   wrong_count INTEGER DEFAULT 1,
   status TEXT DEFAULT 'unreviewed', -- 'unreviewed' | 'reviewed' | 'mastered'
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -277,5 +282,6 @@ CREATE INDEX IF NOT EXISTS idx_quiz_answers_session ON quiz_answers(session_id);
 CREATE INDEX IF NOT EXISTS idx_learning_progress_user ON learning_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_learning_progress_subject ON learning_progress(subject);
 CREATE INDEX IF NOT EXISTS idx_wrong_questions_user ON wrong_questions(user_id);
-CREATE INDEX IF NOT EXISTS idx_wrong_questions_subject ON wrong_questions(subject)
+CREATE INDEX IF NOT EXISTS idx_wrong_questions_subject ON wrong_questions(subject);
+CREATE INDEX IF NOT EXISTS idx_wrong_questions_status ON wrong_questions(status);
 

@@ -127,6 +127,151 @@ async function verifyToken(token: string, secret: string): Promise<{ userId: str
   }
 }
 
+// 刷题题目生成
+interface QuizConfig {
+  grade: string
+  subject: string
+  difficulty: string
+  questionCount: number
+}
+
+interface GeneratedQuestion {
+  id: string
+  question: string
+  questionType: 'multiple_choice' | 'short_answer' | 'calculation' | 'explanation'
+  options?: string[]
+  correctAnswer: string | number
+  explanation: string
+  topicTags: string[]
+  difficultyScore: number
+}
+
+// 科目名称映射 (用于刷题)
+const QUIZ_SUBJECT_MAP: Record<string, string> = {
+  chinese: '中国语文', english: '英国语文', math: '数学',
+  liberal: '公民与社会发展', physics: '物理', chemistry: '化学',
+  biology: '生物', economics: '经济', bafs: '企业会计与财务概论',
+  geography: '地理', history: '历史', ict: '资讯及通讯科技',
+}
+
+const QUIZ_GRADE_MAP: Record<string, string> = {
+  f4: '中四', f5: '中五', f6: '中六',
+}
+
+const QUIZ_DIFFICULTY_MAP: Record<string, string> = {
+  basic: '基础', standard: '标准', advanced: '进阶', challenge: '挑战',
+}
+
+// 生成刷题题目
+async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promise<GeneratedQuestion[]> {
+  const subjectName = QUIZ_SUBJECT_MAP[config.subject] || config.subject
+  const gradeName = QUIZ_GRADE_MAP[config.grade] || config.grade
+  const difficultyName = QUIZ_DIFFICULTY_MAP[config.difficulty] || config.difficulty
+
+  // 如果没有API Key，返回模拟题目
+  if (!apiKey) {
+    return generateMockQuestions(config)
+  }
+
+  try {
+    const prompt = `你是一位专业的香港DSE考试出题专家。请为${gradeName}学生生成${config.questionCount}道${subjectName}${difficultyName}难度的题目。
+
+要求：
+1. 题目符合DSE考试标准
+2. 包含多种题型（选择题、简答题、计算题等）
+3. 每道题都有详细解析
+
+请严格按以下JSON格式返回（不要有其他文字）：
+{
+  "questions": [
+    {
+      "id": "q1",
+      "question": "题目内容",
+      "questionType": "multiple_choice",
+      "options": ["选项A", "选项B", "选项C", "选项D"],
+      "correctAnswer": 0,
+      "explanation": "详细解析",
+      "topicTags": ["知识点1", "知识点2"],
+      "difficultyScore": 3
+    }
+  ]
+}
+
+questionType可选值：multiple_choice、short_answer、calculation、explanation
+correctAnswer：选择题填选项索引(0-3)，其他题型填答案文本
+difficultyScore：1-5，1最简单5最难`
+
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: '你是专业的DSE考试出题专家，请用JSON格式回复。' },
+          { role: 'user', content: prompt },
+        ],
+        max_tokens: 4000,
+        temperature: 0.8,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('DeepSeek API error:', response.status)
+      return generateMockQuestions(config)
+    }
+
+    const data = await response.json() as { choices?: { message?: { content?: string } }[] }
+    const content = data.choices?.[0]?.message?.content
+
+    if (!content) {
+      return generateMockQuestions(config)
+    }
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      return generateMockQuestions(config)
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as { questions: GeneratedQuestion[] }
+    return parsed.questions.map((q, i) => ({
+      ...q,
+      id: `q${i + 1}_${Date.now()}`,
+    }))
+  } catch (error) {
+    console.error('Generate questions error:', error)
+    return generateMockQuestions(config)
+  }
+}
+
+// 生成模拟题目
+function generateMockQuestions(config: QuizConfig): GeneratedQuestion[] {
+  const subjectName = QUIZ_SUBJECT_MAP[config.subject] || config.subject
+  const questions: GeneratedQuestion[] = []
+
+  for (let i = 0; i < config.questionCount; i++) {
+    const isMultipleChoice = i % 2 === 0
+    questions.push({
+      id: `mock_${i + 1}_${Date.now()}`,
+      question: isMultipleChoice
+        ? `【${subjectName}】第${i + 1}题：以下哪个选项是正确的？`
+        : `【${subjectName}】第${i + 1}题：请简要回答以下问题。`,
+      questionType: isMultipleChoice ? 'multiple_choice' : 'short_answer',
+      options: isMultipleChoice
+        ? ['选项A - 正确答案', '选项B', '选项C', '选项D']
+        : undefined,
+      correctAnswer: isMultipleChoice ? 0 : '这是参考答案',
+      explanation: `这道题考查的是${subjectName}的基础知识。正确答案的原因是...（详细解析）`,
+      topicTags: [subjectName, '基础概念'],
+      difficultyScore: config.difficulty === 'basic' ? 2 : config.difficulty === 'standard' ? 3 : 4,
+    })
+  }
+
+  return questions
+}
+
 // DeepSeek API 调用
 async function analyzeWithDeepSeek(studentInfo: StudentInfo, apiKey: string): Promise<AnalysisResult> {
   if (!apiKey) {
@@ -1172,6 +1317,238 @@ export default {
         }, 200, origin)
       }
 
+      // =====================
+      // 智能刷题 API
+      // =====================
+
+      // 开始刷题 - 生成题目
+      if (path === '/api/quiz/start' && request.method === 'POST') {
+        const body = await request.json() as {
+          grade: string
+          subject: string
+          difficulty: string
+          questionCount: number
+        }
+
+        // 生成题目
+        const questions = await generateQuizQuestions(body, env.DEEPSEEK_API_KEY)
+
+        const sessionId = crypto.randomUUID()
+
+        // 保存到数据库（如果用户已登录）
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          if (tokenData) {
+            try {
+              await env.DB.prepare(
+                `INSERT INTO quiz_sessions (id, user_id, config, status, questions, start_time) 
+                 VALUES (?, ?, ?, 'active', ?, ?)`
+              ).bind(sessionId, tokenData.userId, JSON.stringify(body), JSON.stringify(questions), new Date().toISOString()).run()
+            } catch (e) {
+              console.error('Save quiz session error:', e)
+            }
+          }
+        }
+
+        // 返回前端期望的格式
+        return jsonResponse({
+          sessionId,
+          questions,
+        }, 200, origin)
+      }
+
+      // 评分答案
+      if (path === '/api/quiz/grade' && request.method === 'POST') {
+        const body = await request.json() as {
+          question: string
+          questionType: string
+          correctAnswer: string | number
+          studentAnswer: string | number
+        }
+
+        // 简单评分逻辑
+        const isCorrect = String(body.studentAnswer).toLowerCase().trim() === 
+                         String(body.correctAnswer).toLowerCase().trim()
+
+        return jsonResponse({
+          isCorrect,
+          feedback: isCorrect ? '回答正确！' : '回答错误，请查看解析。',
+          score: isCorrect ? 100 : 0,
+          totalScore: 100,
+        }, 200, origin)
+      }
+
+      // 获取错题列表
+      if (path === '/api/quiz/wrong-questions' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return jsonResponse({ questions: [] }, 200, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return jsonResponse({ questions: [] }, 200, origin)
+        }
+
+        const records = await env.DB.prepare(
+          'SELECT * FROM wrong_questions WHERE user_id = ? ORDER BY created_at DESC LIMIT 100'
+        ).bind(tokenData.userId).all()
+
+        return jsonResponse({ questions: records.results || [] }, 200, origin)
+      }
+
+      // 添加错题
+      if (path === '/api/quiz/wrong-questions' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const body = await request.json() as {
+          questionId: string
+          questionText: string
+          questionType: string
+          subject: string
+          topic?: string
+          userAnswer: string
+          correctAnswer: string
+          explanation: string
+        }
+
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+
+        await env.DB.prepare(
+          `INSERT INTO wrong_questions (id, user_id, question_id, question_text, question_type, subject, topic, user_answer, correct_answer, explanation, status, created_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unreviewed', ?)`
+        ).bind(
+          id, tokenData.userId, body.questionId, body.questionText, body.questionType,
+          body.subject, body.topic || '综合', body.userAnswer, body.correctAnswer, body.explanation, now
+        ).run()
+
+        return jsonResponse({ message: '错题已添加', id }, 200, origin)
+      }
+
+      // 更新错题状态
+      if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+\/status$/) && request.method === 'PATCH') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const pathParts = path.split('/')
+        const questionId = pathParts[pathParts.length - 2]
+        const body = await request.json() as { status: string }
+
+        await env.DB.prepare(
+          'UPDATE wrong_questions SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?'
+        ).bind(body.status, new Date().toISOString(), questionId, tokenData.userId).run()
+
+        return jsonResponse({ message: '状态已更新' }, 200, origin)
+      }
+
+      // 删除错题
+      if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+$/) && request.method === 'DELETE') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const questionId = path.split('/').pop()
+        await env.DB.prepare(
+          'DELETE FROM wrong_questions WHERE id = ? AND user_id = ?'
+        ).bind(questionId, tokenData.userId).run()
+
+        return jsonResponse({ message: '删除成功' }, 200, origin)
+      }
+
+      // 获取学习档案
+      if (path === '/api/quiz/learning-profile' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        // 返回模拟学习档案数据
+        const today = new Date().toISOString().split('T')[0]
+        return jsonResponse({
+          totalQuizzes: 10,
+          totalQuestions: 100,
+          correctAnswers: 75,
+          totalTimeSpent: 300,
+          currentStreak: 3,
+          longestStreak: 7,
+          lastStudyDate: today,
+          subjectMastery: [
+            { subjectId: 'math', subjectName: '数学', totalQuestions: 50, correctAnswers: 40, accuracy: 80, recentTrend: 'up', lastPracticed: today },
+            { subjectId: 'english', subjectName: '英国语文', totalQuestions: 30, correctAnswers: 22, accuracy: 73.3, recentTrend: 'stable', lastPracticed: today },
+          ],
+          topicMastery: [],
+          achievements: [
+            { id: '1', name: '初露锋芒', description: '完成第一次刷题', icon: '🌟', unlockedAt: today, progress: 100 },
+          ],
+          goals: [],
+          recentActivity: [],
+        }, 200, origin)
+      }
+
+      // 生成学习报告
+      if (path === '/api/quiz/generate-report' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        // 返回模拟学习报告
+        return jsonResponse({
+          generatedAt: new Date().toISOString(),
+          period: '本周',
+          summary: {
+            totalStudyTime: 320,
+            totalQuestions: 156,
+            averageAccuracy: 74.5,
+            improvement: 8.3,
+            strongSubjects: ['数学', '物理'],
+            weakSubjects: ['中国语文'],
+          },
+          subjectAnalysis: [],
+          topicInsights: [],
+          recommendations: ['保持每日练习', '复习错题'],
+          nextSteps: ['完成今日练习'],
+        }, 200, origin)
+      }
+
+      // 刷题健康检查
+      if (path === '/api/quiz/health' && request.method === 'GET') {
+        return jsonResponse({ status: 'ok', service: 'quiz' }, 200, origin)
+      }
+
       // 根路径 - 显示 API 状态
       if (path === '/' || path === '') {
         return jsonResponse({
@@ -1193,6 +1570,12 @@ export default {
             'GET /api/districts',
             'GET /api/universities/programs',
             'GET /api/trends/employment',
+            'POST /api/quiz/start',
+            'POST /api/quiz/grade',
+            'GET /api/quiz/wrong-questions',
+            'POST /api/quiz/wrong-questions',
+            'GET /api/quiz/learning-profile',
+            'POST /api/quiz/generate-report',
           ],
         }, 200, origin)
       }
