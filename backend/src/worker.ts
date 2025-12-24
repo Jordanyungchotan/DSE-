@@ -127,11 +127,11 @@ async function verifyToken(token: string, secret: string): Promise<{ userId: str
   }
 }
 
-// ===== 智能答案匹配系统 =====
+// ===== 智能答案匹配系统 (增强版) =====
 
 interface AnswerMatchResult {
   isCorrect: boolean
-  matchType: 'exact' | 'normalized' | 'numeric' | 'equation' | 'choice'
+  matchType: 'exact' | 'normalized' | 'numeric' | 'equation' | 'choice' | 'semantic' | 'hcf_lcm'
   confidence: number
   feedback: string
 }
@@ -157,7 +157,7 @@ function normalizeAnswer(answer: string): string {
     .replace(/[￥＄]/g, '¥')
     // 统一等号和运算符
     .replace(/[＝]/g, '=')
-    .replace(/[×✕]/g, '*')
+    .replace(/[×✕xX]/g, '*')
     .replace(/[÷]/g, '/')
     .replace(/[−–]/g, '-')
     // 去除开头词
@@ -166,21 +166,74 @@ function normalizeAnswer(answer: string): string {
     .replace(/[。．!！?？]$/, '')
 }
 
-// 提取数字
-function extractNumber(str: string): number | null {
-  if (!str) return null
-  const cleaned = str.replace(/[¥＄$€£\s]/g, '').toLowerCase()
+// 智能数字提取引擎 - 从各种格式中提取数字
+function extractAllNumbers(str: string): number[] {
+  if (!str) return []
   
+  const numbers: number[] = []
+  const cleaned = str
+    .replace(/[¥＄$€£]/g, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+  
+  // 处理中文数字单位
   let multiplier = 1
   if (cleaned.includes('万')) multiplier = 10000
   else if (cleaned.includes('千')) multiplier = 1000
   else if (cleaned.includes('亿')) multiplier = 100000000
 
-  const match = cleaned.match(/[-+]?\d*\.?\d+/)
-  if (!match) return null
+  // 提取所有数字
+  const matches = cleaned.match(/[-+]?\d+(?:\.\d+)?/g)
+  if (matches) {
+    for (const match of matches) {
+      const num = parseFloat(match)
+      if (!isNaN(num)) {
+        numbers.push(num * multiplier)
+      }
+    }
+  }
+  
+  return numbers
+}
 
-  const num = parseFloat(match[0])
-  return isNaN(num) ? null : num * multiplier
+// 从完整句子中提取关键数字（如"最大公因数是15"中的15）
+function extractKeyNumber(str: string): number | null {
+  if (!str) return null
+  
+  // 策略1：检查是否为纯数字
+  const pureNumMatch = str.trim().match(/^[-+]?\d+(?:\.\d+)?$/)
+  if (pureNumMatch) {
+    return parseFloat(pureNumMatch[0])
+  }
+  
+  // 策略2：从"...是X"、"...为X"、"...=X"等格式中提取
+  const patterns = [
+    /(?:是|为|=|等于|得)\s*([-+]?\d+(?:\.\d+)?)\s*$/,
+    /(?:HCF|LCM|hcf|lcm|最大公因数|最小公倍数|最高公因數|最低公倍數)\s*[=:：是为]?\s*([-+]?\d+(?:\.\d+)?)/i,
+    /(?:答案|答|解|结果)[=:：]?\s*([-+]?\d+(?:\.\d+)?)/,
+    /([-+]?\d+(?:\.\d+)?)\s*$/  // 句末的数字
+  ]
+  
+  for (const pattern of patterns) {
+    const match = str.match(pattern)
+    if (match && match[1]) {
+      const num = parseFloat(match[1])
+      if (!isNaN(num)) return num
+    }
+  }
+  
+  // 策略3：提取唯一的数字
+  const allNumbers = extractAllNumbers(str)
+  if (allNumbers.length === 1) {
+    return allNumbers[0]
+  }
+  
+  // 策略4：提取最后一个数字（通常是答案）
+  if (allNumbers.length > 0) {
+    return allNumbers[allNumbers.length - 1]
+  }
+  
+  return null
 }
 
 // 数值相等性判断
@@ -194,7 +247,7 @@ function extractEquationSolution(equation: string): number | null {
   const cleaned = equation.replace(/\s/g, '').toLowerCase()
   
   // x=4, X=4
-  const match1 = cleaned.match(/[xy]=?([-+]?\d*\.?\d+)/)
+  const match1 = cleaned.match(/[xy]\s*=\s*([-+]?\d*\.?\d+)/)
   if (match1) return parseFloat(match1[1])
   
   // 纯数字
@@ -202,24 +255,52 @@ function extractEquationSolution(equation: string): number | null {
   if (match2) return parseFloat(match2[1])
   
   // =4
-  const match3 = cleaned.match(/^=([-+]?\d*\.?\d+)/)
+  const match3 = cleaned.match(/^=\s*([-+]?\d*\.?\d+)/)
   if (match3) return parseFloat(match3[1])
   
   return null
 }
 
-// 智能答案匹配主函数
+// 检测题目类型（从题目文本中推断）
+function detectQuestionSubType(questionText: string): string | null {
+  const text = (questionText || '').toLowerCase()
+  
+  // HCF/最大公因数
+  if (/最大公因数|hcf|highest common factor|最高公因數|gcd|greatest common divisor/i.test(text)) {
+    return 'hcf'
+  }
+  
+  // LCM/最小公倍数
+  if (/最小公倍数|lcm|lowest common multiple|最低公倍數|least common multiple/i.test(text)) {
+    return 'lcm'
+  }
+  
+  // 质因数分解
+  if (/分解质因数|质因数分解|prime factor|質因數/i.test(text)) {
+    return 'prime_factorization'
+  }
+  
+  return null
+}
+
+// 检查是否为纯数字答案
+function isNumericOnly(answer: string): boolean {
+  return /^\s*[-+]?\d+(?:\.\d+)?\s*$/.test(answer)
+}
+
+// 智能答案匹配主函数 (增强版)
 function intelligentAnswerMatch(
   userAnswer: string,
   expectedAnswer: string,
   questionType: string,
-  options?: string[]
+  options?: string[],
+  questionText?: string
 ): AnswerMatchResult {
-  const userStr = String(userAnswer)
-  const expectedStr = String(expectedAnswer)
+  const userStr = String(userAnswer).trim()
+  const expectedStr = String(expectedAnswer).trim()
   
   // 1. 完全匹配
-  if (userStr.trim() === expectedStr.trim()) {
+  if (userStr === expectedStr) {
     return {
       isCorrect: true,
       matchType: 'exact',
@@ -245,7 +326,6 @@ function intelligentAnswerMatch(
   // 3. 选择题特殊处理
   if (questionType === 'multiple_choice') {
     const userChoice = normalizedUser.toUpperCase().charAt(0)
-    // 如果答案是数字索引，转换为字母
     let expectedChoice = normalizedExpected.toUpperCase().charAt(0)
     if (/^\d$/.test(expectedChoice)) {
       expectedChoice = String.fromCharCode(65 + parseInt(expectedChoice))
@@ -260,7 +340,6 @@ function intelligentAnswerMatch(
       }
     }
     
-    // 检查用户输入的是选项内容而非字母
     if (options && options.length > 0) {
       const matchedIndex = options.findIndex(opt => 
         normalizeAnswer(opt).toLowerCase() === normalizedUser.toLowerCase()
@@ -279,35 +358,83 @@ function intelligentAnswerMatch(
     }
   }
   
-  // 4. 数值匹配（计算题）
-  if (questionType === 'calculation' || questionType === 'short_answer') {
-    const userNum = extractNumber(normalizedUser)
-    const expectedNum = extractNumber(normalizedExpected)
-    
-    if (userNum !== null && expectedNum !== null) {
-      if (isNumericEqual(userNum, expectedNum)) {
+  // 4. 智能数值匹配 - 核心改进！
+  // 从用户答案和标准答案中提取关键数字
+  const userKeyNum = extractKeyNumber(userStr)
+  const expectedKeyNum = extractKeyNumber(expectedStr)
+  
+  if (userKeyNum !== null && expectedKeyNum !== null) {
+    if (isNumericEqual(userKeyNum, expectedKeyNum)) {
+      // 检测题目子类型以提供更精确的反馈
+      const subType = detectQuestionSubType(questionText || expectedStr)
+      
+      // 根据用户输入格式给出不同反馈
+      if (isNumericOnly(userStr)) {
+        // 用户只输入了数字，但数值正确
+        let hint = ''
+        if (subType === 'hcf') {
+          hint = '建议使用完整格式，如："最大公因数是' + userKeyNum + '"'
+        } else if (subType === 'lcm') {
+          hint = '建议使用完整格式，如："最小公倍数是' + userKeyNum + '"'
+        }
+        
         return {
           isCorrect: true,
           matchType: 'numeric',
           confidence: 0.9,
-          feedback: '答案正确！（数值匹配）✅'
+          feedback: '答案正确！✅' + (hint ? '\n💡 ' + hint : '')
+        }
+      } else {
+        return {
+          isCorrect: true,
+          matchType: 'numeric',
+          confidence: 0.95,
+          feedback: '答案正确！✅'
         }
       }
     }
   }
   
   // 5. 方程解匹配
-  if (questionType === 'calculation') {
-    const userSolution = extractEquationSolution(normalizedUser)
-    const expectedSolution = extractEquationSolution(normalizedExpected)
+  const userSolution = extractEquationSolution(normalizedUser)
+  const expectedSolution = extractEquationSolution(normalizedExpected)
+  
+  if (userSolution !== null && expectedSolution !== null) {
+    if (isNumericEqual(userSolution, expectedSolution)) {
+      return {
+        isCorrect: true,
+        matchType: 'equation',
+        confidence: 0.9,
+        feedback: '答案正确！（系统已识别方程解）✅'
+      }
+    }
+  }
+  
+  // 6. 质因数分解匹配
+  if (detectQuestionSubType(questionText || '') === 'prime_factorization') {
+    const userFactors = extractAllNumbers(userStr).sort((a, b) => a - b)
+    const expectedFactors = extractAllNumbers(expectedStr).sort((a, b) => a - b)
     
-    if (userSolution !== null && expectedSolution !== null) {
-      if (isNumericEqual(userSolution, expectedSolution)) {
+    if (userFactors.length > 0 && expectedFactors.length > 0) {
+      // 检查质因数是否相同
+      if (JSON.stringify(userFactors) === JSON.stringify(expectedFactors)) {
         return {
           isCorrect: true,
-          matchType: 'equation',
+          matchType: 'semantic',
           confidence: 0.9,
-          feedback: '答案正确！（系统已识别方程解）✅'
+          feedback: '质因数分解正确！✅'
+        }
+      }
+      
+      // 检查乘积是否相同
+      const userProduct = userFactors.reduce((a, b) => a * b, 1)
+      const expectedProduct = expectedFactors.reduce((a, b) => a * b, 1)
+      if (userProduct === expectedProduct) {
+        return {
+          isCorrect: true,
+          matchType: 'semantic',
+          confidence: 0.85,
+          feedback: '质因数分解正确！✅'
         }
       }
     }
@@ -316,28 +443,23 @@ function intelligentAnswerMatch(
   // 答案不正确，生成智能反馈
   let feedback = '答案不正确，请再仔细检查一下。'
   
-  // 检查是否数值接近
-  const userNum = extractNumber(normalizedUser)
-  const expectedNum = extractNumber(normalizedExpected)
-  if (userNum !== null && expectedNum !== null) {
-    if (isNumericEqual(userNum, expectedNum, 0.1)) {
+  // 分析错误类型并给出建议
+  if (userKeyNum !== null && expectedKeyNum !== null) {
+    const diff = Math.abs(userKeyNum - expectedKeyNum)
+    const expectedAbs = Math.abs(expectedKeyNum)
+    
+    if (diff / expectedAbs < 0.1) {
       feedback = '数值接近但不够精确，请检查计算过程。'
-    } else if (Math.abs(userNum) === Math.abs(expectedNum)) {
+    } else if (userKeyNum === -expectedKeyNum) {
       feedback = '注意正负号！'
+    } else if (userKeyNum === expectedKeyNum * 2 || userKeyNum * 2 === expectedKeyNum) {
+      feedback = '请检查是否算错了倍数关系。'
     }
   }
   
-  // 检查是否可能是格式问题
-  if (questionType === 'calculation' && /^\d+$/.test(userStr.trim())) {
-    const solution = extractEquationSolution(expectedStr)
-    if (solution !== null && extractNumber(userStr) === solution) {
-      return {
-        isCorrect: true,
-        matchType: 'numeric',
-        confidence: 0.85,
-        feedback: '答案正确！提示：下次可以写成 x=' + solution + ' 的形式 ✅'
-      }
-    }
+  // 如果用户输入看起来像是部分答案
+  if (userKeyNum !== null && expectedKeyNum === null) {
+    feedback = '请检查答案格式是否正确。'
   }
   
   return {
@@ -1592,9 +1714,10 @@ export default {
         const userAnswer = String(body.studentAnswer)
         const expectedAnswer = String(body.correctAnswer)
         const questionType = body.questionType || 'short_answer'
+        const questionText = body.question || ''
 
-        // 智能答案匹配
-        const matchResult = intelligentAnswerMatch(userAnswer, expectedAnswer, questionType, body.options)
+        // 智能答案匹配（传入题目文本以便识别题目类型）
+        const matchResult = intelligentAnswerMatch(userAnswer, expectedAnswer, questionType, body.options, questionText)
 
         return jsonResponse({
           isCorrect: matchResult.isCorrect,
