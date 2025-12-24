@@ -220,14 +220,31 @@ const LeaderboardPage: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<'overall' | 'subject' | 'speed'>('overall')
 
+  // Tab到criteria的映射
+  const tabToCriteria = (tab: typeof activeTab): 'composite' | 'accuracy' | 'speed' | 'subject' => {
+    switch (tab) {
+      case 'overall': return 'composite'  // 综合榜 - 按综合得分排序
+      case 'subject': return 'subject'     // 科目榜 - 按科目表现排序
+      case 'speed': return 'speed'         // 速度榜 - 按答题速度排序
+      default: return 'composite'
+    }
+  }
+
   // 初始加载
   useEffect(() => {
-    fetchLeaderboard()
+    fetchLeaderboard({ criteria: tabToCriteria(activeTab) })
   }, [])
+
+  // Tab变化时更新criteria并重新加载
+  useEffect(() => {
+    const criteria = tabToCriteria(activeTab)
+    updateFilters({ criteria })
+    fetchLeaderboard({ criteria })
+  }, [activeTab])
 
   // 筛选变化时重新加载
   useEffect(() => {
-    fetchLeaderboard()
+    fetchLeaderboard({ criteria: tabToCriteria(activeTab) })
   }, [filters.type, filters.grade, filters.difficulty, filters.subject])
 
   // 获取所有科目

@@ -2349,21 +2349,44 @@ export default {
         }
 
         try {
-          // 简化的查询 - 从quiz_sessions获取排名数据
+          // 根据criteria选择不同的排序方式
+          let orderClause = 'avg_accuracy DESC, avg_time ASC' // 默认综合排序
+          
+          switch (criteria) {
+            case 'accuracy':
+              orderClause = 'avg_accuracy DESC, total_sessions DESC'
+              break
+            case 'speed':
+              orderClause = 'avg_time ASC, avg_accuracy DESC'
+              break
+            case 'subject':
+              // 科目榜按正确率和题目数排序
+              orderClause = 'avg_accuracy DESC, total_questions DESC'
+              break
+            case 'composite':
+            default:
+              // 综合榜：正确率优先，速度次之
+              orderClause = 'avg_accuracy DESC, avg_time ASC'
+              break
+          }
+
+          // 构建查询 - 从quiz_sessions获取排名数据
           const query = `
             SELECT 
               qs.user_id,
               u.name as display_name,
               COUNT(*) as total_sessions,
+              SUM(json_array_length(qs.questions)) as total_questions,
               AVG(COALESCE(qs.accuracy, 0)) as avg_accuracy,
-              AVG(COALESCE(qs.total_time, 60)) as avg_time
+              AVG(COALESCE(qs.total_time, 60)) as avg_time,
+              AVG(COALESCE(qs.total_time * 1.0 / NULLIF(json_array_length(qs.questions), 0), 30)) as avg_time_per_question
             FROM quiz_sessions qs
             LEFT JOIN users u ON qs.user_id = u.id
             WHERE qs.status = 'completed'
               AND qs.user_id IS NOT NULL
               AND qs.created_at >= ?
             GROUP BY qs.user_id
-            ORDER BY avg_accuracy DESC, avg_time ASC
+            ORDER BY ${orderClause}
             LIMIT ? OFFSET ?
           `
           
@@ -2375,13 +2398,37 @@ export default {
           const rankings = (results.results || []).map((row: Record<string, unknown>, index: number) => {
             const accuracy = (row.avg_accuracy as number) || 0
             const avgTime = (row.avg_time as number) || 60
+            const avgTimePerQuestion = (row.avg_time_per_question as number) || 30
             const sessions = (row.total_sessions as number) || 0
+            const totalQuestions = (row.total_questions as number) || 0
             
             // 计算各项得分
             const accuracyScore = Math.min(accuracy * 40, 40)
-            const speedScore = avgTime <= 30 ? 20 : avgTime <= 45 ? 15 : avgTime <= 60 ? 10 : 5
+            const speedScore = avgTimePerQuestion <= 15 ? 20 : avgTimePerQuestion <= 30 ? 15 : avgTimePerQuestion <= 45 ? 10 : 5
             const difficultyBonus = difficulty === 'exam' ? 20 : difficulty === 'challenging' ? 10 : difficulty === 'standard' ? 5 : 0
-            const totalScore = accuracyScore + speedScore + difficultyBonus
+            const activityBonus = sessions >= 20 ? 10 : sessions >= 10 ? 5 : sessions >= 5 ? 2 : 0
+            
+            // 根据criteria计算不同的总分
+            let totalScore = 0
+            switch (criteria) {
+              case 'accuracy':
+                // 准确率榜：准确率占80%
+                totalScore = accuracyScore * 2 + activityBonus
+                break
+              case 'speed':
+                // 速度榜：速度占80%
+                totalScore = speedScore * 4 + accuracyScore * 0.5
+                break
+              case 'subject':
+                // 科目榜：准确率和题目数量
+                totalScore = accuracyScore + Math.min(totalQuestions / 10, 20) + activityBonus
+                break
+              case 'composite':
+              default:
+                // 综合榜：平衡各项
+                totalScore = accuracyScore + speedScore + difficultyBonus + activityBonus
+                break
+            }
 
             return {
               rank: (page - 1) * limit + index + 1,
@@ -2392,6 +2439,8 @@ export default {
               totalScore: Math.round(totalScore * 10) / 10,
               accuracyScore: Math.round(accuracyScore * 10) / 10,
               speedScore,
+              activityBonus,
+              totalQuestions,
               difficultyBonus,
               consistencyBonus: 0,
               activityBonus: 0,
