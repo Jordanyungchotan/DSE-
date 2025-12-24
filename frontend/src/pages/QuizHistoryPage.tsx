@@ -6,7 +6,6 @@ import {
   TrophyOutlined,
   ClockCircleOutlined,
   BarChartOutlined,
-  FireOutlined,
   ReloadOutlined,
   RightOutlined,
   CheckCircleOutlined,
@@ -190,12 +189,6 @@ const QuizHistoryPage = () => {
       averageAccuracy: Math.round(totalAccuracy / totalSessions * 10) / 10,
       totalTime,
     })
-  }
-
-  // 获取科目名称
-  const getSubjectName = (subjectId: string) => {
-    const subject = allSubjects.find((s) => s.id === subjectId)
-    return subject ? `${subject.icon} ${subject.name}` : subjectId
   }
 
   // 获取年级名称
