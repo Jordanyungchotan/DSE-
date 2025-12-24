@@ -47,34 +47,34 @@ const MainLayout = () => {
     {
       key: 'quiz-group',
       icon: <ExperimentOutlined />,
-      label: '智能刷题',
+      label: t('nav.smartQuiz'),
       children: [
         {
           key: '/quiz',
           icon: <ExperimentOutlined />,
-          label: '开始刷题',
+          label: t('nav.startQuiz'),
         },
         {
           key: '/quiz/wrong-questions',
           icon: <BookOutlined />,
-          label: '错题本',
+          label: t('nav.wrongQuestions'),
         },
         {
           key: '/quiz/history',
           icon: <HistoryOutlined />,
-          label: '刷题记录',
+          label: t('nav.quizHistory'),
         },
         {
           key: '/quiz/profile',
           icon: <LineChartOutlined />,
-          label: '学习档案',
+          label: t('nav.learningProfile'),
         },
       ],
     },
     {
       key: '/leaderboard',
       icon: <TrophyOutlined />,
-      label: '🏆 排行榜',
+      label: `🏆 ${t('nav.leaderboard')}`,
     },
     {
       key: '/history',
@@ -88,13 +88,13 @@ const MainLayout = () => {
     {
       key: 'profile',
       icon: <LineChartOutlined />,
-      label: '学习档案',
+      label: t('nav.learningProfile'),
       onClick: () => navigate('/quiz/profile'),
     },
     {
       key: 'achievements',
       icon: <TrophyOutlined />,
-      label: '我的成就',
+      label: t('leaderboard.myRank'),
       onClick: () => navigate('/quiz/profile?tab=achievements'),
     },
     {

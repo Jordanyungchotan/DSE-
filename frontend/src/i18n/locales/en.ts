@@ -27,6 +27,13 @@ export const en = {
     logout: 'Logout',
     register: 'Register',
     myRecords: 'My Records',
+    // Smart Quiz Navigation
+    smartQuiz: 'Smart Quiz',
+    startQuiz: 'Start Quiz',
+    wrongQuestions: 'Wrong Questions',
+    quizHistory: 'Quiz History',
+    learningProfile: 'Learning Profile',
+    leaderboard: 'Leaderboard',
   },
 
   // System
@@ -383,6 +390,155 @@ export const en = {
     zhCN: '简体中文',
     zhTW: '繁體中文',
     en: 'English',
+  },
+
+  // Smart Quiz System
+  quiz: {
+    // Home Card
+    title: 'DSE Smart Quiz System',
+    newFeature: 'New Feature',
+    description: 'Powered by DeepSeek AI dynamic question generation, each quiz session generates DSE exam-standard questions based on your configuration. Supports Form 4-6, covering core and elective subjects.',
+    feature1: 'AI Dynamic Question Generation',
+    feature2: 'Instant Grading & Analysis',
+    feature3: 'Wrong Question Tracking',
+    feature4: 'Learning Progress Reports',
+    startQuiz: 'Start Quiz',
+    viewWrongQuestions: 'View Wrong Questions',
+    stats: {
+      subjects: 'Subjects Supported',
+      difficulties: 'Difficulty Levels',
+      aiGenerated: 'AI Generated',
+    },
+    
+    // Quiz Configuration
+    config: {
+      title: 'Quiz Configuration',
+      subject: 'Select Subject',
+      grade: 'Select Grade',
+      difficulty: 'Select Difficulty',
+      questionCount: 'Number of Questions',
+      start: 'Start Quiz',
+    },
+    
+    // Grades
+    grades: {
+      f4: 'Form 4',
+      f5: 'Form 5',
+      f6: 'Form 6',
+    },
+    
+    // Difficulties
+    difficulties: {
+      basic: 'Basic',
+      standard: 'Standard',
+      challenging: 'Challenging',
+      exam: 'Exam Level',
+    },
+    
+    // Subjects
+    subjects: {
+      math: 'Mathematics',
+      chinese: 'Chinese',
+      english: 'English',
+      physics: 'Physics',
+      chemistry: 'Chemistry',
+      biology: 'Biology',
+      economics: 'Economics',
+      bafs: 'BAFS',
+      history: 'History',
+      geography: 'Geography',
+    },
+    
+    // Quiz Page
+    question: 'Question {current} / {total}',
+    timeRemaining: 'Time Remaining',
+    submitAnswer: 'Submit Answer',
+    nextQuestion: 'Next Question',
+    finishQuiz: 'Finish Quiz',
+    correct: 'Correct',
+    incorrect: 'Incorrect',
+    correctAnswer: 'Correct Answer',
+    explanation: 'Explanation',
+    
+    // Result Page
+    result: {
+      title: 'Quiz Result',
+      score: 'Score',
+      accuracy: 'Accuracy',
+      time: 'Time',
+      correct: 'Correct',
+      incorrect: 'Incorrect',
+      review: 'Review',
+      retry: 'Retry',
+      backHome: 'Back to Home',
+    },
+    
+    // Wrong Questions
+    wrongBook: {
+      title: 'Wrong Questions',
+      empty: 'No wrong questions yet',
+      subject: 'Subject',
+      topic: 'Topic',
+      addedAt: 'Added At',
+      yourAnswer: 'Your Answer',
+      correctAnswer: 'Correct Answer',
+      review: 'Review',
+      delete: 'Delete',
+      mastered: 'Mastered',
+    },
+    
+    // Quiz History
+    history: {
+      title: 'Quiz History',
+      empty: 'No quiz history yet',
+      date: 'Date',
+      subject: 'Subject',
+      difficulty: 'Difficulty',
+      score: 'Score',
+      accuracy: 'Accuracy',
+      view: 'View Details',
+    },
+  },
+
+  // Leaderboard
+  leaderboard: {
+    title: 'Quiz Leaderboard',
+    overall: 'Overall',
+    subject: 'By Subject',
+    speed: 'Speed',
+    
+    // Filters
+    filter: {
+      timeRange: 'Time Range',
+      grade: 'Grade',
+      difficulty: 'Difficulty',
+      subject: 'Subject',
+      all: 'All',
+      daily: 'Today',
+      weekly: 'This Week',
+      monthly: 'This Month',
+      allTime: 'All Time',
+    },
+    
+    // Rankings
+    rank: 'Rank',
+    user: 'User',
+    score: 'Score',
+    accuracy: 'Accuracy',
+    avgTime: 'Avg Time',
+    questions: 'Questions',
+    
+    // User Card
+    myRank: 'My Rank',
+    notRanked: 'Not Ranked',
+    totalSessions: 'Quiz Sessions',
+    totalQuestions: 'Total Questions',
+    avgAccuracy: 'Avg Accuracy',
+    
+    // Status
+    loading: 'Loading...',
+    empty: 'No data',
+    error: 'Failed to load',
   },
 }
 

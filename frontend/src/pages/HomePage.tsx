@@ -401,31 +401,30 @@ const HomePage = () => {
             <Col xs={24} lg={14}>
               <div className={styles.quizContent}>
                 <div className={styles.quizBadge}>
-                  <ExperimentOutlined /> 全新功能
+                  <ExperimentOutlined /> {t('quiz.newFeature')}
                 </div>
                 <Title level={2}>
-                  <span className="gradient-title">DSE智能刷题系统</span>
+                  <span className="gradient-title">{t('quiz.title')}</span>
                 </Title>
                 <Paragraph className={styles.quizDesc}>
-                  基于DeepSeek AI的动态题目生成，每次刷题都会根据您的配置实时生成符合DSE考试标准的题目。
-                  支持中四至中六年级，涵盖核心科目和主要选修科目。
+                  {t('quiz.description')}
                 </Paragraph>
                 <div className={styles.quizFeatures}>
                   <div className={styles.quizFeatureItem}>
                     <ThunderboltOutlined style={{ color: '#1890ff' }} />
-                    <span>AI动态生成题目</span>
+                    <span>{t('quiz.feature1')}</span>
                   </div>
                   <div className={styles.quizFeatureItem}>
                     <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    <span>即时批改与解析</span>
+                    <span>{t('quiz.feature2')}</span>
                   </div>
                   <div className={styles.quizFeatureItem}>
                     <BookOutlined style={{ color: '#fa8c16' }} />
-                    <span>错题本追踪复习</span>
+                    <span>{t('quiz.feature3')}</span>
                   </div>
                   <div className={styles.quizFeatureItem}>
                     <BarChartOutlined style={{ color: '#722ed1' }} />
-                    <span>学习进度报告</span>
+                    <span>{t('quiz.feature4')}</span>
                   </div>
                 </div>
                 <div className={styles.quizButtons}>
@@ -436,14 +435,14 @@ const HomePage = () => {
                     onClick={() => navigate('/quiz')}
                     className={styles.quizPrimaryBtn}
                   >
-                    立即刷题
+                    {t('quiz.startQuiz')}
                   </Button>
                   <Button
                     size="large"
                     icon={<BookOutlined />}
                     onClick={() => navigate('/quiz/wrong-questions')}
                   >
-                    查看错题本
+                    {t('quiz.viewWrongQuestions')}
                   </Button>
                 </div>
               </div>
@@ -457,7 +456,7 @@ const HomePage = () => {
                     </div>
                     <div className={styles.quizStatInfo}>
                       <span className={styles.quizStatValue}>12+</span>
-                      <span className={styles.quizStatLabel}>支持科目</span>
+                      <span className={styles.quizStatLabel}>{t('quiz.stats.subjects')}</span>
                     </div>
                   </div>
                   <div className={styles.quizStatItem}>
@@ -466,7 +465,7 @@ const HomePage = () => {
                     </div>
                     <div className={styles.quizStatInfo}>
                       <span className={styles.quizStatValue}>4</span>
-                      <span className={styles.quizStatLabel}>难度级别</span>
+                      <span className={styles.quizStatLabel}>{t('quiz.stats.difficulties')}</span>
                     </div>
                   </div>
                   <div className={styles.quizStatItem}>
@@ -475,7 +474,7 @@ const HomePage = () => {
                     </div>
                     <div className={styles.quizStatInfo}>
                       <span className={styles.quizStatValue}>AI</span>
-                      <span className={styles.quizStatLabel}>智能生成</span>
+                      <span className={styles.quizStatLabel}>{t('quiz.stats.aiGenerated')}</span>
                     </div>
                   </div>
                 </div>

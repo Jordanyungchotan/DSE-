@@ -27,6 +27,13 @@ export const zhTW = {
     logout: '登出',
     register: '註冊',
     myRecords: '我的記錄',
+    // 智能刷題導航
+    smartQuiz: '智能刷題',
+    startQuiz: '開始刷題',
+    wrongQuestions: '錯題本',
+    quizHistory: '刷題記錄',
+    learningProfile: '學習檔案',
+    leaderboard: '排行榜',
   },
 
   // 系統名稱
@@ -383,6 +390,155 @@ export const zhTW = {
     zhCN: '简体中文',
     zhTW: '繁體中文',
     en: 'English',
+  },
+
+  // 智能刷題系統
+  quiz: {
+    // 首頁卡片
+    title: 'DSE智能刷題系統',
+    newFeature: '全新功能',
+    description: '基於DeepSeek AI的動態題目生成，每次刷題都會根據您的配置實時生成符合DSE考試標準的題目。支持中四至中六年級，涵蓋核心科目和主要選修科目。',
+    feature1: 'AI動態生成題目',
+    feature2: '即時批改與解析',
+    feature3: '錯題本追蹤複習',
+    feature4: '學習進度報告',
+    startQuiz: '立即刷題',
+    viewWrongQuestions: '查看錯題本',
+    stats: {
+      subjects: '支持科目',
+      difficulties: '難度級別',
+      aiGenerated: '智能生成',
+    },
+    
+    // 刷題配置
+    config: {
+      title: '刷題配置',
+      subject: '選擇科目',
+      grade: '選擇年級',
+      difficulty: '選擇難度',
+      questionCount: '題目數量',
+      start: '開始刷題',
+    },
+    
+    // 年級
+    grades: {
+      f4: '中四',
+      f5: '中五',
+      f6: '中六',
+    },
+    
+    // 難度
+    difficulties: {
+      basic: '基礎',
+      standard: '標準',
+      challenging: '挑戰',
+      exam: '考試',
+    },
+    
+    // 科目
+    subjects: {
+      math: '數學',
+      chinese: '中文',
+      english: '英文',
+      physics: '物理',
+      chemistry: '化學',
+      biology: '生物',
+      economics: '經濟',
+      bafs: '企業會計與財務概論',
+      history: '歷史',
+      geography: '地理',
+    },
+    
+    // 答題頁面
+    question: '第 {current} 題 / 共 {total} 題',
+    timeRemaining: '剩餘時間',
+    submitAnswer: '提交答案',
+    nextQuestion: '下一題',
+    finishQuiz: '完成測驗',
+    correct: '回答正確',
+    incorrect: '回答錯誤',
+    correctAnswer: '正確答案',
+    explanation: '解析',
+    
+    // 結果頁面
+    result: {
+      title: '刷題結果',
+      score: '得分',
+      accuracy: '正確率',
+      time: '用時',
+      correct: '正確',
+      incorrect: '錯誤',
+      review: '查看解析',
+      retry: '重新刷題',
+      backHome: '返回首頁',
+    },
+    
+    // 錯題本
+    wrongBook: {
+      title: '錯題本',
+      empty: '暫無錯題記錄',
+      subject: '科目',
+      topic: '知識點',
+      addedAt: '添加時間',
+      yourAnswer: '你的答案',
+      correctAnswer: '正確答案',
+      review: '複習',
+      delete: '刪除',
+      mastered: '已掌握',
+    },
+    
+    // 刷題歷史
+    history: {
+      title: '刷題記錄',
+      empty: '暫無刷題記錄',
+      date: '日期',
+      subject: '科目',
+      difficulty: '難度',
+      score: '得分',
+      accuracy: '正確率',
+      view: '查看詳情',
+    },
+  },
+
+  // 排行榜
+  leaderboard: {
+    title: '刷題排行榜',
+    overall: '綜合榜',
+    subject: '科目榜',
+    speed: '速度榜',
+    
+    // 篩選
+    filter: {
+      timeRange: '時間範圍',
+      grade: '年級',
+      difficulty: '難度',
+      subject: '科目',
+      all: '全部',
+      daily: '今日',
+      weekly: '本週',
+      monthly: '本月',
+      allTime: '總榜',
+    },
+    
+    // 排名
+    rank: '排名',
+    user: '用戶',
+    score: '得分',
+    accuracy: '正確率',
+    avgTime: '平均用時',
+    questions: '題目數',
+    
+    // 用戶卡片
+    myRank: '我的排名',
+    notRanked: '暫無排名',
+    totalSessions: '刷題次數',
+    totalQuestions: '總題目數',
+    avgAccuracy: '平均正確率',
+    
+    // 狀態
+    loading: '載入中...',
+    empty: '暫無數據',
+    error: '載入失敗',
   },
 }
 

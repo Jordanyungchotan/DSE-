@@ -27,6 +27,13 @@ export const zhCN = {
     logout: '退出登录',
     register: '注册',
     myRecords: '我的记录',
+    // 智能刷题导航
+    smartQuiz: '智能刷题',
+    startQuiz: '开始刷题',
+    wrongQuestions: '错题本',
+    quizHistory: '刷题记录',
+    learningProfile: '学习档案',
+    leaderboard: '排行榜',
   },
 
   // 系统名称
@@ -383,6 +390,155 @@ export const zhCN = {
     zhCN: '简体中文',
     zhTW: '繁體中文',
     en: 'English',
+  },
+
+  // 智能刷题系统
+  quiz: {
+    // 首页卡片
+    title: 'DSE智能刷题系统',
+    newFeature: '全新功能',
+    description: '基于DeepSeek AI的动态题目生成，每次刷题都会根据您的配置实时生成符合DSE考试标准的题目。支持中四至中六年级，涵盖核心科目和主要选修科目。',
+    feature1: 'AI动态生成题目',
+    feature2: '即时批改与解析',
+    feature3: '错题本追踪复习',
+    feature4: '学习进度报告',
+    startQuiz: '立即刷题',
+    viewWrongQuestions: '查看错题本',
+    stats: {
+      subjects: '支持科目',
+      difficulties: '难度级别',
+      aiGenerated: '智能生成',
+    },
+    
+    // 刷题配置
+    config: {
+      title: '刷题配置',
+      subject: '选择科目',
+      grade: '选择年级',
+      difficulty: '选择难度',
+      questionCount: '题目数量',
+      start: '开始刷题',
+    },
+    
+    // 年级
+    grades: {
+      f4: '中四',
+      f5: '中五',
+      f6: '中六',
+    },
+    
+    // 难度
+    difficulties: {
+      basic: '基础',
+      standard: '标准',
+      challenging: '挑战',
+      exam: '考试',
+    },
+    
+    // 科目
+    subjects: {
+      math: '数学',
+      chinese: '中文',
+      english: '英文',
+      physics: '物理',
+      chemistry: '化学',
+      biology: '生物',
+      economics: '经济',
+      bafs: '企业会计与财务概论',
+      history: '历史',
+      geography: '地理',
+    },
+    
+    // 答题页面
+    question: '第 {current} 题 / 共 {total} 题',
+    timeRemaining: '剩余时间',
+    submitAnswer: '提交答案',
+    nextQuestion: '下一题',
+    finishQuiz: '完成测验',
+    correct: '回答正确',
+    incorrect: '回答错误',
+    correctAnswer: '正确答案',
+    explanation: '解析',
+    
+    // 结果页面
+    result: {
+      title: '刷题结果',
+      score: '得分',
+      accuracy: '正确率',
+      time: '用时',
+      correct: '正确',
+      incorrect: '错误',
+      review: '查看解析',
+      retry: '重新刷题',
+      backHome: '返回首页',
+    },
+    
+    // 错题本
+    wrongBook: {
+      title: '错题本',
+      empty: '暂无错题记录',
+      subject: '科目',
+      topic: '知识点',
+      addedAt: '添加时间',
+      yourAnswer: '你的答案',
+      correctAnswer: '正确答案',
+      review: '复习',
+      delete: '删除',
+      mastered: '已掌握',
+    },
+    
+    // 刷题历史
+    history: {
+      title: '刷题记录',
+      empty: '暂无刷题记录',
+      date: '日期',
+      subject: '科目',
+      difficulty: '难度',
+      score: '得分',
+      accuracy: '正确率',
+      view: '查看详情',
+    },
+  },
+
+  // 排行榜
+  leaderboard: {
+    title: '刷题排行榜',
+    overall: '综合榜',
+    subject: '科目榜',
+    speed: '速度榜',
+    
+    // 筛选
+    filter: {
+      timeRange: '时间范围',
+      grade: '年级',
+      difficulty: '难度',
+      subject: '科目',
+      all: '全部',
+      daily: '今日',
+      weekly: '本周',
+      monthly: '本月',
+      allTime: '总榜',
+    },
+    
+    // 排名
+    rank: '排名',
+    user: '用户',
+    score: '得分',
+    accuracy: '正确率',
+    avgTime: '平均用时',
+    questions: '题目数',
+    
+    // 用户卡片
+    myRank: '我的排名',
+    notRanked: '暂无排名',
+    totalSessions: '刷题次数',
+    totalQuestions: '总题目数',
+    avgAccuracy: '平均正确率',
+    
+    // 状态
+    loading: '加载中...',
+    empty: '暂无数据',
+    error: '加载失败',
   },
 }
 
