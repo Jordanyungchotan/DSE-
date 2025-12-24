@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react'
-import { Modal, Button, Card, Typography, Space, message, Tooltip, Divider } from 'antd'
+import { useRef } from 'react'
+import { Modal, Button, Typography, Space, message, Tooltip, Divider } from 'antd'
 import {
   ShareAltOutlined,
   CopyOutlined,
@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons'
 import styles from './ShareResult.module.css'
 
-const { Title, Text, Paragraph } = Typography
+const { Title, Text } = Typography
 
 interface ShareResultProps {
   visible: boolean
@@ -39,7 +39,6 @@ interface ShareResultProps {
  * 分享成绩组件
  */
 const ShareResult = ({ visible, onClose, result }: ShareResultProps) => {
-  const [shareType, setShareType] = useState<'card' | 'text' | 'link'>('card')
   const cardRef = useRef<HTMLDivElement>(null)
 
   // 生成分享文本
@@ -100,7 +99,6 @@ const ShareResult = ({ visible, onClose, result }: ShareResultProps) => {
       message.info('正在生成图片...')
       
       // 创建 canvas 并绘制
-      const card = cardRef.current
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
       if (!ctx) return

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Typography, Button, Tag, Progress, Tooltip, Badge } from 'antd'
+import { Card, Row, Col, Typography, Button, Tag, Badge } from 'antd'
 import {
   BulbOutlined,
   RocketOutlined,
@@ -286,7 +286,7 @@ const SmartRecommendation = ({
                         <Text strong className={styles.cardTitle}>{rec.title}</Text>
                         <div className={styles.cardTags}>
                           {rec.tags.map((tag, index) => (
-                            <Tag key={index} size="small">{tag}</Tag>
+                            <Tag key={index}>{tag}</Tag>
                           ))}
                         </div>
                       </div>
