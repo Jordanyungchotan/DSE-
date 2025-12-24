@@ -302,19 +302,21 @@
 /* ===== 操作按钮 ===== */
 .cardActions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 12px;
 }
 
-.detailBtn {
-  border-radius: 8px;
-  font-size: 0.8rem;
+.expandIcon {
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(43, 108, 176, 0.08);
   transition: all 0.3s;
 }
 
-.detailBtn:hover {
-  transform: scale(1.05);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+.expandedIcon {
+  background: rgba(43, 108, 176, 0.15);
 }
 
 .shareBtn {
@@ -327,60 +329,68 @@
   transform: scale(1.05);
 }
 
-/* ===== 详情弹窗 ===== */
-.detailModalTitle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ===== 展开状态 ===== */
+.historyCard.expanded {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(43, 108, 176, 0.2);
 }
 
-.detailContent {
-  max-height: 70vh;
-  overflow-y: auto;
+/* ===== 展开的内容 ===== */
+.expandedContent {
+  border-top: 1px solid var(--border-color);
+  padding-top: 20px;
+  margin-top: 16px;
+  animation: slideDown 0.3s ease;
 }
 
-.detailSummary {
-  display: flex;
-  justify-content: space-around;
-  background: linear-gradient(135deg, rgba(43, 108, 176, 0.05), rgba(82, 196, 26, 0.05));
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.summaryItem {
-  text-align: center;
+.questionListHeader {
+  margin-bottom: 16px;
 }
 
-.summaryLabel {
-  display: block;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  margin-bottom: 4px;
-}
-
-.summaryValue {
-  display: block;
-  font-size: 1.25rem;
-  font-weight: 600;
+.questionListHeader h5 {
+  margin: 0 !important;
   color: var(--text-primary);
 }
 
-.questionList h5 {
-  margin-bottom: 16px !important;
+.questionItems {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.questionHeader {
-  font-size: 0.9rem;
+.questionItem {
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
 }
 
-.questionDetail {
-  padding: 8px 0;
+.questionItemHeader {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.questionItemContent {
+  padding-left: 8px;
 }
 
 .questionText {
   margin-bottom: 16px;
-  line-height: 1.6;
+  line-height: 1.8;
+  font-size: 0.95rem;
+  color: var(--text-primary);
 }
 
 .optionsList {
@@ -393,10 +403,11 @@
 .optionItem {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
-  background: var(--bg-secondary);
+  padding: 10px 14px;
+  background: white;
   border-radius: 8px;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
 }
 
 .optionItem.correctOption {
@@ -411,30 +422,50 @@
 
 .optionLetter {
   font-weight: 600;
-  margin-right: 8px;
+  margin-right: 10px;
   color: var(--text-secondary);
+  min-width: 20px;
 }
 
-.answerSection {
+.answerCompare {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--bg-secondary);
+  gap: 24px;
+  padding: 12px 16px;
+  background: white;
   border-radius: 8px;
+  border: 1px solid var(--border-color);
   margin-bottom: 16px;
 }
 
+.answerItem {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.correctText {
+  color: #52c41a;
+}
+
+.wrongText {
+  color: #f5222d;
+}
+
 .explanationBox {
-  padding: 12px;
-  background: rgba(250, 140, 22, 0.05);
-  border-left: 3px solid #fa8c16;
+  padding: 14px 16px;
+  background: rgba(250, 140, 22, 0.08);
+  border-left: 4px solid #fa8c16;
   border-radius: 0 8px 8px 0;
+  margin-top: 12px;
 }
 
 .explanationBox span:first-child {
-  display: block;
-  margin-bottom: 4px;
+  font-weight: 500;
+  margin-right: 4px;
+}
+
+.emptyQuestions {
+  padding: 32px 0;
 }
 
 /* ===== 响应式设计 ===== */

@@ -2226,7 +2226,8 @@ export default {
               totalQuestions,
               accuracy: Math.round((row.accuracy as number || 0) * 100),
               timeSpent: row.timeSpent || 0,
-              completedAt: row.completedAt
+              completedAt: row.completedAt,
+              questions: questionsArray // 添加题目数组
             }
           })
 
