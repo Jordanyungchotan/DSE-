@@ -601,6 +601,10 @@ async function generateQuizQuestions(config: QuizConfig, apiKey: string): Promis
     // 增强版提示词
     const systemPrompt = `你是一位经验丰富的香港DSE ${subjectName}科教育专家和题目设计师。
 
+【重要：语言要求】
+⚠️ 所有输出必须使用简体中文，不要使用繁体中文！
+⚠️ 包括题目、选项、答案、解释都必须是简体中文！
+
 【你的专业背景】
 - 拥有超过10年的DSE考试辅导经验
 - 精通DSE ${subjectName}科的课程大纲和考试要求
@@ -628,6 +632,10 @@ ${diversityInstructions.map((inst, i) => `${i + 1}. ${inst}`).join('\n')}
 ⚠️ 避免使用过于简单的场景如"小明买苹果"、"学校有学生"
 ⚠️ 每道题的结构和问法要有明显差异
 ⚠️ 尝试使用新颖的现实生活情境
+
+【语言要求 - 非常重要】
+⚠️ 必须使用简体中文！不要使用繁体中文！
+⚠️ 所有题目、选项、答案、解释都用简体中文书写！
 
 【题型分布】
 - 选择题：约40%

@@ -544,11 +544,37 @@ const QuizPage = () => {
                   <Text strong>正确答案：</Text>
                   {currentQuestion.questionType === 'multiple_choice' && currentQuestion.options ? (
                     <Text>
-                      {String.fromCharCode(65 + Number(currentQuestion.correctAnswer))}.{' '}
-                      {currentQuestion.options[Number(currentQuestion.correctAnswer)]}
+                      {(() => {
+                        const answer = currentQuestion.correctAnswer
+                        // 支持多种答案格式：数字索引(0-3)、字母(A-D)、完整选项文本
+                        let answerIndex = -1
+                        if (typeof answer === 'number') {
+                          answerIndex = answer
+                        } else if (typeof answer === 'string') {
+                          const upperAnswer = answer.toUpperCase().trim()
+                          if (/^[A-D]$/.test(upperAnswer)) {
+                            answerIndex = upperAnswer.charCodeAt(0) - 65
+                          } else if (/^[0-3]$/.test(answer)) {
+                            answerIndex = parseInt(answer)
+                          } else {
+                            // 可能是完整选项文本
+                            answerIndex = currentQuestion.options!.findIndex(
+                              opt => opt.toLowerCase().includes(answer.toLowerCase()) || 
+                                     answer.toLowerCase().includes(opt.toLowerCase())
+                            )
+                          }
+                        }
+                        
+                        if (answerIndex >= 0 && answerIndex < currentQuestion.options!.length) {
+                          return `${String.fromCharCode(65 + answerIndex)}. ${currentQuestion.options![answerIndex]}`
+                        }
+                        return String(answer)
+                      })()}
                     </Text>
                   ) : (
-                    <Text>{currentQuestion.correctAnswer}</Text>
+                    <Text style={{ color: '#52c41a', fontWeight: 'bold' }}>
+                      {currentQuestion.correctAnswer}
+                    </Text>
                   )}
                 </div>
               )}
