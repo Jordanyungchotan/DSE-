@@ -2860,8 +2860,6 @@ export default {
 
           // 5. 计算成就
           const achievements = []
-          const totalQuizzes = overallStats?.totalQuizzes || 0
-          const totalQuestions = overallStats?.totalQuestions || 0
 
           // 初露锋芒 - 完成第一次刷题
           achievements.push({
@@ -2869,8 +2867,8 @@ export default {
             name: '初露锋芒',
             description: '完成第一次刷题',
             icon: '🌟',
-            unlockedAt: totalQuizzes >= 1 ? lastStudyDate : null,
-            progress: totalQuizzes >= 1 ? 100 : 0,
+            unlockedAt: overallStats.totalQuizzes >= 1 ? lastStudyDate : null,
+            progress: overallStats.totalQuizzes >= 1 ? 100 : 0,
           })
 
           // 勤学不倦 - 连续学习7天
@@ -2889,8 +2887,8 @@ export default {
             name: '百题斩',
             description: '完成100道题目',
             icon: '💯',
-            unlockedAt: totalQuestions >= 100 ? lastStudyDate : null,
-            progress: Math.min(100, Math.round((totalQuestions / 100) * 100)),
+            unlockedAt: overallStats.totalQuestions >= 100 ? lastStudyDate : null,
+            progress: Math.min(100, Math.round((overallStats.totalQuestions / 100) * 100)),
           })
 
           // 千题王 - 完成1000道题目
@@ -2899,8 +2897,8 @@ export default {
             name: '千题王',
             description: '完成1000道题目',
             icon: '👑',
-            unlockedAt: totalQuestions >= 1000 ? lastStudyDate : null,
-            progress: Math.min(100, Math.round((totalQuestions / 1000) * 100)),
+            unlockedAt: overallStats.totalQuestions >= 1000 ? lastStudyDate : null,
+            progress: Math.min(100, Math.round((overallStats.totalQuestions / 1000) * 100)),
           })
 
           // 6. 计算学习目标（从已获取的数据计算）
@@ -3193,11 +3191,9 @@ export default {
               totalQuestions,
               difficultyBonus,
               consistencyBonus: 0,
-              activityBonus: 0,
               accuracy: Math.round((accuracy * 100) * 10) / 10,
               avgTimePerQuestion: Math.round(avgTime * 10) / 10,
               totalSessions: sessions,
-              totalQuestions: sessions * 10, // 估算
               isCurrentUser: row.user_id === currentUserId
             }
           })
