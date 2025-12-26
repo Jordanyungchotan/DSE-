@@ -293,3 +293,4 @@ const LearningChart = ({ recentActivity, subjectMastery }: LearningChartProps) =
 
 export default LearningChart
 
+

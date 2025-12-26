@@ -2643,27 +2643,246 @@ export default {
           return errorResponse('登录已过期', 401, origin)
         }
 
-        // 返回模拟学习档案数据
+        const userId = tokenData.userId
         const today = new Date().toISOString().split('T')[0]
-        return jsonResponse({
-          totalQuizzes: 10,
-          totalQuestions: 100,
-          correctAnswers: 75,
-          totalTimeSpent: 300,
-          currentStreak: 3,
-          longestStreak: 7,
-          lastStudyDate: today,
-          subjectMastery: [
-            { subjectId: 'math', subjectName: '数学', totalQuestions: 50, correctAnswers: 40, accuracy: 80, recentTrend: 'up', lastPracticed: today },
-            { subjectId: 'english', subjectName: '英国语文', totalQuestions: 30, correctAnswers: 22, accuracy: 73.3, recentTrend: 'stable', lastPracticed: today },
-          ],
-          topicMastery: [],
-          achievements: [
-            { id: '1', name: '初露锋芒', description: '完成第一次刷题', icon: '🌟', unlockedAt: today, progress: 100 },
-          ],
-          goals: [],
-          recentActivity: [],
-        }, 200, origin)
+
+        try {
+          // 1. 获取总体统计
+          const overallStats = await env.DB.prepare(`
+            SELECT 
+              COUNT(*) as totalQuizzes,
+              COALESCE(SUM(total_questions), 0) as totalQuestions,
+              COALESCE(SUM(correct_count), 0) as correctAnswers,
+              COALESCE(SUM(duration), 0) as totalTimeSpent
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed'
+          `).bind(userId).first<{
+            totalQuizzes: number
+            totalQuestions: number
+            correctAnswers: number
+            totalTimeSpent: number
+          }>()
+
+          // 2. 获取连续学习天数
+          const studyDays = await env.DB.prepare(`
+            SELECT DISTINCT DATE(created_at) as study_date
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed'
+            ORDER BY study_date DESC
+          `).bind(userId).all()
+
+          // 计算连续天数
+          let currentStreak = 0
+          let longestStreak = 0
+          let tempStreak = 0
+          let lastDate: Date | null = null
+          let lastStudyDate = today
+
+          if (studyDays.results && studyDays.results.length > 0) {
+            lastStudyDate = studyDays.results[0].study_date as string
+
+            for (const row of studyDays.results) {
+              const dateStr = row.study_date as string
+              const currentDate = new Date(dateStr)
+              
+              if (lastDate === null) {
+                tempStreak = 1
+                // 检查是否是今天或昨天
+                const todayDate = new Date(today)
+                const diffDays = Math.floor((todayDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
+                if (diffDays <= 1) {
+                  currentStreak = 1
+                }
+              } else {
+                const diffDays = Math.floor((lastDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
+                if (diffDays === 1) {
+                  tempStreak++
+                  if (currentStreak > 0) {
+                    currentStreak = tempStreak
+                  }
+                } else {
+                  tempStreak = 1
+                }
+              }
+              
+              longestStreak = Math.max(longestStreak, tempStreak)
+              lastDate = currentDate
+            }
+          }
+
+          // 3. 获取各科目统计
+          const subjectStats = await env.DB.prepare(`
+            SELECT 
+              json_extract(config, '$.subject') as subjectId,
+              COUNT(*) as sessions,
+              SUM(total_questions) as totalQuestions,
+              SUM(correct_count) as correctAnswers,
+              MAX(DATE(created_at)) as lastPracticed
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed'
+            GROUP BY json_extract(config, '$.subject')
+            ORDER BY totalQuestions DESC
+          `).bind(userId).all()
+
+          // 科目名称映射
+          const subjectNameMap: Record<string, string> = {
+            math: '数学',
+            physics: '物理',
+            chemistry: '化学',
+            biology: '生物',
+            english: '英国语文',
+            chinese: '中国语文',
+            liberal: '公民与社会发展',
+            economics: '经济',
+            bafs: '企业、会计与财务概论',
+            geography: '地理',
+            history: '历史',
+            ict: '资讯及通讯科技',
+          }
+
+          const subjectMastery = (subjectStats.results || []).map((row: Record<string, unknown>) => {
+            const total = Number(row.totalQuestions) || 0
+            const correct = Number(row.correctAnswers) || 0
+            const accuracy = total > 0 ? (correct / total) * 100 : 0
+            const subjectId = row.subjectId as string
+            
+            return {
+              subjectId,
+              subjectName: subjectNameMap[subjectId] || subjectId,
+              totalQuestions: total,
+              correctAnswers: correct,
+              accuracy: Math.round(accuracy * 10) / 10,
+              recentTrend: 'stable' as const,
+              lastPracticed: row.lastPracticed as string || today,
+            }
+          })
+
+          // 4. 获取最近活动（最近7天）
+          const recentActivity = await env.DB.prepare(`
+            SELECT 
+              DATE(created_at) as date,
+              COUNT(*) as quizCount,
+              SUM(total_questions) as questionsAnswered,
+              CASE WHEN SUM(total_questions) > 0 
+                THEN ROUND(SUM(correct_count) * 100.0 / SUM(total_questions), 1)
+                ELSE 0 END as accuracy
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed'
+              AND created_at >= datetime('now', '-7 days')
+            GROUP BY DATE(created_at)
+            ORDER BY date DESC
+          `).bind(userId).all()
+
+          // 5. 计算成就
+          const achievements = []
+          const totalQuizzes = overallStats?.totalQuizzes || 0
+          const totalQuestions = overallStats?.totalQuestions || 0
+
+          // 初露锋芒 - 完成第一次刷题
+          achievements.push({
+            id: '1',
+            name: '初露锋芒',
+            description: '完成第一次刷题',
+            icon: '🌟',
+            unlockedAt: totalQuizzes >= 1 ? lastStudyDate : null,
+            progress: totalQuizzes >= 1 ? 100 : 0,
+          })
+
+          // 勤学不倦 - 连续学习7天
+          achievements.push({
+            id: '2',
+            name: '勤学不倦',
+            description: '连续学习7天',
+            icon: '🔥',
+            unlockedAt: longestStreak >= 7 ? lastStudyDate : null,
+            progress: Math.min(100, Math.round((longestStreak / 7) * 100)),
+          })
+
+          // 百题斩 - 完成100道题目
+          achievements.push({
+            id: '3',
+            name: '百题斩',
+            description: '完成100道题目',
+            icon: '💯',
+            unlockedAt: totalQuestions >= 100 ? lastStudyDate : null,
+            progress: Math.min(100, Math.round((totalQuestions / 100) * 100)),
+          })
+
+          // 千题王 - 完成1000道题目
+          achievements.push({
+            id: '4',
+            name: '千题王',
+            description: '完成1000道题目',
+            icon: '👑',
+            unlockedAt: totalQuestions >= 1000 ? lastStudyDate : null,
+            progress: Math.min(100, Math.round((totalQuestions / 1000) * 100)),
+          })
+
+          // 6. 计算学习目标（基于当日/本周/本月）
+          const todayQuestions = await env.DB.prepare(`
+            SELECT COALESCE(SUM(total_questions), 0) as count
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed' AND DATE(created_at) = DATE('now')
+          `).bind(userId).first<{ count: number }>()
+
+          const weekQuestions = await env.DB.prepare(`
+            SELECT COALESCE(SUM(total_questions), 0) as count
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed' 
+              AND created_at >= datetime('now', '-7 days')
+          `).bind(userId).first<{ count: number }>()
+
+          const monthQuestions = await env.DB.prepare(`
+            SELECT COALESCE(SUM(total_questions), 0) as count
+            FROM quiz_sessions
+            WHERE user_id = ? AND status = 'completed' 
+              AND created_at >= datetime('now', '-30 days')
+          `).bind(userId).first<{ count: number }>()
+
+          const goals = [
+            { id: '1', title: '每日刷题', target: 20, current: todayQuestions?.count || 0, deadline: today, type: 'daily' },
+            { id: '2', title: '本周目标', target: 100, current: weekQuestions?.count || 0, deadline: today, type: 'weekly' },
+            { id: '3', title: '月度挑战', target: 500, current: monthQuestions?.count || 0, deadline: today, type: 'monthly' },
+          ]
+
+          return jsonResponse({
+            totalQuizzes: overallStats?.totalQuizzes || 0,
+            totalQuestions: overallStats?.totalQuestions || 0,
+            correctAnswers: overallStats?.correctAnswers || 0,
+            totalTimeSpent: Math.round((overallStats?.totalTimeSpent || 0) / 60), // 秒转分钟
+            currentStreak,
+            longestStreak,
+            lastStudyDate,
+            subjectMastery,
+            topicMastery: [],
+            achievements,
+            goals,
+            recentActivity: (recentActivity.results || []).map((row: Record<string, unknown>) => ({
+              date: row.date as string,
+              quizCount: Number(row.quizCount) || 0,
+              questionsAnswered: Number(row.questionsAnswered) || 0,
+              accuracy: Number(row.accuracy) || 0,
+            })),
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('获取学习档案失败:', error)
+          // 返回空数据而不是模拟数据
+          return jsonResponse({
+            totalQuizzes: 0,
+            totalQuestions: 0,
+            correctAnswers: 0,
+            totalTimeSpent: 0,
+            currentStreak: 0,
+            longestStreak: 0,
+            lastStudyDate: today,
+            subjectMastery: [],
+            topicMastery: [],
+            achievements: [],
+            goals: [],
+            recentActivity: [],
+          }, 200, origin)
+        }
       }
 
       // 生成学习报告
