@@ -2647,21 +2647,51 @@ export default {
         const today = new Date().toISOString().split('T')[0]
 
         try {
-          // 1. 获取总体统计
-          const overallStats = await env.DB.prepare(`
+          // 1. 获取所有完成的刷题记录
+          const allSessions = await env.DB.prepare(`
             SELECT 
-              COUNT(*) as totalQuizzes,
-              COALESCE(SUM(total_questions), 0) as totalQuestions,
-              COALESCE(SUM(correct_count), 0) as correctAnswers,
-              COALESCE(SUM(duration), 0) as totalTimeSpent
+              config,
+              questions,
+              score,
+              accuracy,
+              total_time
             FROM quiz_sessions
             WHERE user_id = ? AND status = 'completed'
-          `).bind(userId).first<{
-            totalQuizzes: number
-            totalQuestions: number
-            correctAnswers: number
-            totalTimeSpent: number
-          }>()
+          `).bind(userId).all()
+
+          // 计算总体统计
+          let totalQuizzes = 0
+          let totalQuestions = 0
+          let correctAnswers = 0
+          let totalTimeSpent = 0
+
+          for (const row of (allSessions.results || [])) {
+            totalQuizzes++
+            
+            // 从 questions JSON 获取题目数量
+            let questionsCount = 0
+            try {
+              const questionsArr = JSON.parse(row.questions as string || '[]')
+              questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0
+            } catch {
+              // 尝试从 config 获取
+              try {
+                const config = JSON.parse(row.config as string || '{}')
+                questionsCount = config.questionCount || 5
+              } catch {}
+            }
+            
+            totalQuestions += questionsCount
+            correctAnswers += Number(row.score) || 0
+            totalTimeSpent += Number(row.total_time) || 0
+          }
+
+          const overallStats = {
+            totalQuizzes,
+            totalQuestions,
+            correctAnswers,
+            totalTimeSpent,
+          }
 
           // 2. 获取连续学习天数
           const studyDays = await env.DB.prepare(`
@@ -2710,21 +2740,7 @@ export default {
             }
           }
 
-          // 3. 获取各科目统计
-          const subjectStats = await env.DB.prepare(`
-            SELECT 
-              json_extract(config, '$.subject') as subjectId,
-              COUNT(*) as sessions,
-              SUM(total_questions) as totalQuestions,
-              SUM(correct_count) as correctAnswers,
-              MAX(DATE(created_at)) as lastPracticed
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed'
-            GROUP BY json_extract(config, '$.subject')
-            ORDER BY totalQuestions DESC
-          `).bind(userId).all()
-
-          // 科目名称映射
+          // 3. 获取各科目统计（从已获取的数据计算）
           const subjectNameMap: Record<string, string> = {
             math: '数学',
             physics: '物理',
@@ -2740,38 +2756,107 @@ export default {
             ict: '资讯及通讯科技',
           }
 
-          const subjectMastery = (subjectStats.results || []).map((row: Record<string, unknown>) => {
-            const total = Number(row.totalQuestions) || 0
-            const correct = Number(row.correctAnswers) || 0
-            const accuracy = total > 0 ? (correct / total) * 100 : 0
-            const subjectId = row.subjectId as string
+          // 按科目聚合统计
+          const subjectStatsMap: Record<string, {
+            totalQuestions: number
+            correctAnswers: number
+            lastPracticed: string
+          }> = {}
+
+          for (const row of (allSessions.results || [])) {
+            let subjectId = 'math'
+            let questionsCount = 0
+            let lastPracticed = today
+            
+            try {
+              const config = JSON.parse(row.config as string || '{}')
+              subjectId = config.subject || 'math'
+            } catch {}
+            
+            try {
+              const questionsArr = JSON.parse(row.questions as string || '[]')
+              questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0
+            } catch {}
+
+            if (!subjectStatsMap[subjectId]) {
+              subjectStatsMap[subjectId] = {
+                totalQuestions: 0,
+                correctAnswers: 0,
+                lastPracticed: today,
+              }
+            }
+
+            subjectStatsMap[subjectId].totalQuestions += questionsCount
+            subjectStatsMap[subjectId].correctAnswers += Number(row.score) || 0
+          }
+
+          const subjectMastery = Object.entries(subjectStatsMap).map(([subjectId, stats]) => {
+            const accuracy = stats.totalQuestions > 0 
+              ? (stats.correctAnswers / stats.totalQuestions) * 100 
+              : 0
             
             return {
               subjectId,
               subjectName: subjectNameMap[subjectId] || subjectId,
-              totalQuestions: total,
-              correctAnswers: correct,
+              totalQuestions: stats.totalQuestions,
+              correctAnswers: stats.correctAnswers,
               accuracy: Math.round(accuracy * 10) / 10,
               recentTrend: 'stable' as const,
-              lastPracticed: row.lastPracticed as string || today,
+              lastPracticed: stats.lastPracticed,
             }
-          })
+          }).sort((a, b) => b.totalQuestions - a.totalQuestions)
 
-          // 4. 获取最近活动（最近7天）
-          const recentActivity = await env.DB.prepare(`
+          // 4. 获取最近活动（从已获取的数据计算最近7天）
+          const sevenDaysAgo = new Date()
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+          
+          const recentActivitySessions = await env.DB.prepare(`
             SELECT 
               DATE(created_at) as date,
-              COUNT(*) as quizCount,
-              SUM(total_questions) as questionsAnswered,
-              CASE WHEN SUM(total_questions) > 0 
-                THEN ROUND(SUM(correct_count) * 100.0 / SUM(total_questions), 1)
-                ELSE 0 END as accuracy
+              config,
+              questions,
+              score
             FROM quiz_sessions
             WHERE user_id = ? AND status = 'completed'
-              AND created_at >= datetime('now', '-7 days')
-            GROUP BY DATE(created_at)
-            ORDER BY date DESC
-          `).bind(userId).all()
+              AND created_at >= ?
+            ORDER BY created_at DESC
+          `).bind(userId, sevenDaysAgo.toISOString()).all()
+
+          // 按日期聚合
+          const activityByDate: Record<string, {
+            quizCount: number
+            questionsAnswered: number
+            correctCount: number
+          }> = {}
+
+          for (const row of (recentActivitySessions.results || [])) {
+            const date = row.date as string
+            let questionsCount = 0
+            
+            try {
+              const questionsArr = JSON.parse(row.questions as string || '[]')
+              questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0
+            } catch {}
+
+            if (!activityByDate[date]) {
+              activityByDate[date] = { quizCount: 0, questionsAnswered: 0, correctCount: 0 }
+            }
+
+            activityByDate[date].quizCount++
+            activityByDate[date].questionsAnswered += questionsCount
+            activityByDate[date].correctCount += Number(row.score) || 0
+          }
+
+          const recentActivity = {
+            results: Object.entries(activityByDate).map(([date, stats]) => ({
+              date,
+              quizCount: stats.quizCount,
+              questionsAnswered: stats.questionsAnswered,
+              accuracy: stats.questionsAnswered > 0 
+                ? Math.round((stats.correctCount / stats.questionsAnswered) * 1000) / 10
+                : 0,
+            })).sort((a, b) => b.date.localeCompare(a.date))
+          }
 
           // 5. 计算成就
           const achievements = []
@@ -2818,31 +2903,49 @@ export default {
             progress: Math.min(100, Math.round((totalQuestions / 1000) * 100)),
           })
 
-          // 6. 计算学习目标（基于当日/本周/本月）
-          const todayQuestions = await env.DB.prepare(`
-            SELECT COALESCE(SUM(total_questions), 0) as count
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed' AND DATE(created_at) = DATE('now')
-          `).bind(userId).first<{ count: number }>()
+          // 6. 计算学习目标（从已获取的数据计算）
+          const todayStart = new Date(today).toISOString()
+          const weekStart = new Date()
+          weekStart.setDate(weekStart.getDate() - 7)
+          const monthStart = new Date()
+          monthStart.setDate(monthStart.getDate() - 30)
 
-          const weekQuestions = await env.DB.prepare(`
-            SELECT COALESCE(SUM(total_questions), 0) as count
+          // 获取各时间段的题目数
+          const goalSessions = await env.DB.prepare(`
+            SELECT questions, created_at
             FROM quiz_sessions
             WHERE user_id = ? AND status = 'completed' 
-              AND created_at >= datetime('now', '-7 days')
-          `).bind(userId).first<{ count: number }>()
+              AND created_at >= ?
+          `).bind(userId, monthStart.toISOString()).all()
 
-          const monthQuestions = await env.DB.prepare(`
-            SELECT COALESCE(SUM(total_questions), 0) as count
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed' 
-              AND created_at >= datetime('now', '-30 days')
-          `).bind(userId).first<{ count: number }>()
+          let todayCount = 0
+          let weekCount = 0
+          let monthCount = 0
+
+          for (const row of (goalSessions.results || [])) {
+            let questionsCount = 0
+            try {
+              const questionsArr = JSON.parse(row.questions as string || '[]')
+              questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0
+            } catch {}
+
+            const createdAt = new Date(row.created_at as string)
+            
+            monthCount += questionsCount
+            
+            if (createdAt >= weekStart) {
+              weekCount += questionsCount
+            }
+            
+            if ((row.created_at as string).startsWith(today)) {
+              todayCount += questionsCount
+            }
+          }
 
           const goals = [
-            { id: '1', title: '每日刷题', target: 20, current: todayQuestions?.count || 0, deadline: today, type: 'daily' },
-            { id: '2', title: '本周目标', target: 100, current: weekQuestions?.count || 0, deadline: today, type: 'weekly' },
-            { id: '3', title: '月度挑战', target: 500, current: monthQuestions?.count || 0, deadline: today, type: 'monthly' },
+            { id: '1', title: '每日刷题', target: 20, current: todayCount, deadline: today, type: 'daily' },
+            { id: '2', title: '本周目标', target: 100, current: weekCount, deadline: today, type: 'weekly' },
+            { id: '3', title: '月度挑战', target: 500, current: monthCount, deadline: today, type: 'monthly' },
           ]
 
           return jsonResponse({
