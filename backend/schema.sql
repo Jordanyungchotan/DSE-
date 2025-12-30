@@ -599,3 +599,340 @@ CREATE INDEX IF NOT EXISTS idx_wrong_questions_user ON wrong_questions(user_id);
 CREATE INDEX IF NOT EXISTS idx_wrong_questions_subject ON wrong_questions(subject);
 CREATE INDEX IF NOT EXISTS idx_wrong_questions_status ON wrong_questions(status);
 
+-- =====================
+-- DSE水平测试系统相关表
+-- =====================
+
+-- 水平测试主表
+CREATE TABLE IF NOT EXISTS level_tests (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  
+  -- 测试配置
+  grade TEXT NOT NULL,                    -- '中四' | '中五' | '中六'
+  subject TEXT NOT NULL,                  -- 科目名称
+  test_type TEXT DEFAULT 'full',          -- 'quick'(15-20题) | 'full'(25-30题)
+  
+  -- 测试状态
+  status TEXT DEFAULT 'pending',          -- 'pending' | 'in_progress' | 'completed' | 'graded' | 'expired'
+  
+  -- 评分结果
+  raw_score REAL,                         -- 原始得分
+  weighted_score REAL,                    -- 加权得分
+  final_score REAL,                       -- 最终得分（0-100）
+  level TEXT,                             -- DSE等级
+  percentile REAL,                        -- 百分位排名
+  
+  -- 多维分析得分
+  dimension_scores TEXT,                  -- JSON
+  
+  -- 时间相关
+  time_limit INTEGER,                     -- 时间限制（秒）
+  time_spent INTEGER DEFAULT 0,           -- 实际用时（秒）
+  started_at TEXT,                        -- 开始时间
+  completed_at TEXT,                      -- 完成时间
+  graded_at TEXT,                         -- 批改完成时间
+  
+  -- 进度追踪
+  current_question_index INTEGER DEFAULT 0,
+  answered_count INTEGER DEFAULT 0,
+  
+  -- 元数据
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 测试题目表
+CREATE TABLE IF NOT EXISTS test_questions (
+  id TEXT PRIMARY KEY,
+  test_id TEXT NOT NULL,
+  
+  -- 题目基本信息
+  question_index INTEGER NOT NULL,
+  question_text TEXT NOT NULL,
+  question_type TEXT NOT NULL,             -- 'choice' | 'short' | 'long'
+  
+  -- 选择题专用
+  options TEXT,                            -- JSON
+  
+  -- 答案与评分
+  correct_answer TEXT NOT NULL,
+  scoring_points TEXT,                     -- JSON
+  max_score REAL DEFAULT 1.0,
+  
+  -- 用户作答
+  user_answer TEXT,
+  user_score REAL,
+  auto_graded INTEGER DEFAULT 0,
+  manual_graded INTEGER DEFAULT 0,
+  grading_feedback TEXT,
+  
+  -- 题目属性
+  difficulty TEXT DEFAULT 'medium',
+  difficulty_weight REAL DEFAULT 1.0,
+  estimated_time INTEGER DEFAULT 120,
+  actual_time INTEGER,
+  
+  -- 知识点关联
+  knowledge_points TEXT,                   -- JSON
+  dse_reference TEXT,
+  topic TEXT,
+  
+  -- 标记
+  is_marked INTEGER DEFAULT 0,
+  is_skipped INTEGER DEFAULT 0,
+  
+  -- 时间追踪
+  answered_at TEXT,
+  
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE
+);
+
+-- 题目缓存表
+CREATE TABLE IF NOT EXISTS question_cache (
+  id TEXT PRIMARY KEY,
+  
+  -- 题目分类
+  grade TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  topic TEXT,
+  question_type TEXT NOT NULL,
+  difficulty TEXT NOT NULL,
+  
+  -- 题目内容
+  question_text TEXT NOT NULL,
+  options TEXT,
+  correct_answer TEXT NOT NULL,
+  scoring_points TEXT,
+  knowledge_points TEXT,
+  dse_reference TEXT,
+  estimated_time INTEGER DEFAULT 120,
+  
+  -- 质量指标
+  usage_count INTEGER DEFAULT 0,
+  avg_score REAL,
+  avg_time REAL,
+  discrimination_index REAL,
+  quality_rating REAL DEFAULT 3.0,
+  
+  -- 审核状态
+  review_status TEXT DEFAULT 'pending',
+  reviewed_by TEXT,
+  reviewed_at TEXT,
+  review_notes TEXT,
+  
+  -- 生成来源
+  source TEXT DEFAULT 'ai',
+  ai_model TEXT,
+  
+  -- 时间
+  last_used TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 测试报告表
+CREATE TABLE IF NOT EXISTS test_reports (
+  id TEXT PRIMARY KEY,
+  test_id TEXT NOT NULL UNIQUE,
+  user_id TEXT NOT NULL,
+  
+  -- 总体评估
+  overall_level TEXT NOT NULL,
+  overall_score REAL NOT NULL,
+  grade_equivalent TEXT,
+  
+  -- 能力维度分析
+  ability_radar TEXT NOT NULL,             -- JSON
+  
+  -- 知识点分析
+  strength_points TEXT,                    -- JSON
+  weakness_points TEXT,                    -- JSON
+  
+  -- 错误分析
+  error_patterns TEXT,                     -- JSON
+  common_mistakes TEXT,                    -- JSON
+  
+  -- 学习建议
+  recommendations TEXT,                    -- JSON
+  study_plan TEXT,                         -- JSON
+  expected_progress TEXT,                  -- JSON
+  
+  -- 对比分析
+  peer_comparison TEXT,                    -- JSON
+  historical_comparison TEXT,              -- JSON
+  
+  -- 报告生成
+  generated_by TEXT DEFAULT 'ai',
+  generated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  -- 元数据
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 知识点掌握度表
+CREATE TABLE IF NOT EXISTS test_knowledge_mastery (
+  id TEXT PRIMARY KEY,
+  test_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  
+  knowledge_point TEXT NOT NULL,
+  topic TEXT,
+  subject TEXT NOT NULL,
+  grade TEXT NOT NULL,
+  
+  mastery_level TEXT,
+  mastery_score REAL,
+  
+  questions_count INTEGER DEFAULT 0,
+  correct_count INTEGER DEFAULT 0,
+  avg_time REAL,
+  
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 用户测试历史统计表
+CREATE TABLE IF NOT EXISTS user_test_stats (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE,
+  
+  total_tests INTEGER DEFAULT 0,
+  completed_tests INTEGER DEFAULT 0,
+  
+  subject_stats TEXT,                      -- JSON
+  grade_stats TEXT,                        -- JSON
+  
+  improvement_trend TEXT,                  -- JSON
+  best_level TEXT,
+  best_score REAL,
+  
+  last_test_at TEXT,
+  tests_this_month INTEGER DEFAULT 0,
+  tests_this_week INTEGER DEFAULT 0,
+  
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 测试自动保存表
+CREATE TABLE IF NOT EXISTS test_autosave (
+  id TEXT PRIMARY KEY,
+  test_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  
+  answers_snapshot TEXT NOT NULL,          -- JSON
+  current_index INTEGER NOT NULL,
+  time_remaining INTEGER NOT NULL,
+  marked_questions TEXT,                   -- JSON
+  
+  saved_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 题目审核队列表
+CREATE TABLE IF NOT EXISTS question_review_queue (
+  id TEXT PRIMARY KEY,
+  question_id TEXT NOT NULL,
+  source_type TEXT NOT NULL,               -- 'generated' | 'cached'
+  status TEXT DEFAULT 'pending',           -- 'pending' | 'approved' | 'rejected' | 'modified'
+  reviewer_id TEXT,
+  review_comments TEXT,
+  reviewed_at TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 评估算法校准日志
+CREATE TABLE IF NOT EXISTS grading_calibration_logs (
+  id TEXT PRIMARY KEY,
+  test_id TEXT NOT NULL,
+  question_id TEXT NOT NULL,
+  
+  ai_score REAL NOT NULL,
+  manual_score REAL NOT NULL,
+  score_difference REAL NOT NULL,
+  
+  adjustment_factor REAL,
+  calibration_notes TEXT,
+  
+  calibrated_by TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE
+);
+
+-- DSE课程大纲表
+CREATE TABLE IF NOT EXISTS dse_curriculum (
+  id TEXT PRIMARY KEY,
+  
+  subject TEXT NOT NULL,
+  grade TEXT NOT NULL,
+  module TEXT,
+  topic TEXT NOT NULL,
+  subtopic TEXT,
+  
+  learning_objectives TEXT,                -- JSON
+  key_concepts TEXT,                       -- JSON
+  skills_required TEXT,                    -- JSON
+  
+  exam_weight REAL,
+  typical_question_types TEXT,             -- JSON
+  difficulty_level TEXT,
+  
+  reference_code TEXT,
+  version TEXT DEFAULT '2024',
+  
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 水平测试相关索引
+CREATE INDEX IF NOT EXISTS idx_level_tests_user ON level_tests(user_id);
+CREATE INDEX IF NOT EXISTS idx_level_tests_status ON level_tests(status);
+CREATE INDEX IF NOT EXISTS idx_level_tests_grade_subject ON level_tests(grade, subject);
+CREATE INDEX IF NOT EXISTS idx_level_tests_created ON level_tests(created_at);
+CREATE INDEX IF NOT EXISTS idx_level_tests_level ON level_tests(level);
+
+CREATE INDEX IF NOT EXISTS idx_test_questions_test ON test_questions(test_id);
+CREATE INDEX IF NOT EXISTS idx_test_questions_type ON test_questions(question_type);
+CREATE INDEX IF NOT EXISTS idx_test_questions_difficulty ON test_questions(difficulty);
+CREATE INDEX IF NOT EXISTS idx_test_questions_index ON test_questions(test_id, question_index);
+
+CREATE INDEX IF NOT EXISTS idx_question_cache_grade_subject ON question_cache(grade, subject);
+CREATE INDEX IF NOT EXISTS idx_question_cache_difficulty ON question_cache(difficulty);
+CREATE INDEX IF NOT EXISTS idx_question_cache_type ON question_cache(question_type);
+CREATE INDEX IF NOT EXISTS idx_question_cache_quality ON question_cache(quality_rating);
+CREATE INDEX IF NOT EXISTS idx_question_cache_review ON question_cache(review_status);
+
+CREATE INDEX IF NOT EXISTS idx_test_reports_user ON test_reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_test_reports_test ON test_reports(test_id);
+CREATE INDEX IF NOT EXISTS idx_test_reports_level ON test_reports(overall_level);
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_mastery_test ON test_knowledge_mastery(test_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_mastery_user ON test_knowledge_mastery(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_test_stats_user ON user_test_stats(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_autosave_test ON test_autosave(test_id);
+CREATE INDEX IF NOT EXISTS idx_autosave_user ON test_autosave(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_review_queue_status ON question_review_queue(status);
+
+CREATE INDEX IF NOT EXISTS idx_curriculum_subject ON dse_curriculum(subject);
+CREATE INDEX IF NOT EXISTS idx_curriculum_grade ON dse_curriculum(grade);
+
