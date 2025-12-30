@@ -17,15 +17,24 @@
   --color-warning: #dd6b20;
   --color-error: #e53e3e;
   
+  /* 主题色 - 用于组件（兼容旧变量名） */
+  --accent-primary: #1a365d;
+  --accent-primary-rgb: 26, 54, 93;
+  --accent-secondary: #2b6cb0;
+  --accent-success: #38a169;
+  
   /* 背景色 */
   --bg-primary: #f7fafc;
   --bg-secondary: #edf2f7;
+  --bg-tertiary: #e2e8f0;
   --bg-card: #ffffff;
   --bg-dark: #1a202c;
+  --bg-hover: #f0f5ff;
   
   /* 文字颜色 */
   --text-primary: #1a202c;
   --text-secondary: #4a5568;
+  --text-tertiary: #718096;
   --text-muted: #718096;
   --text-light: #a0aec0;
   
