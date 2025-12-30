@@ -70,7 +70,7 @@ export default function LevelTestPage() {
       if (!testId) return
       
       try {
-        const response = await apiFetch(`/api/level-test/${testId}/questions`) as TestData & { error?: string }
+        const response = await apiFetch(`/api/level-test/${testId}/questions`) as unknown as TestData & { error?: string }
         
         if (response.testId) {
           setTestData(response)
@@ -196,7 +196,7 @@ export default function LevelTestPage() {
           answers: answersArray,
           totalTimeSpent
         })
-      }) as { success?: boolean; error?: string }
+      }) as unknown as { success?: boolean; error?: string }
       
       if (response.success) {
         message.success('测试已提交！')
@@ -510,7 +510,7 @@ export default function LevelTestPage() {
           <Button 
             key="submit" 
             type="primary" 
-            onClick={() => handleSubmit(false)}
+            onClick={() => handleSubmit()}
             loading={submitting}
           >
             确认提交

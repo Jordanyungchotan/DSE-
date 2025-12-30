@@ -87,7 +87,7 @@ export default function LevelTestSetupPage() {
       const response = await apiFetch('/api/level-test/generate', {
         method: 'POST',
         body: JSON.stringify({ grade, subject, testType })
-      }) as { success?: boolean; testId?: string; error?: string }
+      }) as unknown as { success?: boolean; testId?: string; error?: string }
 
       if (response.success) {
         message.success('测试已生成，即将开始')

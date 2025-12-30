@@ -78,7 +78,7 @@ export default function LevelTestReportPage() {
       if (!testId) return
       
       try {
-        const response = await apiFetch(`/api/level-test/${testId}/report`) as ReportData & { error?: string }
+        const response = await apiFetch(`/api/level-test/${testId}/report`) as unknown as ReportData & { error?: string }
         
         if (response.testId) {
           setReport(response)

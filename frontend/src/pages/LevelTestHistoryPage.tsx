@@ -53,7 +53,7 @@ export default function LevelTestHistoryPage() {
       if (filterSubject) url += `&subject=${encodeURIComponent(filterSubject)}`
       if (filterGrade) url += `&grade=${encodeURIComponent(filterGrade)}`
       
-      const response = await apiFetch(url) as { tests?: TestRecord[]; total?: number }
+      const response = await apiFetch(url) as unknown as { tests?: TestRecord[]; total?: number }
       
       if (response.tests) {
         setTests(response.tests)
