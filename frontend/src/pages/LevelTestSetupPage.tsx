@@ -84,17 +84,19 @@ export default function LevelTestSetupPage() {
 
     setLoading(true)
     try {
-      const response = await apiFetch('/api/level-test/generate', {
+      const res = await apiFetch('/api/level-test/generate', {
         method: 'POST',
         body: JSON.stringify({ grade, subject, testType })
-      }) as unknown as { success?: boolean; testId?: string; error?: string }
+      })
+      
+      const data = await res.json() as { success?: boolean; testId?: string; error?: string }
 
-      if (response.success) {
+      if (data.success && data.testId) {
         message.success('测试已生成，即将开始')
         // 跳转到测试页面
-        navigate(`/level-test/${response.testId}`)
+        navigate(`/level-test/${data.testId}`)
       } else {
-        message.error(response.error || '生成测试失败')
+        message.error(data.error || '生成测试失败')
       }
     } catch (error) {
       console.error('Generate test error:', error)

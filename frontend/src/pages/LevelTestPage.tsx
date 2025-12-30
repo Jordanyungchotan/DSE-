@@ -70,7 +70,8 @@ export default function LevelTestPage() {
       if (!testId) return
       
       try {
-        const response = await apiFetch(`/api/level-test/${testId}/questions`) as unknown as TestData & { error?: string }
+        const res = await apiFetch(`/api/level-test/${testId}/questions`)
+        const response = await res.json() as TestData & { error?: string }
         
         if (response.testId) {
           setTestData(response)
@@ -190,13 +191,14 @@ export default function LevelTestPage() {
       
       const totalTimeSpent = testData.timeLimit - timeRemaining
       
-      const response = await apiFetch(`/api/level-test/${testId}/submit`, {
+      const res = await apiFetch(`/api/level-test/${testId}/submit`, {
         method: 'POST',
         body: JSON.stringify({
           answers: answersArray,
           totalTimeSpent
         })
-      }) as unknown as { success?: boolean; error?: string }
+      })
+      const response = await res.json() as { success?: boolean; error?: string }
       
       if (response.success) {
         message.success('测试已提交！')

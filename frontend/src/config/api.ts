@@ -24,10 +24,43 @@ export function getApiUrl(path: string): string {
 }
 
 /**
- * 封装的 fetch 函数，自动添加 API 基础 URL
+ * 获取存储的 token
+ */
+function getAuthToken(): string | null {
+  try {
+    const authData = localStorage.getItem('auth-storage')
+    if (authData) {
+      const parsed = JSON.parse(authData)
+      return parsed?.state?.token || null
+    }
+  } catch {
+    // ignore parse error
+  }
+  return null
+}
+
+/**
+ * 封装的 fetch 函数，自动添加 API 基础 URL 和 Authorization header
  */
 export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
   const url = getApiUrl(path)
-  return fetch(url, options)
+  
+  // 获取 token
+  const token = getAuthToken()
+  
+  // 合并 headers
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(options?.headers || {}),
+  }
+  
+  // 如果有 token，添加 Authorization header
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
+  }
+  
+  return fetch(url, {
+    ...options,
+    headers,
+  })
 }
-
