@@ -506,6 +506,152 @@
   margin-top: 4px;
 }
 
+/* ===== 水平测试入口 ===== */
+.levelTestSection {
+  padding: 60px 0;
+}
+
+.levelTestCard {
+  border-radius: 28px;
+  border: none;
+  background: linear-gradient(145deg, #f0fff4 0%, #e6fffa 50%, #f0f9ff 100%);
+  box-shadow: 0 20px 50px rgba(56, 161, 105, 0.12);
+  overflow: hidden;
+  position: relative;
+}
+
+.levelTestCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #52c41a, #1890ff, #722ed1);
+}
+
+.levelTestCard :global(.ant-card-body) {
+  padding: 48px;
+}
+
+.levelTestVisual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+}
+
+.levelTestBadge {
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #52c41a, #1890ff);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 15px 40px rgba(82, 196, 26, 0.3);
+}
+
+.levelTestBadgeIcon {
+  font-size: 48px;
+  color: white;
+}
+
+.levelTestLevels {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.levelTestLevel {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: levelPop 0.5s ease-out forwards;
+  opacity: 0;
+  transform: scale(0.8);
+}
+
+@keyframes levelPop {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.levelTestContent {
+  max-width: 550px;
+}
+
+.levelTestTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.1), rgba(24, 144, 255, 0.1));
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #52c41a;
+  margin-bottom: 20px;
+}
+
+.levelTestDesc {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  line-height: 1.8;
+  margin-bottom: 24px !important;
+}
+
+.levelTestFeatures {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.levelTestFeatureItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.levelTestFeatureItem span {
+  opacity: 0.9;
+}
+
+.levelTestButtons {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.levelTestPrimaryBtn {
+  height: 48px;
+  padding: 0 32px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #52c41a 0%, #1890ff 100%);
+  box-shadow: 0 8px 20px rgba(82, 196, 26, 0.3);
+}
+
+.levelTestPrimaryBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(82, 196, 26, 0.4);
+}
+
 /* ===== 系统优势区域 ===== */
 .advantagesSection {
   padding: 100px 0;
@@ -1051,6 +1197,38 @@
     min-width: auto;
     width: 100%;
     margin-top: 24px;
+  }
+
+  /* 水平测试响应式 */
+  .levelTestCard :global(.ant-card-body) {
+    padding: 32px 24px;
+  }
+
+  .levelTestContent h2 {
+    font-size: 1.5rem !important;
+  }
+
+  .levelTestFeatures {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .levelTestButtons {
+    flex-direction: column;
+  }
+
+  .levelTestButtons button {
+    width: 100%;
+  }
+
+  .levelTestVisual {
+    margin-bottom: 24px;
+  }
+
+  .levelTestLevel {
+    width: 48px;
+    height: 48px;
+    font-size: 0.95rem;
   }
 
   .heroSection {

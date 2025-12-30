@@ -34,6 +34,10 @@ export const zhTW = {
     quizHistory: '刷題記錄',
     learningProfile: '學習檔案',
     leaderboard: '排行榜',
+    // 水平測試導航
+    levelTest: '水平測試',
+    startLevelTest: '開始測試',
+    levelTestHistory: '測試記錄',
   },
 
   // 系統名稱

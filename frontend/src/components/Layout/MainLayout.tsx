@@ -14,6 +14,8 @@ import {
   LineChartOutlined,
   TrophyOutlined,
   SettingOutlined,
+  SafetyCertificateOutlined,
+  FileSearchOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import { useLanguageStore } from '../../stores/languageStore'
@@ -69,6 +71,23 @@ const MainLayout = () => {
           key: '/quiz/profile',
           icon: <LineChartOutlined />,
           label: t('nav.learningProfile'),
+        },
+      ],
+    },
+    {
+      key: 'level-test-group',
+      icon: <SafetyCertificateOutlined />,
+      label: '水平测试',
+      children: [
+        {
+          key: '/level-test',
+          icon: <SafetyCertificateOutlined />,
+          label: '开始测试',
+        },
+        {
+          key: '/level-test/history',
+          icon: <FileSearchOutlined />,
+          label: '测试记录',
         },
       ],
     },

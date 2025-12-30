@@ -484,6 +484,88 @@ const HomePage = () => {
         </Card>
       </section>
 
+      {/* ===== 水平测试入口 ===== */}
+      <section className={styles.levelTestSection}>
+        <Card className={styles.levelTestCard}>
+          <Row gutter={[32, 32]} align="middle">
+            <Col xs={24} lg={10}>
+              <div className={styles.levelTestVisual}>
+                <div className={styles.levelTestBadge}>
+                  <SafetyOutlined className={styles.levelTestBadgeIcon} />
+                </div>
+                <div className={styles.levelTestLevels}>
+                  {['5**', '5*', '5', '4', '3'].map((level, idx) => (
+                    <div 
+                      key={level} 
+                      className={styles.levelTestLevel}
+                      style={{ 
+                        animationDelay: `${idx * 0.1}s`,
+                        background: idx === 0 ? 'linear-gradient(135deg, #52c41a, #73d13d)' : 
+                                   idx === 1 ? 'linear-gradient(135deg, #73d13d, #95de64)' :
+                                   idx === 2 ? 'linear-gradient(135deg, #1890ff, #40a9ff)' :
+                                   idx === 3 ? 'linear-gradient(135deg, #faad14, #ffc53d)' :
+                                   'linear-gradient(135deg, #ff7a45, #ffa940)'
+                      }}
+                    >
+                      {level}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </Col>
+            <Col xs={24} lg={14}>
+              <div className={styles.levelTestContent}>
+                <div className={styles.levelTestTag}>
+                  <TrophyOutlined /> 全新功能
+                </div>
+                <Title level={2}>
+                  <span className="gradient-title">DSE水平测试</span>
+                </Title>
+                <Paragraph className={styles.levelTestDesc}>
+                  精准评估您在香港DSE课程中的实际学业水平，获取DSE等级预测和个性化学习建议
+                </Paragraph>
+                <div className={styles.levelTestFeatures}>
+                  <div className={styles.levelTestFeatureItem}>
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <span>智能AI出题，符合考评局标准</span>
+                  </div>
+                  <div className={styles.levelTestFeatureItem}>
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <span>多维度能力评估，精准定位</span>
+                  </div>
+                  <div className={styles.levelTestFeatureItem}>
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <span>DSE等级预测 (1-5**)</span>
+                  </div>
+                  <div className={styles.levelTestFeatureItem}>
+                    <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                    <span>详细报告和学习建议</span>
+                  </div>
+                </div>
+                <div className={styles.levelTestButtons}>
+                  <Button
+                    type="primary"
+                    size="large"
+                    icon={<ExperimentOutlined />}
+                    onClick={() => navigate('/level-test')}
+                    className={styles.levelTestPrimaryBtn}
+                  >
+                    开始水平测试
+                  </Button>
+                  <Button
+                    size="large"
+                    icon={<FileSearchOutlined />}
+                    onClick={() => navigate('/level-test/history')}
+                  >
+                    查看测试记录
+                  </Button>
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </Card>
+      </section>
+
       {/* ===== 系统优势 ===== */}
       <section className={styles.advantagesSection}>
         <div className={styles.sectionHeader}>

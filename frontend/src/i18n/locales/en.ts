@@ -34,6 +34,10 @@ export const en = {
     quizHistory: 'Quiz History',
     learningProfile: 'Learning Profile',
     leaderboard: 'Leaderboard',
+    // Level Test Navigation
+    levelTest: 'Level Test',
+    startLevelTest: 'Start Test',
+    levelTestHistory: 'Test History',
   },
 
   // System

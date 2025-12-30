@@ -34,6 +34,10 @@ export const zhCN = {
     quizHistory: '刷题记录',
     learningProfile: '学习档案',
     leaderboard: '排行榜',
+    // 水平测试导航
+    levelTest: '水平测试',
+    startLevelTest: '开始测试',
+    levelTestHistory: '测试记录',
   },
 
   // 系统名称
