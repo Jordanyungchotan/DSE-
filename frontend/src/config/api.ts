@@ -28,7 +28,7 @@ export function getApiUrl(path: string): string {
  */
 function getAuthToken(): string | null {
   try {
-    const authData = localStorage.getItem('auth-storage')
+    const authData = localStorage.getItem('dse-auth-storage')
     if (authData) {
       const parsed = JSON.parse(authData)
       return parsed?.state?.token || null
