@@ -1,5 +1,5 @@
 -- DSE水平测试系统表迁移
--- 只创建新表，不修改已有表
+-- 仅创建新表，跳过已存在的表
 
 -- 水平测试主表
 CREATE TABLE IF NOT EXISTS level_tests (
@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS level_tests (
   current_question_index INTEGER DEFAULT 0,
   answered_count INTEGER DEFAULT 0,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 测试题目表
@@ -52,7 +53,8 @@ CREATE TABLE IF NOT EXISTS test_questions (
   is_marked INTEGER DEFAULT 0,
   is_skipped INTEGER DEFAULT 0,
   answered_at TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE
 );
 
 -- 题目缓存表
@@ -107,7 +109,9 @@ CREATE TABLE IF NOT EXISTS test_reports (
   generated_by TEXT DEFAULT 'ai',
   generated_at TEXT DEFAULT CURRENT_TIMESTAMP,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 知识点掌握度表
@@ -124,7 +128,9 @@ CREATE TABLE IF NOT EXISTS test_knowledge_mastery (
   questions_count INTEGER DEFAULT 0,
   correct_count INTEGER DEFAULT 0,
   avg_time REAL,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 用户测试历史统计表
@@ -142,7 +148,8 @@ CREATE TABLE IF NOT EXISTS user_test_stats (
   tests_this_month INTEGER DEFAULT 0,
   tests_this_week INTEGER DEFAULT 0,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 测试自动保存表
@@ -154,7 +161,9 @@ CREATE TABLE IF NOT EXISTS test_autosave (
   current_index INTEGER NOT NULL,
   time_remaining INTEGER NOT NULL,
   marked_questions TEXT,
-  saved_at TEXT DEFAULT CURRENT_TIMESTAMP
+  saved_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 题目审核队列表
@@ -181,7 +190,8 @@ CREATE TABLE IF NOT EXISTS grading_calibration_logs (
   adjustment_factor REAL,
   calibration_notes TEXT,
   calibrated_by TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (test_id) REFERENCES level_tests(id) ON DELETE CASCADE
 );
 
 -- DSE课程大纲表
@@ -225,4 +235,3 @@ CREATE INDEX IF NOT EXISTS idx_autosave_test ON test_autosave(test_id);
 CREATE INDEX IF NOT EXISTS idx_autosave_user ON test_autosave(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_review_queue_status ON question_review_queue(status);
-
