@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
   Card, Typography, Tag, Progress, Row, Col, Button, 
-  Collapse, Spin, Divider, List, Space, Alert
+  Collapse, Spin, Divider, List, Alert
 } from 'antd'
 import { 
   TrophyOutlined, 
@@ -78,7 +78,7 @@ export default function LevelTestReportPage() {
       if (!testId) return
       
       try {
-        const response = await apiFetch(`/api/level-test/${testId}/report`)
+        const response = await apiFetch(`/api/level-test/${testId}/report`) as ReportData & { error?: string }
         
         if (response.testId) {
           setReport(response)
@@ -152,8 +152,6 @@ export default function LevelTestReportPage() {
   }
 
   const correctCount = report.questions.filter(q => q.score === q.maxScore).length
-  const totalScore = report.questions.reduce((sum, q) => sum + q.maxScore, 0)
-  const earnedScore = report.questions.reduce((sum, q) => sum + q.score, 0)
 
   return (
     <div className={styles.container}>
@@ -297,7 +295,7 @@ export default function LevelTestReportPage() {
         <Card className={styles.card} title={<><BulbOutlined /> 学习建议</>}>
           <List
             dataSource={report.recommendations}
-            renderItem={(item, index) => (
+            renderItem={(item) => (
               <List.Item className={styles.recommendationItem}>
                 <div className={styles.recommendationContent}>
                   <div className={styles.recommendationHeader}>

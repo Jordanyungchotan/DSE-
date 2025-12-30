@@ -9,7 +9,6 @@ import {
   TrophyOutlined,
   SafetyCertificateOutlined
 } from '@ant-design/icons'
-import { useTranslation } from 'react-i18next'
 import { apiFetch } from '../config/api'
 import styles from './LevelTestSetupPage.module.css'
 
@@ -66,7 +65,6 @@ const TEST_TYPES = [
 ]
 
 export default function LevelTestSetupPage() {
-  const { t } = useTranslation()
   const navigate = useNavigate()
   
   const [grade, setGrade] = useState<string>('')
@@ -89,7 +87,7 @@ export default function LevelTestSetupPage() {
       const response = await apiFetch('/api/level-test/generate', {
         method: 'POST',
         body: JSON.stringify({ grade, subject, testType })
-      })
+      }) as { success?: boolean; testId?: string; error?: string }
 
       if (response.success) {
         message.success('测试已生成，即将开始')

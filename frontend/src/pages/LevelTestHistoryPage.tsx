@@ -53,11 +53,11 @@ export default function LevelTestHistoryPage() {
       if (filterSubject) url += `&subject=${encodeURIComponent(filterSubject)}`
       if (filterGrade) url += `&grade=${encodeURIComponent(filterGrade)}`
       
-      const response = await apiFetch(url)
+      const response = await apiFetch(url) as { tests?: TestRecord[]; total?: number }
       
       if (response.tests) {
         setTests(response.tests)
-        setTotal(response.total)
+        setTotal(response.total || 0)
       }
     } catch (error) {
       console.error('Load history error:', error)

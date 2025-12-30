@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
   Card, Button, message, Typography, Radio, Input, Progress, 
-  Modal, Tag, Tooltip, Spin, Badge, Space, Divider 
+  Modal, Tag, Tooltip, Spin, Space, Divider 
 } from 'antd'
 import { 
   ClockCircleOutlined, 
@@ -70,7 +70,7 @@ export default function LevelTestPage() {
       if (!testId) return
       
       try {
-        const response = await apiFetch(`/api/level-test/${testId}/questions`)
+        const response = await apiFetch(`/api/level-test/${testId}/questions`) as TestData & { error?: string }
         
         if (response.testId) {
           setTestData(response)
@@ -172,10 +172,10 @@ export default function LevelTestPage() {
 
   const handleAutoSubmit = async () => {
     message.warning('时间到！正在自动提交...')
-    await handleSubmit(true)
+    await handleSubmit()
   }
 
-  const handleSubmit = async (isAutoSubmit = false) => {
+  const handleSubmit = async () => {
     if (!testId || !testData) return
     
     setSubmitting(true)
@@ -196,7 +196,7 @@ export default function LevelTestPage() {
           answers: answersArray,
           totalTimeSpent
         })
-      })
+      }) as { success?: boolean; error?: string }
       
       if (response.success) {
         message.success('测试已提交！')
