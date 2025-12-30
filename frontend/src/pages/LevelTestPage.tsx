@@ -52,6 +52,7 @@ export default function LevelTestPage() {
   
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [gradingStatus, setGradingStatus] = useState<string>('')
   const [testData, setTestData] = useState<TestData | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
@@ -181,6 +182,7 @@ export default function LevelTestPage() {
     
     setSubmitting(true)
     setShowSubmitModal(false)
+    setGradingStatus('正在提交答案...')
     
     try {
       const answersArray = Object.entries(answers).map(([questionId, answer]) => ({
@@ -191,6 +193,25 @@ export default function LevelTestPage() {
       
       const totalTimeSpent = testData.timeLimit - timeRemaining
       
+      // 显示批改进度
+      setGradingStatus('正在批改试卷...')
+      
+      // 模拟进度更新
+      const progressMessages = [
+        '正在评估选择题...',
+        '正在分析简答题...',
+        '正在评估论述题...',
+        '正在生成学习报告...',
+        '即将完成...'
+      ]
+      let msgIndex = 0
+      const progressInterval = setInterval(() => {
+        if (msgIndex < progressMessages.length) {
+          setGradingStatus(progressMessages[msgIndex])
+          msgIndex++
+        }
+      }, 3000)
+      
       const res = await apiFetch(`/api/level-test/${testId}/submit`, {
         method: 'POST',
         body: JSON.stringify({
@@ -198,16 +219,23 @@ export default function LevelTestPage() {
           totalTimeSpent
         })
       })
+      
+      clearInterval(progressInterval)
       const response = await res.json() as { success?: boolean; error?: string }
       
       if (response.success) {
+        setGradingStatus('批改完成！正在跳转到报告页面...')
         message.success('测试已提交！')
-        navigate(`/level-test/${testId}/report`)
+        setTimeout(() => {
+          navigate(`/level-test/${testId}/report`)
+        }, 1000)
       } else {
+        setGradingStatus('')
         message.error(response.error || '提交失败')
       }
     } catch (error) {
       console.error('Submit error:', error)
+      setGradingStatus('')
       message.error('提交失败，请重试')
     } finally {
       setSubmitting(false)
@@ -293,6 +321,27 @@ export default function LevelTestPage() {
 
   return (
     <div className={styles.container}>
+      {/* 批改中遮罩层 */}
+      {submitting && (
+        <div className={styles.gradingOverlay}>
+          <div className={styles.gradingContent}>
+            <Spin size="large" />
+            <Title level={3} className={styles.gradingTitle}>正在批改试卷</Title>
+            <Text className={styles.gradingStatus}>{gradingStatus}</Text>
+            <div className={styles.gradingTips}>
+              <Text type="secondary">批改需要一些时间，请耐心等待...</Text>
+              <Text type="secondary">系统正在使用AI对您的答案进行评估</Text>
+            </div>
+            <Progress 
+              type="circle" 
+              percent={gradingStatus.includes('完成') ? 100 : undefined} 
+              status={gradingStatus.includes('完成') ? 'success' : 'active'}
+              strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* 顶部状态栏 */}
       <div className={styles.topBar}>
         <div className={styles.testInfo}>
