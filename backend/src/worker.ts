@@ -619,6 +619,219 @@ function generateBasicRecommendations(
   }))
 }
 
+// 详细能力雷达图计算
+function calculateDetailedAbilityRadar(
+  questions: Record<string, unknown>[],
+  gradingResults: Array<{ questionId: string; isCorrect: boolean; score: number; maxScore: number }>
+): { knowledge: number; application: number; analysis: number; synthesis: number; evaluation: number } {
+  const dimensions = {
+    knowledge: { score: 0, max: 0 },
+    application: { score: 0, max: 0 },
+    analysis: { score: 0, max: 0 },
+    synthesis: { score: 0, max: 0 },
+    evaluation: { score: 0, max: 0 }
+  }
+
+  for (const result of gradingResults) {
+    const question = questions.find(q => q.id === result.questionId)
+    if (!question) continue
+
+    const questionType = question.question_type as string
+    const difficulty = question.difficulty as string
+    const score = result.score
+    const maxScore = result.maxScore
+
+    // 根据题目类型和难度分配到不同能力维度
+    if (questionType === 'choice') {
+      // 选择题主要考察知识理解
+      dimensions.knowledge.score += score * 0.7
+      dimensions.knowledge.max += maxScore * 0.7
+      dimensions.application.score += score * 0.3
+      dimensions.application.max += maxScore * 0.3
+    } else if (questionType === 'short') {
+      // 短答题考察应用和分析能力
+      dimensions.application.score += score * 0.4
+      dimensions.application.max += maxScore * 0.4
+      dimensions.analysis.score += score * 0.4
+      dimensions.analysis.max += maxScore * 0.4
+      dimensions.knowledge.score += score * 0.2
+      dimensions.knowledge.max += maxScore * 0.2
+    } else if (questionType === 'long') {
+      // 论述题考察综合和评价能力
+      dimensions.synthesis.score += score * 0.35
+      dimensions.synthesis.max += maxScore * 0.35
+      dimensions.evaluation.score += score * 0.35
+      dimensions.evaluation.max += maxScore * 0.35
+      dimensions.analysis.score += score * 0.3
+      dimensions.analysis.max += maxScore * 0.3
+    }
+
+    // 高难度题额外贡献评价维度
+    if (difficulty === 'hard') {
+      dimensions.evaluation.score += score * 0.2
+      dimensions.evaluation.max += maxScore * 0.2
+    }
+  }
+
+  // 计算百分比得分
+  const calcPercent = (dim: { score: number; max: number }) =>
+    dim.max > 0 ? Math.min(100, Math.round((dim.score / dim.max) * 100)) : 50
+
+  return {
+    knowledge: calcPercent(dimensions.knowledge),
+    application: calcPercent(dimensions.application),
+    analysis: calcPercent(dimensions.analysis),
+    synthesis: calcPercent(dimensions.synthesis),
+    evaluation: calcPercent(dimensions.evaluation)
+  }
+}
+
+// AI个性化报告生成
+async function generateAIPersonalizedReport(
+  apiKey: string,
+  testInfo: {
+    subject: string
+    grade: string
+    score: number
+    level: string
+    abilityRadar: Record<string, number>
+    strengthPoints: string[]
+    weaknessPoints: string[]
+    totalQuestions: number
+    correctCount: number
+    timeSpent: number
+  }
+): Promise<{
+  summary: string
+  detailedAnalysis: string
+  recommendations: Array<{
+    priority: number
+    topic: string
+    currentLevel: string
+    targetLevel: string
+    actionPlan: string
+    resources: string[]
+    estimatedTime: string
+  }>
+  progressTimeline: {
+    week1: string
+    week2: string
+    month1: string
+    month3: string
+  }
+  encouragement: string
+}> {
+  try {
+    const prompt = `作为一位专业的DSE学业顾问，请根据以下测试结果，为学生生成详细的个性化学习建议报告。
+
+【测试信息】
+- 科目：${testInfo.subject}
+- 年级：${testInfo.grade}
+- 得分：${testInfo.score}分
+- DSE预测等级：${testInfo.level}
+- 答题情况：${testInfo.correctCount}/${testInfo.totalQuestions} 题正确
+- 用时：${Math.floor(testInfo.timeSpent / 60)}分钟
+
+【能力维度分析】
+- 知识理解：${testInfo.abilityRadar.knowledge}%
+- 应用能力：${testInfo.abilityRadar.application}%
+- 分析能力：${testInfo.abilityRadar.analysis}%
+- 综合能力：${testInfo.abilityRadar.synthesis}%
+- 评价能力：${testInfo.abilityRadar.evaluation}%
+
+【优势知识点】
+${testInfo.strengthPoints.length > 0 ? testInfo.strengthPoints.join('、') : '暂无突出优势'}
+
+【薄弱知识点】
+${testInfo.weaknessPoints.length > 0 ? testInfo.weaknessPoints.join('、') : '表现均衡'}
+
+请生成一份包含以下内容的JSON格式报告：
+{
+  "summary": "2-3句话总结学生整体水平",
+  "detailedAnalysis": "详细分析各能力维度的表现和改进方向",
+  "recommendations": [
+    {
+      "priority": 1,
+      "topic": "需要改进的知识点",
+      "currentLevel": "当前水平描述",
+      "targetLevel": "目标水平",
+      "actionPlan": "具体行动计划（100字左右）",
+      "resources": ["推荐资源1", "推荐资源2"],
+      "estimatedTime": "预计所需时间"
+    }
+  ],
+  "progressTimeline": {
+    "week1": "第一周目标",
+    "week2": "第二周目标",
+    "month1": "第一个月目标",
+    "month3": "三个月后目标"
+  },
+  "encouragement": "鼓励性话语，给予学生信心"
+}
+
+请只返回JSON，不要有其他内容。`
+
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: '你是一位经验丰富的香港DSE学业规划顾问，擅长为学生制定个性化的学习计划。' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7,
+        max_tokens: 2000
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error('AI API error')
+    }
+
+    const data = await response.json() as {
+      choices: Array<{ message: { content: string } }>
+    }
+
+    let content = data.choices[0]?.message?.content || '{}'
+    
+    // 清理JSON
+    if (content.startsWith('```json')) content = content.slice(7)
+    if (content.startsWith('```')) content = content.slice(3)
+    if (content.endsWith('```')) content = content.slice(0, -3)
+    content = content.trim()
+
+    return JSON.parse(content)
+  } catch (error) {
+    console.error('Generate AI report error:', error)
+    
+    // 返回基础报告
+    return {
+      summary: `您在${testInfo.subject}科目的水平测试中获得了${testInfo.score}分，预测DSE等级为${testInfo.level}。`,
+      detailedAnalysis: `根据测试结果，您的知识理解能力表现${testInfo.abilityRadar.knowledge >= 70 ? '良好' : '需要加强'}，应用能力${testInfo.abilityRadar.application >= 70 ? '达标' : '有待提升'}。建议针对薄弱知识点进行专项练习。`,
+      recommendations: testInfo.weaknessPoints.slice(0, 3).map((point, idx) => ({
+        priority: idx + 1,
+        topic: point,
+        currentLevel: '基础薄弱',
+        targetLevel: '熟练掌握',
+        actionPlan: `建议每天花30分钟复习${point}相关内容，从基础概念入手，配合练习题巩固。`,
+        resources: [`${testInfo.subject} ${point} 教程`, `DSE历年真题`],
+        estimatedTime: '2-3周'
+      })),
+      progressTimeline: {
+        week1: '巩固基础概念，完成基础练习',
+        week2: '进行综合练习，查漏补缺',
+        month1: '完成系统复习，尝试模拟测试',
+        month3: '达到目标等级，保持学习习惯'
+      },
+      encouragement: '学习是一个持续进步的过程，每一次努力都会让你离目标更近一步。加油！'
+    }
+  }
+}
+
 // 水平测试知识点库
 const LEVEL_TEST_TOPICS: Record<string, Record<string, string[]>> = {
   '数学': {
@@ -661,6 +874,211 @@ const LEVEL_TEST_TOPICS: Record<string, Record<string, string[]>> = {
     '中五': ['全球化', '能源与环境', '科技发展', '人权法治'],
     '中六': ['综合议题', '独立专题研究', '批判思维']
   }
+}
+
+// ===== 题目缓存系统 =====
+
+interface CachedQuestion {
+  id: string
+  questionText: string
+  questionType: 'choice' | 'short' | 'long'
+  options?: string[]
+  correctAnswer: string
+  scoringPoints?: string[]
+  difficulty: 'easy' | 'medium' | 'hard'
+  difficultyWeight: number
+  estimatedTime: number
+  knowledgePoints: string[]
+  topic?: string
+  maxScore: number
+}
+
+// 从缓存获取题目
+async function getQuestionsFromCache(
+  db: D1Database,
+  subject: string,
+  grade: string,
+  questionType: 'choice' | 'short' | 'long',
+  difficulty: 'easy' | 'medium' | 'hard',
+  count: number
+): Promise<CachedQuestion[]> {
+  try {
+    // 查询已审核的高质量缓存题目
+    const result = await db.prepare(`
+      SELECT * FROM question_cache 
+      WHERE subject = ? AND grade = ? AND question_type = ? AND difficulty = ?
+        AND review_status = 'approved' AND quality_rating >= 3.0
+      ORDER BY RANDOM()
+      LIMIT ?
+    `).bind(subject, grade, questionType, difficulty, count).all()
+
+    const difficultyWeights = { easy: 0.8, medium: 1.0, hard: 1.3 }
+    const estimatedTimes = {
+      choice: { easy: 30, medium: 60, hard: 90 },
+      short: { easy: 120, medium: 180, hard: 240 },
+      long: { easy: 300, medium: 420, hard: 600 }
+    }
+    const maxScores = {
+      choice: { easy: 1, medium: 1, hard: 2 },
+      short: { easy: 2, medium: 3, hard: 4 },
+      long: { easy: 4, medium: 6, hard: 8 }
+    }
+
+    return result.results.map((q: Record<string, unknown>) => ({
+      id: crypto.randomUUID(), // 使用新ID避免重复
+      questionText: q.question_text as string,
+      questionType: q.question_type as 'choice' | 'short' | 'long',
+      options: q.options ? JSON.parse(q.options as string) : undefined,
+      correctAnswer: q.correct_answer as string,
+      scoringPoints: q.scoring_points ? JSON.parse(q.scoring_points as string) : undefined,
+      difficulty: q.difficulty as 'easy' | 'medium' | 'hard',
+      difficultyWeight: difficultyWeights[difficulty],
+      estimatedTime: estimatedTimes[questionType][difficulty],
+      knowledgePoints: q.knowledge_points ? JSON.parse(q.knowledge_points as string) : [],
+      topic: q.topic as string | undefined,
+      maxScore: maxScores[questionType][difficulty]
+    }))
+  } catch (error) {
+    console.error('Get cached questions error:', error)
+    return []
+  }
+}
+
+// 保存题目到缓存
+async function saveQuestionsToCache(
+  db: D1Database,
+  subject: string,
+  grade: string,
+  questions: CachedQuestion[]
+): Promise<void> {
+  try {
+    const now = new Date().toISOString()
+    
+    for (const q of questions) {
+      // 检查是否已存在相似题目（简单去重）
+      const existing = await db.prepare(`
+        SELECT id FROM question_cache 
+        WHERE subject = ? AND grade = ? AND question_type = ? 
+          AND question_text = ?
+        LIMIT 1
+      `).bind(subject, grade, q.questionType, q.questionText).first()
+
+      if (!existing) {
+        const cacheId = crypto.randomUUID()
+        await db.prepare(`
+          INSERT INTO question_cache (
+            id, grade, subject, topic, question_type, difficulty,
+            question_text, options, correct_answer, scoring_points,
+            knowledge_points, estimated_time, usage_count,
+            review_status, source, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'pending', 'ai', ?, ?)
+        `).bind(
+          cacheId,
+          grade,
+          subject,
+          q.topic || null,
+          q.questionType,
+          q.difficulty,
+          q.questionText,
+          q.options ? JSON.stringify(q.options) : null,
+          q.correctAnswer,
+          q.scoringPoints ? JSON.stringify(q.scoringPoints) : null,
+          JSON.stringify(q.knowledgePoints),
+          q.estimatedTime,
+          now,
+          now
+        ).run()
+      }
+    }
+  } catch (error) {
+    console.error('Save questions to cache error:', error)
+  }
+}
+
+// 更新缓存题目使用统计
+async function updateCacheUsageStats(
+  db: D1Database,
+  questionIds: string[]
+): Promise<void> {
+  try {
+    const now = new Date().toISOString()
+    for (const id of questionIds) {
+      await db.prepare(`
+        UPDATE question_cache 
+        SET usage_count = usage_count + 1, last_used = ?
+        WHERE id = ?
+      `).bind(now, id).run()
+    }
+  } catch (error) {
+    console.error('Update cache usage stats error:', error)
+  }
+}
+
+// 水平测试题目生成函数（带缓存支持）
+async function generateLevelTestQuestionsWithCache(
+  db: D1Database,
+  subject: string,
+  grade: string,
+  distribution: { choice: number; short: number; long: number },
+  apiKey: string
+): Promise<CachedQuestion[]> {
+  const allQuestions: CachedQuestion[] = []
+  const questionsToGenerate: { type: 'choice' | 'short' | 'long'; count: number }[] = []
+
+  // 难度分配
+  const difficultyDistribution = (count: number) => ({
+    easy: Math.round(count * 0.3),
+    medium: Math.round(count * 0.5),
+    hard: count - Math.round(count * 0.3) - Math.round(count * 0.5)
+  })
+
+  // 尝试从缓存获取题目
+  for (const [type, count] of Object.entries(distribution) as [('choice' | 'short' | 'long'), number][]) {
+    const diffDist = difficultyDistribution(count)
+    let typeQuestions: CachedQuestion[] = []
+    let neededCount = count
+
+    for (const [diff, diffCount] of Object.entries(diffDist) as [('easy' | 'medium' | 'hard'), number][]) {
+      if (diffCount > 0) {
+        const cached = await getQuestionsFromCache(db, subject, grade, type, diff, diffCount)
+        typeQuestions = typeQuestions.concat(cached)
+        neededCount -= cached.length
+      }
+    }
+
+    allQuestions.push(...typeQuestions)
+
+    // 记录需要生成的数量
+    if (neededCount > 0) {
+      questionsToGenerate.push({ type, count: neededCount })
+    }
+  }
+
+  // 如果缓存不足，调用AI生成新题目
+  if (questionsToGenerate.length > 0) {
+    const aiDistribution = {
+      choice: questionsToGenerate.find(q => q.type === 'choice')?.count || 0,
+      short: questionsToGenerate.find(q => q.type === 'short')?.count || 0,
+      long: questionsToGenerate.find(q => q.type === 'long')?.count || 0
+    }
+
+    // 只有当确实需要生成题目时才调用AI
+    if (aiDistribution.choice > 0 || aiDistribution.short > 0 || aiDistribution.long > 0) {
+      const aiQuestions = await generateLevelTestQuestions(subject, grade, aiDistribution, apiKey)
+      allQuestions.push(...aiQuestions)
+
+      // 异步保存到缓存（不阻塞响应）
+      saveQuestionsToCache(db, subject, grade, aiQuestions).catch(console.error)
+    }
+  }
+
+  // 如果题目仍然不足，使用备用题目
+  const totalNeeded = distribution.choice + distribution.short + distribution.long
+  if (allQuestions.length < totalNeeded * 0.8) {
+    return generateFallbackLevelTestQuestions(subject, grade, distribution)
+  }
+
+  return allQuestions
 }
 
 // 水平测试题目生成函数
@@ -4205,8 +4623,9 @@ export default {
           const testId = crypto.randomUUID()
           const now = new Date().toISOString()
 
-          // 生成题目（调用DeepSeek API）
-          const questions = await generateLevelTestQuestions(
+          // 生成题目（优先使用缓存，不足时调用AI）
+          const questions = await generateLevelTestQuestionsWithCache(
+            env.DB,
             body.subject,
             body.grade,
             config.distribution,
@@ -4589,21 +5008,33 @@ export default {
             }
           }
 
-          // 计算能力雷达图
-          const abilityRadar = {
-            knowledge: Math.min(100, Math.round(finalScore * 1.1)),
-            application: Math.round(finalScore * 0.95),
-            analysis: Math.round(finalScore * 0.9),
-            synthesis: Math.round(finalScore * 0.85),
-            evaluation: Math.round(finalScore * 0.8)
-          }
+          // 计算能力雷达图（更精确的计算）
+          const abilityRadar = calculateDetailedAbilityRadar(questions, gradingResults)
+
+          // 生成AI个性化报告（异步但等待结果）
+          const aiReport = await generateAIPersonalizedReport(
+            env.DEEPSEEK_API_KEY,
+            {
+              subject: test.subject as string,
+              grade: test.grade as string,
+              score: finalScore,
+              level,
+              abilityRadar,
+              strengthPoints,
+              weaknessPoints,
+              totalQuestions: questions.length,
+              correctCount: gradingResults.filter(r => r.isCorrect).length,
+              timeSpent: body.totalTimeSpent
+            }
+          )
 
           await env.DB.prepare(`
             INSERT INTO test_reports (
               id, test_id, user_id, overall_level, overall_score,
               grade_equivalent, ability_radar, strength_points,
-              weakness_points, recommendations, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              weakness_points, recommendations, error_patterns,
+              study_plan, expected_progress, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(
             reportId,
             testId,
@@ -4614,7 +5045,10 @@ export default {
             JSON.stringify(abilityRadar),
             JSON.stringify(strengthPoints),
             JSON.stringify(weaknessPoints),
-            JSON.stringify(generateBasicRecommendations(weaknessPoints, test.subject as string)),
+            JSON.stringify(aiReport.recommendations),
+            JSON.stringify({ summary: aiReport.summary, analysis: aiReport.detailedAnalysis }),
+            JSON.stringify(aiReport.progressTimeline),
+            JSON.stringify({ encouragement: aiReport.encouragement }),
             now
           ).run()
 

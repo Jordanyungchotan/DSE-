@@ -60,9 +60,26 @@ interface ReportData {
   recommendations: Array<{
     priority: number
     topic: string
-    suggestion: string
+    suggestion?: string
+    currentLevel?: string
+    targetLevel?: string
+    actionPlan?: string
     resources: string[]
+    estimatedTime?: string
   }>
+  errorPatterns?: {
+    summary?: string
+    analysis?: string
+  }
+  studyPlan?: {
+    week1?: string
+    week2?: string
+    month1?: string
+    month3?: string
+  }
+  expectedProgress?: {
+    encouragement?: string
+  }
   questions: Question[]
 }
 
@@ -290,9 +307,32 @@ export default function LevelTestReportPage() {
         </Col>
       </Row>
 
+      {/* AI分析总结 */}
+      {report.errorPatterns?.summary && (
+        <Card className={styles.card} title={<><BulbOutlined /> AI分析总结</>}>
+          <Alert
+            type="info"
+            message={report.errorPatterns.summary}
+            className={styles.summaryAlert}
+          />
+          {report.errorPatterns.analysis && (
+            <Paragraph className={styles.analysisText}>
+              {report.errorPatterns.analysis}
+            </Paragraph>
+          )}
+          {report.expectedProgress?.encouragement && (
+            <Alert
+              type="success"
+              message={report.expectedProgress.encouragement}
+              className={styles.encouragementAlert}
+            />
+          )}
+        </Card>
+      )}
+
       {/* 学习建议 */}
       {report.recommendations.length > 0 && (
-        <Card className={styles.card} title={<><BulbOutlined /> 学习建议</>}>
+        <Card className={styles.card} title={<><BulbOutlined /> 个性化学习建议</>}>
           <List
             dataSource={report.recommendations}
             renderItem={(item) => (
@@ -301,8 +341,20 @@ export default function LevelTestReportPage() {
                   <div className={styles.recommendationHeader}>
                     <Tag color="blue">优先级 {item.priority}</Tag>
                     <Text strong>{item.topic}</Text>
+                    {item.estimatedTime && (
+                      <Tag color="orange">预计 {item.estimatedTime}</Tag>
+                    )}
                   </div>
-                  <Paragraph className={styles.suggestion}>{item.suggestion}</Paragraph>
+                  {item.currentLevel && item.targetLevel && (
+                    <div className={styles.levelProgress}>
+                      <Tag color="red">{item.currentLevel}</Tag>
+                      <span>→</span>
+                      <Tag color="green">{item.targetLevel}</Tag>
+                    </div>
+                  )}
+                  <Paragraph className={styles.suggestion}>
+                    {item.actionPlan || item.suggestion}
+                  </Paragraph>
                   {item.resources.length > 0 && (
                     <div className={styles.resources}>
                       <Text type="secondary">推荐资源：</Text>
@@ -315,6 +367,38 @@ export default function LevelTestReportPage() {
               </List.Item>
             )}
           />
+        </Card>
+      )}
+
+      {/* 学习进度规划 */}
+      {report.studyPlan && (
+        <Card className={styles.card} title={<><ClockCircleOutlined /> 学习进度规划</>}>
+          <div className={styles.timeline}>
+            {report.studyPlan.week1 && (
+              <div className={styles.timelineItem}>
+                <Tag color="cyan">第1周</Tag>
+                <Text>{report.studyPlan.week1}</Text>
+              </div>
+            )}
+            {report.studyPlan.week2 && (
+              <div className={styles.timelineItem}>
+                <Tag color="blue">第2周</Tag>
+                <Text>{report.studyPlan.week2}</Text>
+              </div>
+            )}
+            {report.studyPlan.month1 && (
+              <div className={styles.timelineItem}>
+                <Tag color="purple">第1个月</Tag>
+                <Text>{report.studyPlan.month1}</Text>
+              </div>
+            )}
+            {report.studyPlan.month3 && (
+              <div className={styles.timelineItem}>
+                <Tag color="green">第3个月</Tag>
+                <Text>{report.studyPlan.month3}</Text>
+              </div>
+            )}
+          </div>
         </Card>
       )}
 

@@ -167,6 +167,62 @@
   gap: 8px;
 }
 
+/* AI分析总结 */
+.summaryAlert {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.analysisText {
+  color: var(--text-secondary);
+  line-height: 1.8;
+  margin-bottom: 16px !important;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.encouragementAlert {
+  border-radius: 8px;
+}
+
+/* 水平进度 */
+.levelProgress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.levelProgress span {
+  color: var(--text-tertiary);
+}
+
+/* 学习进度规划 */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.timelineItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  transition: transform 0.2s;
+}
+
+.timelineItem:hover {
+  transform: translateX(4px);
+}
+
+.timelineItem span:first-child {
+  flex-shrink: 0;
+}
+
 /* 题目详情 */
 .questionHeader {
   display: flex;
