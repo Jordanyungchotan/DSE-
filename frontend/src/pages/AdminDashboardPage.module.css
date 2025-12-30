@@ -69,6 +69,89 @@
   border-top: 1px solid #f0f0f0;
 }
 
+/* 科目分布卡片 */
+.subjectCard {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.subjectCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.subjectHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* 等级分布卡片 */
+.levelCard {
+  border-radius: 8px;
+  text-align: center;
+}
+
+.levelContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+
+/* 题目审核弹窗 */
+.reviewContent {
+  padding: 8px 0;
+}
+
+.reviewMeta {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.questionPreview {
+  margin-bottom: 20px;
+}
+
+.previewCard {
+  background: #fafafa;
+  border-radius: 8px;
+}
+
+.optionsList {
+  margin-top: 12px;
+  padding-left: 16px;
+}
+
+.optionItem {
+  padding: 6px 0;
+  color: #333;
+}
+
+.answerSection {
+  margin-top: 16px;
+  padding: 12px;
+  background: #e6f7ff;
+  border-radius: 6px;
+  border-left: 3px solid #1890ff;
+}
+
+.explanationSection {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f6ffed;
+  border-radius: 6px;
+  border-left: 3px solid #52c41a;
+}
+
+.reviewForm {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .main {

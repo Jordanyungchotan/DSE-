@@ -215,6 +215,124 @@ h1, h2, h3, h4, h5, h6 {
   .main-content {
     padding: 16px;
   }
+  
+  /* 移动端触摸优化 */
+  .ant-btn {
+    min-height: 44px; /* 触摸友好的最小高度 */
+    font-size: 15px;
+  }
+  
+  .ant-input,
+  .ant-select-selector,
+  .ant-picker {
+    min-height: 44px !important;
+    font-size: 16px !important; /* 防止iOS自动缩放 */
+  }
+  
+  .ant-table-cell {
+    padding: 12px 8px !important;
+    font-size: 13px;
+  }
+  
+  /* 移动端卡片间距优化 */
+  .ant-card {
+    margin-bottom: 12px;
+  }
+  
+  .ant-card-body {
+    padding: 16px;
+  }
+}
+
+/* 小屏幕设备 */
+@media (max-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+  
+  .main-content {
+    padding: 12px;
+  }
+  
+  .ant-card-body {
+    padding: 12px;
+  }
+  
+  /* 移动端表格横向滚动提示 */
+  .ant-table-wrapper {
+    position: relative;
+  }
+  
+  .ant-table-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.8));
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  
+  .ant-table-wrapper:hover::after {
+    opacity: 1;
+  }
+}
+
+/* 触摸设备优化 */
+@media (hover: none) and (pointer: coarse) {
+  /* 移除悬停效果，使用触摸反馈 */
+  .custom-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+  }
+  
+  .custom-card:active {
+    transform: scale(0.98);
+  }
+  
+  /* 增大点击区域 */
+  .ant-btn {
+    min-height: 44px;
+  }
+  
+  /* 禁用悬停状态样式 */
+  .ant-btn:hover {
+    transform: none;
+  }
+  
+  .ant-btn:active {
+    transform: scale(0.97);
+  }
+}
+
+/* 横屏优化 */
+@media (max-height: 500px) and (orientation: landscape) {
+  .main-content {
+    padding: 8px 16px;
+  }
+  
+  .ant-modal {
+    top: 5vh;
+  }
+  
+  .ant-modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+}
+
+/* 安全区域适配（iPhone X及以上） */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .ant-layout-footer {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+  
+  .ant-modal-footer {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  }
 }
 
 /* 滚动条美化 */

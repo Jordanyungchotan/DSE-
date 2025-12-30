@@ -283,6 +283,55 @@ const MainLayout = () => {
           </p>
         </div>
       </Footer>
+
+      {/* 移动端底部导航栏 */}
+      <div className={styles.mobileBottomBar}>
+        <Link 
+          to="/" 
+          className={`${styles.bottomNavItem} ${location.pathname === '/' ? styles.active : ''}`}
+        >
+          <HomeOutlined className={styles.icon} />
+          <span>{t('nav.home')}</span>
+        </Link>
+        <Link 
+          to="/quiz" 
+          className={`${styles.bottomNavItem} ${location.pathname.startsWith('/quiz') ? styles.active : ''}`}
+        >
+          <ExperimentOutlined className={styles.icon} />
+          <span>{t('nav.startQuiz')}</span>
+        </Link>
+        <Link 
+          to="/level-test" 
+          className={`${styles.bottomNavItem} ${location.pathname.startsWith('/level-test') ? styles.active : ''}`}
+        >
+          <SafetyCertificateOutlined className={styles.icon} />
+          <span>测试</span>
+        </Link>
+        <Link 
+          to="/leaderboard" 
+          className={`${styles.bottomNavItem} ${location.pathname === '/leaderboard' ? styles.active : ''}`}
+        >
+          <TrophyOutlined className={styles.icon} />
+          <span>{t('nav.leaderboard')}</span>
+        </Link>
+        {isAuthenticated ? (
+          <Link 
+            to="/settings" 
+            className={`${styles.bottomNavItem} ${location.pathname === '/settings' ? styles.active : ''}`}
+          >
+            <UserOutlined className={styles.icon} />
+            <span>我的</span>
+          </Link>
+        ) : (
+          <Link 
+            to="/login" 
+            className={`${styles.bottomNavItem} ${location.pathname === '/login' ? styles.active : ''}`}
+          >
+            <LoginOutlined className={styles.icon} />
+            <span>{t('nav.login')}</span>
+          </Link>
+        )}
+      </div>
     </Layout>
   )
 }

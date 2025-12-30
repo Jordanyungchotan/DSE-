@@ -3192,6 +3192,360 @@ export default {
       }
 
       // =====================
+      // 管理员 - 水平测试管理 API
+      // =====================
+
+      // 获取水平测试统计数据
+      if (path === '/api/admin/level-test/stats' && request.method === 'GET') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          // 测试总数
+          const totalTests = await env.DB.prepare(
+            'SELECT COUNT(*) as count FROM level_tests'
+          ).first() as { count: number } | null
+
+          // 已完成测试数
+          const completedTests = await env.DB.prepare(
+            'SELECT COUNT(*) as count FROM level_tests WHERE status = ?'
+          ).bind('graded').first() as { count: number } | null
+
+          // 今日测试数
+          const today = new Date().toISOString().split('T')[0]
+          const todayTests = await env.DB.prepare(
+            'SELECT COUNT(*) as count FROM level_tests WHERE DATE(created_at) = ?'
+          ).bind(today).first() as { count: number } | null
+
+          // 平均分数
+          const avgScore = await env.DB.prepare(
+            'SELECT AVG(score) as avg FROM level_tests WHERE score IS NOT NULL'
+          ).first() as { avg: number | null } | null
+
+          // 各科目测试分布
+          const subjectDistribution = await env.DB.prepare(
+            `SELECT subject, COUNT(*) as count, AVG(score) as avg_score 
+             FROM level_tests 
+             GROUP BY subject 
+             ORDER BY count DESC`
+          ).all()
+
+          // 各年级测试分布
+          const gradeDistribution = await env.DB.prepare(
+            `SELECT grade, COUNT(*) as count, AVG(score) as avg_score 
+             FROM level_tests 
+             GROUP BY grade`
+          ).all()
+
+          // 等级分布
+          const levelDistribution = await env.DB.prepare(
+            `SELECT overall_level, COUNT(*) as count 
+             FROM level_tests 
+             WHERE overall_level IS NOT NULL 
+             GROUP BY overall_level`
+          ).all()
+
+          // 缓存题目统计
+          const cachedQuestions = await env.DB.prepare(
+            'SELECT COUNT(*) as count FROM question_cache'
+          ).first() as { count: number } | null
+
+          // 待审核题目数
+          const pendingReviews = await env.DB.prepare(
+            'SELECT COUNT(*) as count FROM question_review_queue WHERE status = ?'
+          ).bind('pending').first() as { count: number } | null
+
+          return jsonResponse({
+            totalTests: totalTests?.count || 0,
+            completedTests: completedTests?.count || 0,
+            todayTests: todayTests?.count || 0,
+            averageScore: avgScore?.avg ? Math.round(avgScore.avg * 10) / 10 : 0,
+            subjectDistribution: subjectDistribution.results || [],
+            gradeDistribution: gradeDistribution.results || [],
+            levelDistribution: levelDistribution.results || [],
+            cachedQuestions: cachedQuestions?.count || 0,
+            pendingReviews: pendingReviews?.count || 0,
+          }, 200, origin)
+        } catch (e) {
+          console.error('Level test stats error:', e)
+          return errorResponse('获取统计数据失败', 500, origin)
+        }
+      }
+
+      // 获取待审核题目队列
+      if (path === '/api/admin/level-test/review-queue' && request.method === 'GET') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          const url = new URL(request.url)
+          const status = url.searchParams.get('status') || 'pending'
+          const limit = parseInt(url.searchParams.get('limit') || '20')
+          const offset = parseInt(url.searchParams.get('offset') || '0')
+
+          const reviews = await env.DB.prepare(
+            `SELECT qr.*, qc.question_data, qc.grade, qc.subject, qc.difficulty, qc.question_type
+             FROM question_review_queue qr
+             LEFT JOIN question_cache qc ON qr.question_id = qc.id
+             WHERE qr.status = ?
+             ORDER BY qr.created_at DESC
+             LIMIT ? OFFSET ?`
+          ).bind(status, limit, offset).all()
+
+          const total = await env.DB.prepare(
+            'SELECT COUNT(*) as count FROM question_review_queue WHERE status = ?'
+          ).bind(status).first() as { count: number } | null
+
+          return jsonResponse({
+            reviews: reviews.results || [],
+            total: total?.count || 0,
+          }, 200, origin)
+        } catch (e) {
+          console.error('Review queue error:', e)
+          return errorResponse('获取审核队列失败', 500, origin)
+        }
+      }
+
+      // 审核题目
+      if (path.startsWith('/api/admin/level-test/question/') && path.endsWith('/review') && request.method === 'PUT') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          const pathParts = path.split('/')
+          const questionId = pathParts[pathParts.length - 2]
+          
+          const body = await request.json() as {
+            status: 'approved' | 'rejected' | 'modified'
+            comments?: string
+            modifiedData?: string
+          }
+
+          const now = new Date().toISOString()
+
+          // 更新审核状态
+          await env.DB.prepare(
+            `UPDATE question_review_queue 
+             SET status = ?, review_comments = ?, reviewed_at = ?, updated_at = ?
+             WHERE question_id = ?`
+          ).bind(body.status, body.comments || '', now, now, questionId).run()
+
+          // 如果题目被修改，更新缓存中的题目数据
+          if (body.status === 'modified' && body.modifiedData) {
+            await env.DB.prepare(
+              `UPDATE question_cache SET question_data = ?, updated_at = ? WHERE id = ?`
+            ).bind(body.modifiedData, now, questionId).run()
+          }
+
+          // 如果题目被拒绝，从缓存中删除
+          if (body.status === 'rejected') {
+            await env.DB.prepare(
+              'DELETE FROM question_cache WHERE id = ?'
+            ).bind(questionId).run()
+          }
+
+          return jsonResponse({ success: true, message: '审核完成' }, 200, origin)
+        } catch (e) {
+          console.error('Review question error:', e)
+          return errorResponse('审核失败', 500, origin)
+        }
+      }
+
+      // 获取所有水平测试记录
+      if (path === '/api/admin/level-test/tests' && request.method === 'GET') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          const url = new URL(request.url)
+          const limit = parseInt(url.searchParams.get('limit') || '20')
+          const offset = parseInt(url.searchParams.get('offset') || '0')
+          const status = url.searchParams.get('status')
+          const subject = url.searchParams.get('subject')
+          const grade = url.searchParams.get('grade')
+
+          let query = `
+            SELECT lt.*, u.name as user_name, u.email as user_email,
+                   (SELECT COUNT(*) FROM test_questions WHERE test_id = lt.id) as question_count
+            FROM level_tests lt
+            LEFT JOIN users u ON lt.user_id = u.id
+            WHERE 1=1
+          `
+          const params: (string | number)[] = []
+
+          if (status) {
+            query += ' AND lt.status = ?'
+            params.push(status)
+          }
+          if (subject) {
+            query += ' AND lt.subject = ?'
+            params.push(subject)
+          }
+          if (grade) {
+            query += ' AND lt.grade = ?'
+            params.push(grade)
+          }
+
+          query += ' ORDER BY lt.created_at DESC LIMIT ? OFFSET ?'
+          params.push(limit, offset)
+
+          const tests = await env.DB.prepare(query).bind(...params).all()
+
+          // 获取总数
+          let countQuery = 'SELECT COUNT(*) as count FROM level_tests WHERE 1=1'
+          const countParams: string[] = []
+          if (status) {
+            countQuery += ' AND status = ?'
+            countParams.push(status)
+          }
+          if (subject) {
+            countQuery += ' AND subject = ?'
+            countParams.push(subject)
+          }
+          if (grade) {
+            countQuery += ' AND grade = ?'
+            countParams.push(grade)
+          }
+
+          const total = await env.DB.prepare(countQuery).bind(...countParams).first() as { count: number } | null
+
+          return jsonResponse({
+            tests: tests.results || [],
+            total: total?.count || 0,
+          }, 200, origin)
+        } catch (e) {
+          console.error('Get tests error:', e)
+          return errorResponse('获取测试记录失败', 500, origin)
+        }
+      }
+
+      // 获取测试详情（管理员）
+      if (path.match(/^\/api\/admin\/level-test\/\w+$/) && request.method === 'GET') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          const testId = path.split('/').pop()
+
+          const test = await env.DB.prepare(
+            `SELECT lt.*, u.name as user_name, u.email as user_email
+             FROM level_tests lt
+             LEFT JOIN users u ON lt.user_id = u.id
+             WHERE lt.id = ?`
+          ).bind(testId).first()
+
+          if (!test) {
+            return errorResponse('测试不存在', 404, origin)
+          }
+
+          const questions = await env.DB.prepare(
+            'SELECT * FROM test_questions WHERE test_id = ? ORDER BY id'
+          ).bind(testId).all()
+
+          const report = await env.DB.prepare(
+            'SELECT * FROM test_reports WHERE test_id = ?'
+          ).bind(testId).first()
+
+          return jsonResponse({
+            test,
+            questions: questions.results || [],
+            report,
+          }, 200, origin)
+        } catch (e) {
+          console.error('Get test detail error:', e)
+          return errorResponse('获取测试详情失败', 500, origin)
+        }
+      }
+
+      // 批量添加题目到缓存（管理员手动添加）
+      if (path === '/api/admin/level-test/cache/add' && request.method === 'POST') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          const body = await request.json() as {
+            questions: Array<{
+              grade: string
+              subject: string
+              question_type: string
+              difficulty: string
+              question_data: string
+            }>
+          }
+
+          const now = new Date().toISOString()
+          let addedCount = 0
+
+          for (const q of body.questions) {
+            try {
+              const id = crypto.randomUUID()
+              await env.DB.prepare(
+                `INSERT INTO question_cache (id, grade, subject, question_type, difficulty, question_data, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+              ).bind(id, q.grade, q.subject, q.question_type, q.difficulty, q.question_data, now, now).run()
+              addedCount++
+            } catch (e) {
+              console.error('Add question to cache error:', e)
+            }
+          }
+
+          return jsonResponse({ 
+            success: true, 
+            addedCount,
+            message: `成功添加 ${addedCount} 道题目到缓存`
+          }, 200, origin)
+        } catch (e) {
+          console.error('Batch add questions error:', e)
+          return errorResponse('添加题目失败', 500, origin)
+        }
+      }
+
+      // 清理低质量题目
+      if (path === '/api/admin/level-test/cache/cleanup' && request.method === 'POST') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          const body = await request.json() as {
+            minScoreRate?: number // 最低正确率阈值
+            minUsageCount?: number // 最低使用次数阈值
+          }
+
+          const minScoreRate = body.minScoreRate || 0.3
+          const minUsageCount = body.minUsageCount || 5
+
+          // 删除使用次数足够但正确率过低的题目
+          const result = await env.DB.prepare(
+            `DELETE FROM question_cache 
+             WHERE usage_count >= ? AND avg_score_rate < ?`
+          ).bind(minUsageCount, minScoreRate).run()
+
+          return jsonResponse({
+            success: true,
+            deletedCount: result.meta.changes,
+            message: `已清理 ${result.meta.changes} 道低质量题目`
+          }, 200, origin)
+        } catch (e) {
+          console.error('Cleanup cache error:', e)
+          return errorResponse('清理失败', 500, origin)
+        }
+      }
+
+      // =====================
       // 智能刷题 API
       // =====================
 

@@ -22,6 +22,238 @@
   margin: 0 !important;
 }
 
+.sectionTitle {
+  color: var(--text-primary) !important;
+  margin-bottom: 16px !important;
+}
+
+/* 进步追踪仪表板 */
+.progressDashboard {
+  background: linear-gradient(135deg, rgba(114, 46, 209, 0.05) 0%, rgba(24, 144, 255, 0.05) 100%);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+/* 趋势卡片 */
+.trendCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.trendCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.trendCard.up {
+  background: linear-gradient(135deg, rgba(82, 196, 26, 0.1) 0%, rgba(82, 196, 26, 0.05) 100%);
+  border: 1px solid rgba(82, 196, 26, 0.3);
+}
+
+.trendCard.down {
+  background: linear-gradient(135deg, rgba(255, 77, 79, 0.1) 0%, rgba(255, 77, 79, 0.05) 100%);
+  border: 1px solid rgba(255, 77, 79, 0.3);
+}
+
+.trendCard.stable {
+  background: linear-gradient(135deg, rgba(24, 144, 255, 0.1) 0%, rgba(24, 144, 255, 0.05) 100%);
+  border: 1px solid rgba(24, 144, 255, 0.3);
+}
+
+.trendIcon {
+  font-size: 32px;
+}
+
+.trendContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trendValue {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.changeValue {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* 连续学习卡片 */
+.streakCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: linear-gradient(135deg, rgba(255, 122, 69, 0.1) 0%, rgba(250, 173, 20, 0.1) 100%);
+  border: 1px solid rgba(255, 122, 69, 0.3);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.streakCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.streakIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.streakContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.streakValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ff7a45;
+}
+
+.streakValue span {
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* 科目卡片 */
+.subjectCard {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.subjectCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.subjectIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.subjectContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.subjectValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* 分数趋势图 */
+.chartCard {
+  border-radius: 12px;
+}
+
+.scoreChart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  height: 150px;
+  padding: 16px 0;
+  gap: 8px;
+}
+
+.scoreBar {
+  flex: 1;
+  max-width: 60px;
+  background: linear-gradient(180deg, #722ed1 0%, #1890ff 100%);
+  border-radius: 8px 8px 0 0;
+  min-height: 20px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.scoreBar:hover {
+  transform: scaleX(1.1);
+  box-shadow: 0 -4px 12px rgba(114, 46, 209, 0.3);
+}
+
+.scoreLabel {
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chartLabels {
+  display: flex;
+  justify-content: space-around;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.chartLabels span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 科目进步详情 */
+.subjectProgressCard {
+  border-radius: 12px;
+}
+
+.subjectProgressItem {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.subjectProgressItem:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.progressHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.testCount {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.levelChange {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.arrow {
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
 /* 统计卡片 */
 .statsRow {
   display: flex;
@@ -89,8 +321,19 @@
     gap: 16px;
   }
   
+  .progressDashboard {
+    padding: 16px;
+  }
+  
   .statsRow {
     flex-direction: column;
   }
+  
+  .scoreChart {
+    height: 120px;
+  }
+  
+  .scoreBar {
+    max-width: 40px;
+  }
 }
-
