@@ -26,6 +26,12 @@ const LeaderboardPage = lazy(() => import('./pages/LeaderboardPage'))
 // 用户设置页面
 const UserSettingsPage = lazy(() => import('./pages/UserSettingsPage'))
 
+// 水平测试页面
+const LevelTestSetupPage = lazy(() => import('./pages/LevelTestSetupPage'))
+const LevelTestPage = lazy(() => import('./pages/LevelTestPage'))
+const LevelTestReportPage = lazy(() => import('./pages/LevelTestReportPage'))
+const LevelTestHistoryPage = lazy(() => import('./pages/LevelTestHistoryPage'))
+
 // 管理员后台页面
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
@@ -91,6 +97,12 @@ function App() {
           
           {/* 用户设置 */}
           <Route path="settings" element={<UserSettingsPage />} />
+          
+          {/* 水平测试 */}
+          <Route path="level-test" element={<LevelTestSetupPage />} />
+          <Route path="level-test/history" element={<LevelTestHistoryPage />} />
+          <Route path="level-test/:testId" element={<LevelTestPage />} />
+          <Route path="level-test/:testId/report" element={<LevelTestReportPage />} />
         </Route>
         
         {/* 404重定向到首页 */}

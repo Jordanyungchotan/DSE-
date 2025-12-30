@@ -553,6 +553,557 @@ const QUIZ_DIFFICULTY_MAP: Record<string, string> = {
   basic: '基础', standard: '标准', advanced: '进阶', challenge: '挑战', challenging: '挑战', exam: 'DSE模拟',
 }
 
+// ===== 水平测试系统 =====
+
+// DSE等级映射
+function scoreToLevel(score: number): string {
+  if (score >= 90) return '5**'
+  if (score >= 85) return '5*'
+  if (score >= 80) return '5'
+  if (score >= 70) return '4'
+  if (score >= 60) return '3'
+  if (score >= 40) return '2'
+  if (score >= 20) return '1'
+  return 'U'
+}
+
+function levelToDescription(level: string): string {
+  const descriptions: Record<string, string> = {
+    '5**': '优异 - 表现卓越，掌握高阶思维能力',
+    '5*': '优良 - 全面掌握，能灵活应用',
+    '5': '良好 - 扎实掌握核心概念',
+    '4': '中等 - 理解大部分内容，部分需加强',
+    '3': '基本达标 - 掌握基础，需提升应用能力',
+    '2': '部分达标 - 基础薄弱，需系统复习',
+    '1': '未达标 - 需要重新学习基础知识',
+    'U': '不予评级 - 建议从头开始学习'
+  }
+  return descriptions[level] || '未知等级'
+}
+
+function calculateGradeEquivalent(score: number, targetGrade: string): string {
+  const gradeOrder = ['中四上学期', '中四下学期', '中五上学期', '中五下学期', '中六上学期', '中六下学期']
+  
+  let baseIndex: number
+  switch (targetGrade) {
+    case '中四': baseIndex = 1; break
+    case '中五': baseIndex = 3; break
+    case '中六': baseIndex = 5; break
+    default: baseIndex = 1
+  }
+  
+  let adjustment = 0
+  if (score >= 90) adjustment = 1
+  else if (score >= 70) adjustment = 0
+  else if (score >= 50) adjustment = -1
+  else if (score >= 30) adjustment = -2
+  else adjustment = -3
+  
+  const finalIndex = Math.max(0, Math.min(gradeOrder.length - 1, baseIndex + adjustment))
+  return gradeOrder[finalIndex]
+}
+
+function generateBasicRecommendations(
+  weaknessPoints: string[],
+  subject: string
+): Array<{ priority: number; topic: string; suggestion: string; resources: string[] }> {
+  return weaknessPoints.slice(0, 5).map((point, index) => ({
+    priority: index + 1,
+    topic: point,
+    suggestion: `建议系统复习${point}相关知识，从基础概念开始，逐步提升难度。`,
+    resources: [
+      `${subject} ${point} 讲解视频`,
+      `${subject} ${point} 练习题`,
+      `DSE ${subject} ${point} 历年真题`
+    ]
+  }))
+}
+
+// 水平测试知识点库
+const LEVEL_TEST_TOPICS: Record<string, Record<string, string[]>> = {
+  '数学': {
+    '中四': ['二次方程', '函数及图像', '直线方程', '多项式', '指数与对数', '三角比', '概率初步'],
+    '中五': ['等差及等比数列', '变分', '概率', '统计', '三角函数', '圆的方程', '二项式定理'],
+    '中六': ['微分', '积分', '向量', '矩阵', '线性规划', '概率分布', '复数']
+  },
+  '物理': {
+    '中四': ['热学', '力学基础', '光学', '电学入门', '波动基础'],
+    '中五': ['力与运动', '能量', '波动', '电路', '电磁感应'],
+    '中六': ['电磁学', '原子物理', '量子概念', '核物理', '天体物理']
+  },
+  '化学': {
+    '中四': ['微观世界', '金属', '酸碱盐', '氧化还原', '化学键'],
+    '中五': ['化学反应速率', '化学平衡', '有机化学基础', '碳化合物'],
+    '中六': ['电化学', '分析化学', '工业化学', '化学与环境']
+  },
+  '生物': {
+    '中四': ['细胞与生命', '遗传学基础', '生态系统', '分类学'],
+    '中五': ['人体生理', '植物生理', '微生物', '生物技术'],
+    '中六': ['分子生物学', '生物技术', '进化论', '生态平衡']
+  },
+  '经济': {
+    '中四': ['基本经济概念', '需求与供给', '市场结构', '弹性'],
+    '中五': ['宏观经济', '货币与银行', '国际贸易', '经济指标'],
+    '中六': ['经济增长', '政府政策', '全球化', '经济周期']
+  },
+  '中文': {
+    '中四': ['阅读理解', '写作技巧', '古文阅读', '语文知识', '修辞手法'],
+    '中五': ['文言文', '文学赏析', '议论文', '实用文', '说明文'],
+    '中六': ['综合能力', '文学创作', '批判思维', '经典篇章']
+  },
+  '英文': {
+    '中四': ['Reading Comprehension', 'Grammar', 'Vocabulary', 'Writing Basics', 'Listening'],
+    '中五': ['Essay Writing', 'Listening Skills', 'Speaking', 'Data Handling', 'Summary'],
+    '中六': ['Advanced Writing', 'Critical Reading', 'Integrated Skills', 'Oral Communication']
+  },
+  '通识教育': {
+    '中四': ['个人成长', '今日香港', '现代中国', '公共卫生'],
+    '中五': ['全球化', '能源与环境', '科技发展', '人权法治'],
+    '中六': ['综合议题', '独立专题研究', '批判思维']
+  }
+}
+
+// 水平测试题目生成函数
+async function generateLevelTestQuestions(
+  subject: string,
+  grade: string,
+  distribution: { choice: number; short: number; long: number },
+  apiKey: string
+): Promise<Array<{
+  id: string
+  questionText: string
+  questionType: 'choice' | 'short' | 'long'
+  options?: string[]
+  correctAnswer: string
+  scoringPoints?: string[]
+  difficulty: 'easy' | 'medium' | 'hard'
+  difficultyWeight: number
+  estimatedTime: number
+  knowledgePoints: string[]
+  topic?: string
+  maxScore: number
+}>> {
+  const topics = LEVEL_TEST_TOPICS[subject]?.[grade] || ['综合知识']
+  const questions: Array<{
+    id: string
+    questionText: string
+    questionType: 'choice' | 'short' | 'long'
+    options?: string[]
+    correctAnswer: string
+    scoringPoints?: string[]
+    difficulty: 'easy' | 'medium' | 'hard'
+    difficultyWeight: number
+    estimatedTime: number
+    knowledgePoints: string[]
+    topic?: string
+    maxScore: number
+  }> = []
+
+  // 构建提示词
+  const isEnglish = subject === '英文'
+  const systemPrompt = isEnglish 
+    ? `You are a Hong Kong DSE English Language examination expert. Generate high-quality test questions following the HKEAA curriculum guidelines. All questions and answers must be in English.`
+    : `你是一位资深的香港DSE考试出题专家。请严格按照香港考评局${subject}科${grade}课程纲要生成高质量的测试题目。使用简体中文。`
+
+  const promptText = isEnglish
+    ? `Generate a level test for Form ${grade === '中四' ? '4' : grade === '中五' ? '5' : '6'} English.
+
+Topics: ${topics.join(', ')}
+
+Please generate:
+- ${distribution.choice} multiple choice questions (mix of easy, medium, hard)
+- ${distribution.short} short answer questions (mix of easy, medium, hard)
+- ${distribution.long} extended writing questions (mix of easy, medium, hard)
+
+Return in JSON format:
+{
+  "choice_questions": [
+    {"question": "...", "options": ["A. ...", "B. ...", "C. ...", "D. ..."], "correct_answer": "A", "explanation": "...", "knowledge_points": ["..."], "difficulty": "easy|medium|hard"}
+  ],
+  "short_questions": [
+    {"question": "...", "correct_answer": "...", "scoring_points": ["..."], "knowledge_points": ["..."], "difficulty": "easy|medium|hard"}
+  ],
+  "long_questions": [
+    {"question": "...", "correct_answer": "...", "scoring_points": ["..."], "knowledge_points": ["..."], "difficulty": "easy|medium|hard"}
+  ]
+}
+
+Return only JSON.`
+    : `请为${grade}${subject}学生生成水平测试题目。
+
+【知识范围】
+${topics.join('、')}
+
+【题目要求】
+1. 选择题 ${distribution.choice} 道（基础、中等、进阶各占约30%、50%、20%）
+2. 短答题 ${distribution.short} 道（需提供评分要点）
+3. 论述题 ${distribution.long} 道（需提供评分标准）
+
+【返回格式】
+请返回JSON格式：
+{
+  "choice_questions": [
+    {"question": "题目内容", "options": ["A. 选项", "B. 选项", "C. 选项", "D. 选项"], "correct_answer": "A", "explanation": "解释", "knowledge_points": ["知识点"], "difficulty": "easy|medium|hard"}
+  ],
+  "short_questions": [
+    {"question": "题目内容", "correct_answer": "标准答案", "scoring_points": ["得分点1", "得分点2"], "knowledge_points": ["知识点"], "difficulty": "easy|medium|hard"}
+  ],
+  "long_questions": [
+    {"question": "题目内容", "correct_answer": "参考答案", "scoring_points": ["评分点1", "评分点2"], "knowledge_points": ["知识点"], "difficulty": "easy|medium|hard"}
+  ]
+}
+
+只返回JSON，不要其他内容。`
+
+  try {
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: promptText }
+        ],
+        temperature: 0.7,
+        max_tokens: 8000
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`DeepSeek API error: ${response.status}`)
+    }
+
+    const data = await response.json() as {
+      choices: Array<{ message: { content: string } }>
+    }
+
+    const content = data.choices[0]?.message?.content || '{}'
+    
+    // 清理并解析JSON
+    let cleanedContent = content.trim()
+    if (cleanedContent.startsWith('```json')) {
+      cleanedContent = cleanedContent.slice(7)
+    }
+    if (cleanedContent.startsWith('```')) {
+      cleanedContent = cleanedContent.slice(3)
+    }
+    if (cleanedContent.endsWith('```')) {
+      cleanedContent = cleanedContent.slice(0, -3)
+    }
+
+    const parsed = JSON.parse(cleanedContent) as {
+      choice_questions?: Array<{
+        question: string
+        options: string[]
+        correct_answer: string
+        explanation?: string
+        knowledge_points: string[]
+        difficulty: string
+      }>
+      short_questions?: Array<{
+        question: string
+        correct_answer: string
+        scoring_points?: string[]
+        knowledge_points: string[]
+        difficulty: string
+      }>
+      long_questions?: Array<{
+        question: string
+        correct_answer: string
+        scoring_points?: string[]
+        knowledge_points: string[]
+        difficulty: string
+      }>
+    }
+
+    // 处理选择题
+    const difficultyWeights = { easy: 0.8, medium: 1.0, hard: 1.3 }
+    const estimatedTimes = {
+      choice: { easy: 30, medium: 60, hard: 90 },
+      short: { easy: 120, medium: 180, hard: 240 },
+      long: { easy: 300, medium: 420, hard: 600 }
+    }
+    const maxScores = {
+      choice: { easy: 1, medium: 1, hard: 2 },
+      short: { easy: 2, medium: 3, hard: 4 },
+      long: { easy: 4, medium: 6, hard: 8 }
+    }
+
+    for (const q of (parsed.choice_questions || [])) {
+      const diff = (q.difficulty || 'medium') as 'easy' | 'medium' | 'hard'
+      questions.push({
+        id: crypto.randomUUID(),
+        questionText: q.question,
+        questionType: 'choice',
+        options: q.options,
+        correctAnswer: q.correct_answer,
+        difficulty: diff,
+        difficultyWeight: difficultyWeights[diff],
+        estimatedTime: estimatedTimes.choice[diff],
+        knowledgePoints: q.knowledge_points || [],
+        maxScore: maxScores.choice[diff]
+      })
+    }
+
+    for (const q of (parsed.short_questions || [])) {
+      const diff = (q.difficulty || 'medium') as 'easy' | 'medium' | 'hard'
+      questions.push({
+        id: crypto.randomUUID(),
+        questionText: q.question,
+        questionType: 'short',
+        correctAnswer: q.correct_answer,
+        scoringPoints: q.scoring_points,
+        difficulty: diff,
+        difficultyWeight: difficultyWeights[diff],
+        estimatedTime: estimatedTimes.short[diff],
+        knowledgePoints: q.knowledge_points || [],
+        maxScore: maxScores.short[diff]
+      })
+    }
+
+    for (const q of (parsed.long_questions || [])) {
+      const diff = (q.difficulty || 'medium') as 'easy' | 'medium' | 'hard'
+      questions.push({
+        id: crypto.randomUUID(),
+        questionText: q.question,
+        questionType: 'long',
+        correctAnswer: q.correct_answer,
+        scoringPoints: q.scoring_points,
+        difficulty: diff,
+        difficultyWeight: difficultyWeights[diff],
+        estimatedTime: estimatedTimes.long[diff],
+        knowledgePoints: q.knowledge_points || [],
+        maxScore: maxScores.long[diff]
+      })
+    }
+
+  } catch (error) {
+    console.error('Generate level test questions error:', error)
+    // 生成备用题目
+    return generateFallbackLevelTestQuestions(subject, grade, distribution)
+  }
+
+  // 如果题目不足，补充备用题目
+  if (questions.length < 10) {
+    return generateFallbackLevelTestQuestions(subject, grade, distribution)
+  }
+
+  return questions
+}
+
+// 备用题目生成
+function generateFallbackLevelTestQuestions(
+  subject: string,
+  grade: string,
+  distribution: { choice: number; short: number; long: number }
+): Array<{
+  id: string
+  questionText: string
+  questionType: 'choice' | 'short' | 'long'
+  options?: string[]
+  correctAnswer: string
+  scoringPoints?: string[]
+  difficulty: 'easy' | 'medium' | 'hard'
+  difficultyWeight: number
+  estimatedTime: number
+  knowledgePoints: string[]
+  topic?: string
+  maxScore: number
+}> {
+  const questions: Array<{
+    id: string
+    questionText: string
+    questionType: 'choice' | 'short' | 'long'
+    options?: string[]
+    correctAnswer: string
+    scoringPoints?: string[]
+    difficulty: 'easy' | 'medium' | 'hard'
+    difficultyWeight: number
+    estimatedTime: number
+    knowledgePoints: string[]
+    topic?: string
+    maxScore: number
+  }> = []
+
+  // 根据科目生成基础题目
+  const fallbackQuestions: Record<string, Array<{
+    text: string
+    type: 'choice' | 'short' | 'long'
+    options?: string[]
+    answer: string
+    points?: string[]
+    kp: string[]
+    diff: 'easy' | 'medium' | 'hard'
+  }>> = {
+    '数学': [
+      { text: '解方程：2x + 5 = 13', type: 'short', answer: 'x = 4', points: ['移项正确', '计算正确'], kp: ['一元一次方程'], diff: 'easy' },
+      { text: '若 x² - 5x + 6 = 0，求 x 的值', type: 'short', answer: 'x = 2 或 x = 3', points: ['因式分解正确', '求解正确'], kp: ['二次方程'], diff: 'medium' },
+      { text: '计算：sin²30° + cos²30° = ?', type: 'choice', options: ['A. 0', 'B. 0.5', 'C. 1', 'D. 2'], answer: 'C', kp: ['三角恒等式'], diff: 'easy' },
+      { text: '已知等差数列首项为2，公差为3，求第10项', type: 'short', answer: 'a₁₀ = 2 + (10-1)×3 = 29', points: ['公式正确', '计算正确'], kp: ['等差数列'], diff: 'medium' }
+    ],
+    '物理': [
+      { text: '一个物体从静止开始做自由落体运动，2秒后的速度是多少？(g=10m/s²)', type: 'short', answer: 'v = gt = 10×2 = 20 m/s', points: ['公式正确', '计算正确'], kp: ['自由落体运动'], diff: 'easy' },
+      { text: '关于牛顿第一定律，下列说法正确的是：', type: 'choice', options: ['A. 物体不受力就静止', 'B. 物体受力才能运动', 'C. 物体不受力保持匀速直线运动或静止', 'D. 力是维持运动的原因'], answer: 'C', kp: ['牛顿运动定律'], diff: 'easy' }
+    ],
+    '化学': [
+      { text: '水的化学式是什么？', type: 'choice', options: ['A. H₂O', 'B. CO₂', 'C. NaCl', 'D. O₂'], answer: 'A', kp: ['化学式'], diff: 'easy' },
+      { text: '解释为什么钠与水反应会产生气泡', type: 'short', answer: '钠是活泼金属，与水发生置换反应生成氢气和氢氧化钠', points: ['指出生成氢气', '反应类型正确'], kp: ['金属活动性'], diff: 'medium' }
+    ],
+    '英文': [
+      { text: 'Choose the correct form: She ___ to school every day.', type: 'choice', options: ['A. go', 'B. goes', 'C. going', 'D. went'], answer: 'B', kp: ['Present Simple Tense'], diff: 'easy' },
+      { text: 'Write a short paragraph (50-80 words) about your favorite hobby.', type: 'long', answer: 'Model answer about hobbies with proper grammar and vocabulary', points: ['Content relevance', 'Grammar accuracy', 'Vocabulary range', 'Coherence'], kp: ['Writing Skills'], diff: 'medium' }
+    ],
+    '中文': [
+      { text: '"锲而不舍"的意思是什么？', type: 'choice', options: ['A. 坚持不懈', 'B. 半途而废', 'C. 三心二意', 'D. 急于求成'], answer: 'A', kp: ['成语理解'], diff: 'easy' },
+      { text: '阅读以下文段，概括其主旨大意', type: 'short', answer: '根据文段内容归纳中心思想', points: ['理解正确', '概括准确'], kp: ['阅读理解'], diff: 'medium' }
+    ]
+  }
+
+  const subjectQuestions = fallbackQuestions[subject] || fallbackQuestions['数学']
+  
+  // 生成选择题
+  for (let i = 0; i < distribution.choice; i++) {
+    const q = subjectQuestions.find(sq => sq.type === 'choice') || subjectQuestions[0]
+    questions.push({
+      id: crypto.randomUUID(),
+      questionText: q.text,
+      questionType: 'choice',
+      options: q.options,
+      correctAnswer: q.answer,
+      difficulty: q.diff,
+      difficultyWeight: q.diff === 'easy' ? 0.8 : q.diff === 'medium' ? 1.0 : 1.3,
+      estimatedTime: q.diff === 'easy' ? 30 : q.diff === 'medium' ? 60 : 90,
+      knowledgePoints: q.kp,
+      maxScore: q.diff === 'hard' ? 2 : 1
+    })
+  }
+
+  // 生成短答题
+  for (let i = 0; i < distribution.short; i++) {
+    const q = subjectQuestions.find(sq => sq.type === 'short') || subjectQuestions[0]
+    questions.push({
+      id: crypto.randomUUID(),
+      questionText: q.text,
+      questionType: 'short',
+      correctAnswer: q.answer,
+      scoringPoints: q.points,
+      difficulty: q.diff,
+      difficultyWeight: q.diff === 'easy' ? 0.8 : q.diff === 'medium' ? 1.0 : 1.3,
+      estimatedTime: q.diff === 'easy' ? 120 : q.diff === 'medium' ? 180 : 240,
+      knowledgePoints: q.kp,
+      maxScore: q.diff === 'easy' ? 2 : q.diff === 'medium' ? 3 : 4
+    })
+  }
+
+  // 生成论述题
+  for (let i = 0; i < distribution.long; i++) {
+    const q = subjectQuestions.find(sq => sq.type === 'long') || subjectQuestions[0]
+    questions.push({
+      id: crypto.randomUUID(),
+      questionText: q.text,
+      questionType: 'long',
+      correctAnswer: q.answer,
+      scoringPoints: q.points,
+      difficulty: 'medium',
+      difficultyWeight: 1.0,
+      estimatedTime: 420,
+      knowledgePoints: q.kp,
+      maxScore: 6
+    })
+  }
+
+  return questions
+}
+
+// AI评分主观题
+async function gradeSubjectiveAnswer(
+  questionText: string,
+  correctAnswer: string,
+  userAnswer: string,
+  scoringPoints: string[],
+  maxScore: number,
+  apiKey: string
+): Promise<{ score: number; feedback: string }> {
+  if (!userAnswer || userAnswer.trim() === '') {
+    return { score: 0, feedback: '未作答' }
+  }
+
+  try {
+    const prompt = `你是一位经验丰富的DSE阅卷老师。请根据评分标准对学生答案评分。
+
+【题目】
+${questionText}
+
+【标准答案】
+${correctAnswer}
+
+【评分要点】
+${scoringPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}
+
+【满分】${maxScore}分
+
+【学生答案】
+${userAnswer}
+
+请评分并返回JSON格式：
+{"score": 0, "feedback": "评语"}
+
+只返回JSON。`
+
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 500
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error('API error')
+    }
+
+    const data = await response.json() as {
+      choices: Array<{ message: { content: string } }>
+    }
+
+    const content = data.choices[0]?.message?.content || '{}'
+    let cleanedContent = content.trim()
+    if (cleanedContent.startsWith('```json')) cleanedContent = cleanedContent.slice(7)
+    if (cleanedContent.startsWith('```')) cleanedContent = cleanedContent.slice(3)
+    if (cleanedContent.endsWith('```')) cleanedContent = cleanedContent.slice(0, -3)
+
+    const result = JSON.parse(cleanedContent) as { score: number; feedback: string }
+    return {
+      score: Math.min(Math.max(0, result.score), maxScore),
+      feedback: result.feedback || '已评分'
+    }
+  } catch (error) {
+    console.error('Grade subjective answer error:', error)
+    // 简单关键词匹配评分
+    const keywords = correctAnswer.split(/[,，。、\s]+/).filter(k => k.length > 1)
+    let matchCount = 0
+    for (const kw of keywords) {
+      if (userAnswer.includes(kw)) matchCount++
+    }
+    const ratio = keywords.length > 0 ? matchCount / keywords.length : 0
+    const score = Math.round(maxScore * ratio)
+    return {
+      score,
+      feedback: score >= maxScore * 0.6 ? '答案基本正确' : '答案需要改进'
+    }
+  }
+}
+
 // ===== 题目多样性增强系统 =====
 
 // 场景库 - 用于随机化题目背景（各科目独立）
@@ -3491,6 +4042,13 @@ export default {
             'PUT /api/user/profile',
             'POST /api/user/avatar',
             'PUT /api/user/password',
+            // 水平测试 API
+            'POST /api/level-test/generate',
+            'GET /api/level-test/:id/questions',
+            'POST /api/level-test/:id/autosave',
+            'POST /api/level-test/:id/submit',
+            'GET /api/level-test/:id/report',
+            'GET /api/level-test/history',
           ],
         }, 200, origin)
       }
@@ -3590,6 +4148,663 @@ export default {
         } catch (error) {
           console.error('Change password error:', error)
           return errorResponse('修改失败', 500, origin)
+        }
+      }
+
+      // ========== 水平测试 API ==========
+
+      // 生成水平测试
+      if (path === '/api/level-test/generate' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const body = await request.json() as {
+            grade: '中四' | '中五' | '中六'
+            subject: string
+            testType: 'quick' | 'full'
+          }
+
+          // 验证参数
+          if (!body.grade || !body.subject || !body.testType) {
+            return errorResponse('缺少必要参数', 400, origin)
+          }
+
+          const validGrades = ['中四', '中五', '中六']
+          if (!validGrades.includes(body.grade)) {
+            return errorResponse('无效的年级', 400, origin)
+          }
+
+          const validTestTypes = ['quick', 'full']
+          if (!validTestTypes.includes(body.testType)) {
+            return errorResponse('无效的测试类型', 400, origin)
+          }
+
+          // 测试配置
+          const testConfig = {
+            quick: {
+              questionCount: 18,
+              timeLimit: 30 * 60, // 30分钟
+              distribution: { choice: 9, short: 7, long: 2 }
+            },
+            full: {
+              questionCount: 28,
+              timeLimit: 60 * 60, // 60分钟
+              distribution: { choice: 11, short: 11, long: 6 }
+            }
+          }
+
+          const config = testConfig[body.testType]
+          const testId = crypto.randomUUID()
+          const now = new Date().toISOString()
+
+          // 生成题目（调用DeepSeek API）
+          const questions = await generateLevelTestQuestions(
+            body.subject,
+            body.grade,
+            config.distribution,
+            env.DEEPSEEK_API_KEY
+          )
+
+          // 保存测试到数据库
+          await env.DB.prepare(`
+            INSERT INTO level_tests (
+              id, user_id, grade, subject, test_type, status,
+              time_limit, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+          `).bind(
+            testId,
+            tokenData.userId,
+            body.grade,
+            body.subject,
+            body.testType,
+            config.timeLimit,
+            now,
+            now
+          ).run()
+
+          // 保存题目到数据库
+          for (let i = 0; i < questions.length; i++) {
+            const q = questions[i]
+            await env.DB.prepare(`
+              INSERT INTO test_questions (
+                id, test_id, question_index, question_text, question_type,
+                options, correct_answer, scoring_points, max_score,
+                difficulty, difficulty_weight, estimated_time,
+                knowledge_points, topic, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              q.id,
+              testId,
+              i,
+              q.questionText,
+              q.questionType,
+              q.options ? JSON.stringify(q.options) : null,
+              q.correctAnswer,
+              q.scoringPoints ? JSON.stringify(q.scoringPoints) : null,
+              q.maxScore,
+              q.difficulty,
+              q.difficultyWeight,
+              q.estimatedTime,
+              JSON.stringify(q.knowledgePoints),
+              q.topic || null,
+              now
+            ).run()
+          }
+
+          return jsonResponse({
+            success: true,
+            testId,
+            questionCount: questions.length,
+            timeLimit: config.timeLimit,
+            testType: body.testType
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('Generate level test error:', error)
+          return errorResponse('生成测试失败，请稍后重试', 500, origin)
+        }
+      }
+
+      // 获取测试题目
+      if (path.startsWith('/api/level-test/') && path.endsWith('/questions') && request.method === 'GET') {
+        const testId = path.replace('/api/level-test/', '').replace('/questions', '')
+        
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          // 获取测试信息
+          const test = await env.DB.prepare(
+            'SELECT * FROM level_tests WHERE id = ? AND user_id = ?'
+          ).bind(testId, tokenData.userId).first()
+
+          if (!test) {
+            return errorResponse('测试不存在', 404, origin)
+          }
+
+          // 获取题目（不返回正确答案）
+          const questionsResult = await env.DB.prepare(`
+            SELECT id, question_index, question_text, question_type,
+                   options, difficulty, estimated_time, max_score,
+                   knowledge_points, topic, is_marked, user_answer
+            FROM test_questions 
+            WHERE test_id = ?
+            ORDER BY question_index
+          `).bind(testId).all()
+
+          const questions = questionsResult.results.map((q: Record<string, unknown>) => ({
+            id: q.id,
+            questionIndex: q.question_index,
+            questionText: q.question_text,
+            questionType: q.question_type,
+            options: q.options ? JSON.parse(q.options as string) : null,
+            difficulty: q.difficulty,
+            estimatedTime: q.estimated_time,
+            maxScore: q.max_score,
+            knowledgePoints: q.knowledge_points ? JSON.parse(q.knowledge_points as string) : [],
+            topic: q.topic,
+            isMarked: q.is_marked === 1,
+            userAnswer: q.user_answer
+          }))
+
+          // 如果测试是pending状态，更新为in_progress
+          if (test.status === 'pending') {
+            await env.DB.prepare(
+              'UPDATE level_tests SET status = ?, started_at = ?, updated_at = ? WHERE id = ?'
+            ).bind('in_progress', new Date().toISOString(), new Date().toISOString(), testId).run()
+          }
+
+          return jsonResponse({
+            testId,
+            grade: test.grade,
+            subject: test.subject,
+            testType: test.test_type,
+            status: test.status === 'pending' ? 'in_progress' : test.status,
+            timeLimit: test.time_limit,
+            startedAt: test.started_at || new Date().toISOString(),
+            questions
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('Get test questions error:', error)
+          return errorResponse('获取题目失败', 500, origin)
+        }
+      }
+
+      // 自动保存答案
+      if (path.startsWith('/api/level-test/') && path.endsWith('/autosave') && request.method === 'POST') {
+        const testId = path.replace('/api/level-test/', '').replace('/autosave', '')
+        
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const body = await request.json() as {
+            answers: Array<{ questionId: string; answer: string; timeSpent?: number }>
+            currentIndex: number
+            timeRemaining: number
+            markedQuestions: number[]
+          }
+
+          const now = new Date().toISOString()
+
+          // 更新每个答案
+          for (const ans of body.answers) {
+            await env.DB.prepare(`
+              UPDATE test_questions 
+              SET user_answer = ?, actual_time = ?, answered_at = ?
+              WHERE id = ? AND test_id = ?
+            `).bind(
+              ans.answer,
+              ans.timeSpent || null,
+              now,
+              ans.questionId,
+              testId
+            ).run()
+          }
+
+          // 更新标记状态
+          if (body.markedQuestions && body.markedQuestions.length > 0) {
+            // 先清除所有标记
+            await env.DB.prepare(
+              'UPDATE test_questions SET is_marked = 0 WHERE test_id = ?'
+            ).bind(testId).run()
+            
+            // 设置新标记
+            for (const idx of body.markedQuestions) {
+              await env.DB.prepare(
+                'UPDATE test_questions SET is_marked = 1 WHERE test_id = ? AND question_index = ?'
+              ).bind(testId, idx).run()
+            }
+          }
+
+          // 保存自动保存记录
+          const autosaveId = crypto.randomUUID()
+          await env.DB.prepare(`
+            INSERT OR REPLACE INTO test_autosave (
+              id, test_id, user_id, answers_snapshot, current_index,
+              time_remaining, marked_questions, saved_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            autosaveId,
+            testId,
+            tokenData.userId,
+            JSON.stringify(body.answers),
+            body.currentIndex,
+            body.timeRemaining,
+            JSON.stringify(body.markedQuestions || []),
+            now
+          ).run()
+
+          // 更新测试进度
+          await env.DB.prepare(`
+            UPDATE level_tests 
+            SET current_question_index = ?, answered_count = ?, updated_at = ?
+            WHERE id = ?
+          `).bind(body.currentIndex, body.answers.length, now, testId).run()
+
+          return jsonResponse({ success: true, savedAt: now }, 200, origin)
+
+        } catch (error) {
+          console.error('Autosave error:', error)
+          return errorResponse('保存失败', 500, origin)
+        }
+      }
+
+      // 提交测试答案
+      if (path.startsWith('/api/level-test/') && path.endsWith('/submit') && request.method === 'POST') {
+        const testId = path.replace('/api/level-test/', '').replace('/submit', '')
+        
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const body = await request.json() as {
+            answers: Array<{ questionId: string; answer: string; timeSpent?: number }>
+            totalTimeSpent: number
+          }
+
+          const now = new Date().toISOString()
+
+          // 获取测试信息
+          const test = await env.DB.prepare(
+            'SELECT * FROM level_tests WHERE id = ? AND user_id = ?'
+          ).bind(testId, tokenData.userId).first()
+
+          if (!test) {
+            return errorResponse('测试不存在', 404, origin)
+          }
+
+          if (test.status === 'completed' || test.status === 'graded') {
+            return errorResponse('测试已提交', 400, origin)
+          }
+
+          // 获取所有题目
+          const questionsResult = await env.DB.prepare(
+            'SELECT * FROM test_questions WHERE test_id = ? ORDER BY question_index'
+          ).bind(testId).all()
+
+          const questions = questionsResult.results as Record<string, unknown>[]
+
+          // 评分
+          let totalScore = 0
+          let totalMaxScore = 0
+          const gradingResults: Array<{
+            questionId: string
+            isCorrect: boolean
+            score: number
+            maxScore: number
+            feedback: string
+          }> = []
+
+          for (const q of questions) {
+            const userAnswer = body.answers.find(a => a.questionId === q.id)?.answer || ''
+            const correctAnswer = q.correct_answer as string
+            const maxScore = q.max_score as number
+            const questionType = q.question_type as string
+
+            let score = 0
+            let isCorrect = false
+            let feedback = ''
+
+            if (questionType === 'choice') {
+              // 选择题直接比较
+              isCorrect = userAnswer.toUpperCase() === correctAnswer.toUpperCase()
+              score = isCorrect ? maxScore : 0
+              feedback = isCorrect ? '回答正确' : `正确答案是 ${correctAnswer}`
+            } else {
+              // 短答题和论述题使用AI评分或关键词匹配
+              const result = await gradeSubjectiveAnswer(
+                q.question_text as string,
+                correctAnswer,
+                userAnswer,
+                q.scoring_points ? JSON.parse(q.scoring_points as string) : [],
+                maxScore,
+                env.DEEPSEEK_API_KEY
+              )
+              score = result.score
+              isCorrect = score >= maxScore * 0.6
+              feedback = result.feedback
+            }
+
+            totalScore += score
+            totalMaxScore += maxScore
+
+            // 更新题目得分
+            await env.DB.prepare(`
+              UPDATE test_questions 
+              SET user_answer = ?, user_score = ?, auto_graded = 1,
+                  grading_feedback = ?, answered_at = ?
+              WHERE id = ?
+            `).bind(userAnswer, score, feedback, now, q.id).run()
+
+            gradingResults.push({
+              questionId: q.id as string,
+              isCorrect,
+              score,
+              maxScore,
+              feedback
+            })
+          }
+
+          // 计算最终得分和等级
+          const finalScore = totalMaxScore > 0 ? Math.round((totalScore / totalMaxScore) * 100) : 0
+          const level = scoreToLevel(finalScore)
+
+          // 更新测试状态
+          await env.DB.prepare(`
+            UPDATE level_tests 
+            SET status = 'graded', raw_score = ?, final_score = ?,
+                level = ?, time_spent = ?, completed_at = ?,
+                graded_at = ?, updated_at = ?
+            WHERE id = ?
+          `).bind(
+            totalScore,
+            finalScore,
+            level,
+            body.totalTimeSpent,
+            now,
+            now,
+            now,
+            testId
+          ).run()
+
+          // 生成报告
+          const reportId = crypto.randomUUID()
+          const strengthPoints: string[] = []
+          const weaknessPoints: string[] = []
+
+          // 分析知识点
+          const knowledgeStats: Record<string, { correct: number; total: number }> = {}
+          for (let i = 0; i < questions.length; i++) {
+            const q = questions[i]
+            const result = gradingResults[i]
+            const kps = q.knowledge_points ? JSON.parse(q.knowledge_points as string) : []
+            for (const kp of kps) {
+              if (!knowledgeStats[kp]) {
+                knowledgeStats[kp] = { correct: 0, total: 0 }
+              }
+              knowledgeStats[kp].total++
+              if (result.isCorrect) {
+                knowledgeStats[kp].correct++
+              }
+            }
+          }
+
+          for (const [kp, stats] of Object.entries(knowledgeStats)) {
+            const accuracy = stats.correct / stats.total
+            if (accuracy >= 0.8) {
+              strengthPoints.push(kp)
+            } else if (accuracy < 0.5) {
+              weaknessPoints.push(kp)
+            }
+          }
+
+          // 计算能力雷达图
+          const abilityRadar = {
+            knowledge: Math.min(100, Math.round(finalScore * 1.1)),
+            application: Math.round(finalScore * 0.95),
+            analysis: Math.round(finalScore * 0.9),
+            synthesis: Math.round(finalScore * 0.85),
+            evaluation: Math.round(finalScore * 0.8)
+          }
+
+          await env.DB.prepare(`
+            INSERT INTO test_reports (
+              id, test_id, user_id, overall_level, overall_score,
+              grade_equivalent, ability_radar, strength_points,
+              weakness_points, recommendations, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            reportId,
+            testId,
+            tokenData.userId,
+            level,
+            finalScore,
+            calculateGradeEquivalent(finalScore, test.grade as string),
+            JSON.stringify(abilityRadar),
+            JSON.stringify(strengthPoints),
+            JSON.stringify(weaknessPoints),
+            JSON.stringify(generateBasicRecommendations(weaknessPoints, test.subject as string)),
+            now
+          ).run()
+
+          return jsonResponse({
+            success: true,
+            testId,
+            reportId,
+            finalScore,
+            level,
+            levelDescription: levelToDescription(level),
+            totalQuestions: questions.length,
+            correctCount: gradingResults.filter(r => r.isCorrect).length,
+            abilityRadar,
+            strengthPoints,
+            weaknessPoints
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('Submit test error:', error)
+          return errorResponse('提交失败', 500, origin)
+        }
+      }
+
+      // 获取测试报告
+      if (path.startsWith('/api/level-test/') && path.endsWith('/report') && request.method === 'GET') {
+        const testId = path.replace('/api/level-test/', '').replace('/report', '')
+        
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          // 获取测试信息
+          const test = await env.DB.prepare(
+            'SELECT * FROM level_tests WHERE id = ? AND user_id = ?'
+          ).bind(testId, tokenData.userId).first()
+
+          if (!test) {
+            return errorResponse('测试不存在', 404, origin)
+          }
+
+          if (test.status !== 'graded') {
+            return errorResponse('测试尚未完成评分', 400, origin)
+          }
+
+          // 获取报告
+          const report = await env.DB.prepare(
+            'SELECT * FROM test_reports WHERE test_id = ?'
+          ).bind(testId).first()
+
+          if (!report) {
+            return errorResponse('报告不存在', 404, origin)
+          }
+
+          // 获取题目详情
+          const questionsResult = await env.DB.prepare(`
+            SELECT id, question_index, question_text, question_type,
+                   options, correct_answer, user_answer, user_score,
+                   max_score, grading_feedback, difficulty, knowledge_points
+            FROM test_questions 
+            WHERE test_id = ?
+            ORDER BY question_index
+          `).bind(testId).all()
+
+          const questions = questionsResult.results.map((q: Record<string, unknown>) => ({
+            id: q.id,
+            questionIndex: q.question_index,
+            questionText: q.question_text,
+            questionType: q.question_type,
+            options: q.options ? JSON.parse(q.options as string) : null,
+            correctAnswer: q.correct_answer,
+            userAnswer: q.user_answer,
+            score: q.user_score,
+            maxScore: q.max_score,
+            feedback: q.grading_feedback,
+            difficulty: q.difficulty,
+            knowledgePoints: q.knowledge_points ? JSON.parse(q.knowledge_points as string) : []
+          }))
+
+          return jsonResponse({
+            testId,
+            grade: test.grade,
+            subject: test.subject,
+            testType: test.test_type,
+            completedAt: test.completed_at,
+            timeSpent: test.time_spent,
+            overallLevel: report.overall_level,
+            overallScore: report.overall_score,
+            gradeEquivalent: report.grade_equivalent,
+            abilityRadar: JSON.parse(report.ability_radar as string),
+            strengthPoints: JSON.parse(report.strength_points as string),
+            weaknessPoints: JSON.parse(report.weakness_points as string),
+            recommendations: JSON.parse(report.recommendations as string),
+            questions
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('Get report error:', error)
+          return errorResponse('获取报告失败', 500, origin)
+        }
+      }
+
+      // 获取测试历史
+      if (path === '/api/level-test/history' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const url = new URL(request.url)
+          const subject = url.searchParams.get('subject')
+          const grade = url.searchParams.get('grade')
+          const limit = parseInt(url.searchParams.get('limit') || '20')
+          const offset = parseInt(url.searchParams.get('offset') || '0')
+
+          let query = `
+            SELECT id, grade, subject, test_type, status, final_score, level,
+                   time_spent, created_at, completed_at
+            FROM level_tests 
+            WHERE user_id = ? AND status = 'graded'
+          `
+          const params: (string | number)[] = [tokenData.userId]
+
+          if (subject) {
+            query += ' AND subject = ?'
+            params.push(subject)
+          }
+          if (grade) {
+            query += ' AND grade = ?'
+            params.push(grade)
+          }
+
+          query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+          params.push(limit, offset)
+
+          const result = await env.DB.prepare(query).bind(...params).all()
+
+          const tests = result.results.map((t: Record<string, unknown>) => ({
+            id: t.id,
+            grade: t.grade,
+            subject: t.subject,
+            testType: t.test_type,
+            status: t.status,
+            finalScore: t.final_score,
+            level: t.level,
+            levelDescription: levelToDescription(t.level as string),
+            timeSpent: t.time_spent,
+            createdAt: t.created_at,
+            completedAt: t.completed_at
+          }))
+
+          // 获取总数
+          let countQuery = `
+            SELECT COUNT(*) as count FROM level_tests 
+            WHERE user_id = ? AND status = 'graded'
+          `
+          const countParams: string[] = [tokenData.userId]
+          if (subject) {
+            countQuery += ' AND subject = ?'
+            countParams.push(subject)
+          }
+          if (grade) {
+            countQuery += ' AND grade = ?'
+            countParams.push(grade)
+          }
+
+          const countResult = await env.DB.prepare(countQuery).bind(...countParams).first() as { count: number }
+
+          return jsonResponse({
+            tests,
+            total: countResult?.count || 0,
+            limit,
+            offset
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('Get test history error:', error)
+          return errorResponse('获取历史失败', 500, origin)
         }
       }
 
