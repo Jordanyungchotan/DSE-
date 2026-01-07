@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { apiFetch } from '../config/api'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './LevelTestHistoryPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -57,6 +58,7 @@ interface ProgressData {
 
 export default function LevelTestHistoryPage() {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   
   const [loading, setLoading] = useState(true)
   const [tests, setTests] = useState<TestRecord[]>([])
@@ -298,16 +300,16 @@ export default function LevelTestHistoryPage() {
       <div className={styles.header}>
         <div className={styles.headerLeft}>
           <Title level={2} className={styles.title}>
-            <FileTextOutlined /> 测试历史
+            <FileTextOutlined /> {t('levelTest.history.title')}
           </Title>
-          <Text type="secondary">查看您的水平测试记录和进步追踪</Text>
+          <Text type="secondary">{t('levelTest.history.title')}</Text>
         </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => navigate('/level-test')}
         >
-          开始新测试
+          {t('levelTest.setup.startTest')}
         </Button>
       </div>
 
@@ -493,7 +495,7 @@ export default function LevelTestHistoryPage() {
             <Option value="中文">中文</Option>
             <Option value="英文">英文</Option>
             <Option value="数学">数学</Option>
-            <Option value="通识教育">通识教育</Option>
+            <Option value="公民与社会发展">{t('quiz.subjects.citizenship')}</Option>
             <Option value="物理">物理</Option>
             <Option value="化学">化学</Option>
             <Option value="生物">生物</Option>

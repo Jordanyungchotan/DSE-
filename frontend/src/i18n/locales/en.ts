@@ -16,6 +16,9 @@ export const en = {
     error: 'Error',
     warning: 'Warning',
     info: 'Info',
+    notSelected: 'Not Selected',
+    questions: 'Questions',
+    generatingQuestions: 'Generating questions...',
   },
 
   // Navigation
@@ -38,6 +41,15 @@ export const en = {
     levelTest: 'Level Test',
     startLevelTest: 'Start Test',
     levelTestHistory: 'Test History',
+    // Learning Center
+    learningCenter: 'Learning Center',
+    // Points System
+    points: 'Points',
+    myPoints: 'My Points',
+    pointsMall: 'Points Mall',
+    analysisHistory: 'Analysis History',
+    accountSettings: 'Account Settings',
+    myRanking: 'My Ranking',
   },
 
   // System
@@ -292,6 +304,19 @@ export const en = {
       startFree: '🚀 Start Free Analysis',
       register: '👇 Free Registration',
     },
+    
+    // Level Test Card
+    levelTest: {
+      newFeature: 'New Feature',
+      title: 'DSE Level Test',
+      description: 'Accurately assess your academic level in Hong Kong DSE curriculum, get DSE grade predictions and personalized learning advice',
+      feature1: 'AI-powered questions, HKEAA standards',
+      feature2: 'Multi-dimensional assessment, precise positioning',
+      feature3: 'DSE grade prediction (1-5**)',
+      feature4: 'Detailed reports and learning advice',
+      startButton: 'Start Level Test',
+      viewHistoryButton: 'View Test History',
+    },
   },
 
   // Analysis Page
@@ -379,6 +404,8 @@ export const en = {
     registerSuccess: 'Registration successful',
     loginFailed: 'Login failed',
     registerFailed: 'Registration failed',
+    login: 'Login Now',
+    loginToViewRank: 'Login to view your ranking',
   },
 
   // Footer
@@ -417,11 +444,53 @@ export const en = {
     // Quiz Configuration
     config: {
       title: 'Quiz Configuration',
-      subject: 'Select Subject',
-      grade: 'Select Grade',
-      difficulty: 'Select Difficulty',
-      questionCount: 'Number of Questions',
+      subject: 'Subject',
+      subjectDesc: 'Select the subject you want to practice',
+      grade: 'Grade',
+      difficulty: 'Difficulty',
+      difficultyDesc: 'Choose the difficulty based on your level',
+      questionCount: 'Questions',
+      questionCountDesc: 'Select number of questions for this practice',
       start: 'Start Quiz',
+      scienceElectives: 'Science Electives',
+      artsElectives: 'Arts Electives',
+      aiGenerated: 'AI Generated',
+      aiGeneratedDesc: 'Questions are generated based on DSE standards from the past 5 years, each practice has brand new questions',
+      features: 'Quiz Features',
+      modules: 'Knowledge Modules',
+      modulesDesc: 'Select the modules you want to practice (multiple selection allowed, leave empty for random)',
+      compulsory: 'Compulsory Part',
+      elective: 'Elective Part (Choose 2 of 4)',
+    },
+    
+    // Warnings
+    warnings: {
+      selectSubject: 'Please select a subject',
+      selectGrade: 'Please select a grade',
+      selectDifficulty: 'Please select a difficulty',
+    },
+    
+    // Loading Tips
+    loadingTips: {
+      selecting: 'Selecting questions from the database...',
+      adjusting: 'Adjusting difficulty for your grade...',
+      generating: 'Generating answer explanations...',
+      optimizing: 'Optimizing question content...',
+      almostDone: 'Almost done, please wait...',
+    },
+    
+    // AI Generation
+    aiGenerating: 'AI Generating',
+    generatingHint: 'Questions are generated based on DSE standards with detailed explanations',
+    targetAccuracy: 'Target Accuracy',
+    
+    // Features
+    features: {
+      dseStandard: 'DSE Exam Standard',
+      aiGenerated: 'AI Dynamic Generation',
+      instantGrading: 'Instant Grading & Analysis',
+      detailedReport: 'Detailed Learning Report',
+      pauseResume: 'Pause & Resume Anytime',
     },
     
     // Grades
@@ -429,6 +498,13 @@ export const en = {
       f4: 'Form 4',
       f5: 'Form 5',
       f6: 'Form 6',
+    },
+    
+    // Grade Descriptions
+    gradeDescs: {
+      f4: 'DSE Year 1 Curriculum',
+      f5: 'DSE Year 2 Curriculum',
+      f6: 'DSE Year 3 / Exam Year',
     },
     
     // Difficulties
@@ -439,6 +515,23 @@ export const en = {
       exam: 'Exam Level',
     },
     
+    // Difficulty Descriptions
+    difficultyDescs: {
+      basic: 'Foundation Knowledge Review',
+      standard: 'Regular Practice Level',
+      challenging: 'Skill Enhancement Training',
+      exam: 'DSE Real Exam Simulation',
+    },
+    
+    // Question Count Labels
+    countLabels: {
+      quick: 'Quick Practice',
+      standard: 'Standard Practice',
+      deep: 'Deep Practice',
+      mock: 'Mock Test',
+    },
+    countSuffix: ' Questions',
+    
     // Subjects
     subjects: {
       math: 'Mathematics',
@@ -447,10 +540,8 @@ export const en = {
       physics: 'Physics',
       chemistry: 'Chemistry',
       biology: 'Biology',
-      economics: 'Economics',
-      bafs: 'BAFS',
-      history: 'History',
-      geography: 'Geography',
+      mathM1: 'M1 (Calculus & Statistics)',
+      mathM2: 'M2 (Algebra & Calculus)',
     },
     
     // Quiz Page
@@ -462,7 +553,13 @@ export const en = {
     correct: 'Correct',
     incorrect: 'Incorrect',
     correctAnswer: 'Correct Answer',
+    incorrectAnswer: 'Incorrect Answer',
     explanation: 'Explanation',
+    pleaseAnswer: 'Please select or enter an answer first',
+    timeWarning: '⏰ Less than 1 minute remaining!',
+    timeUp: 'Time is up! Auto-submitting...',
+    favorited: 'Added to favorites',
+    unfavorited: 'Removed from favorites',
     
     // Result Page
     result: {
@@ -501,6 +598,173 @@ export const en = {
       score: 'Score',
       accuracy: 'Accuracy',
       view: 'View Details',
+    },
+  },
+
+  // Level Test
+  levelTest: {
+    title: 'DSE Level Test',
+    subtitle: 'Accurately assess your actual academic level in Hong Kong DSE courses and get personalized learning suggestions',
+    testNotFound: 'Test not found or expired',
+    timeUp: 'Time is up! Auto-submitting...',
+    points: 'pts',
+    
+    // Question Types
+    questionTypes: {
+      choice: 'Multiple Choice',
+      short: 'Short Answer',
+      long: 'Essay',
+    },
+    
+    // Confirm Submit
+    confirmSubmit: {
+      title: 'Confirm Submission',
+      continue: 'Continue',
+      answered: 'Answered',
+      unanswered: 'Unanswered',
+      marked: 'Marked for Review',
+      warning: 'You have {count} unanswered questions. Are you sure you want to submit?',
+    },
+    
+    // Grading Tips
+    gradingTips: {
+      wait: 'Grading takes some time, please wait...',
+      ai: 'AI is evaluating your answers',
+    },
+    
+    // Test Notice
+    testNotice: {
+      title: 'Test Instructions',
+      tip1: 'Ensure stable network. Progress auto-saves every 30 seconds.',
+      tip2: 'Questions include MC (40%), Short Answer (40%), Essay (20%).',
+      tip3: 'Complete within the time limit. Auto-submit on timeout.',
+      tip4: 'Results generate detailed analysis and learning suggestions.',
+    },
+    
+    // DSE Levels
+    dseLevels: {
+      title: 'DSE Levels Guide',
+      '5star2': 'Outstanding',
+      '5star': 'Excellent',
+      '5': 'Good',
+      '4': 'Fair',
+      '3': 'Basic Proficiency',
+      '2': 'Partial Proficiency',
+      '1': 'Below Proficiency',
+      'U': 'Ungraded',
+    },
+    
+    // Features
+    features: {
+      aiTitle: 'Smart AI Questions',
+      aiDesc: 'Based on DeepSeek AI, strictly following HKEAA DSE curriculum guidelines',
+      multiTitle: 'Multi-dimensional Assessment',
+      multiDesc: 'Multiple choice, short answer, and essay questions for comprehensive evaluation',
+      predictTitle: 'DSE Level Prediction',
+      predictDesc: 'Predict DSE level (1-5**) based on test performance for precise positioning',
+    },
+    
+    // Setup Page
+    setup: {
+      startTest: 'Start Test',
+      selectGrade: 'Select Grade',
+      selectSubject: 'Select Subject',
+      selectType: 'Select Test Type',
+      selectBoth: 'Please select grade and subject first',
+      coreSubjects: 'Core Subjects',
+      electiveSubjects: 'Elective Subjects',
+      quickTest: 'Quick Test',
+      quickDesc: '15-20 questions, about 30 minutes',
+      fullTest: 'Full Assessment',
+      fullDesc: '25-30 questions, about 60 minutes',
+      recommended: 'Recommended',
+      pleaseSelectGrade: 'Please select grade',
+      pleaseSelectSubject: 'Please select subject',
+      noQuestionsError: 'No questions available for this subject. Please select another subject.',
+      generateFailed: 'Failed to generate test',
+    },
+    
+    // Test In Progress
+    progress: {
+      question: 'Question {current}',
+      questionCard: 'Answer Card',
+      answered: 'Answered',
+      marked: 'Marked',
+      current: 'Current',
+      submitTest: 'Submit Test',
+      markQuestion: 'Mark',
+      previousQuestion: 'Previous',
+      nextQuestion: 'Next',
+      relatedTopics: 'Related Topics',
+      pleaseAnswer: 'Please enter your answer...',
+      pleaseAnswerLong: 'Please write your detailed answer...',
+    },
+    
+    // Test Submission
+    submit: {
+      submitting: 'Submitting answers...',
+      grading: 'Grading test...',
+      gradingMC: 'Evaluating multiple choice...',
+      gradingSA: 'Analyzing short answers...',
+      gradingLA: 'Evaluating essays...',
+      generatingReport: 'Generating report...',
+      almostDone: 'Almost done...',
+      completed: 'Grading complete! Redirecting to report...',
+      success: 'Test submitted!',
+      failed: 'Submission failed',
+    },
+    
+    // Report Page
+    report: {
+      title: 'Level Test Report',
+      overallScore: 'Overall Score',
+      predictedLevel: 'Predicted DSE Level',
+      timeSpent: 'Time Spent',
+      correctRate: 'Accuracy',
+      totalQuestions: 'Total Questions',
+      correctCount: 'Correct Answers',
+      
+      // Ability Analysis
+      abilityAnalysis: 'Ability Analysis',
+      knowledge: 'Knowledge',
+      application: 'Application',
+      analysis: 'Analysis',
+      synthesis: 'Synthesis',
+      evaluation: 'Evaluation',
+      
+      // Strengths & Weaknesses
+      strengths: 'Strengths',
+      weaknesses: 'Areas to Improve',
+      
+      // Recommendations
+      recommendations: 'Study Recommendations',
+      priority: 'Priority',
+      topic: 'Topic',
+      resources: 'Resources',
+      
+      // Question Details
+      questionDetails: 'Question Details',
+      yourAnswer: 'Your Answer',
+      correctAnswer: 'Correct Answer',
+      notAnswered: 'Not Answered',
+      feedback: 'Feedback',
+      
+      // Actions
+      backToSetup: 'Back to Setup',
+      backHome: 'Back to Home',
+      retakeTest: 'Retake Test',
+    },
+    
+    // History
+    history: {
+      title: 'Test History',
+      empty: 'No test records',
+      testDate: 'Test Date',
+      subject: 'Subject',
+      grade: 'Grade',
+      score: 'Score',
+      level: 'Level',
+      viewReport: 'View Report',
     },
   },
 
@@ -543,6 +807,93 @@ export const en = {
     loading: 'Loading...',
     empty: 'No data',
     error: 'Failed to load',
+    completeToJoin: 'Complete a quiz to join the ranking',
+    beFirstToRank: 'Be the first to rank!',
+  },
+
+  // Points System
+  points: {
+    title: 'Points Center',
+    myPoints: 'My Points',
+    totalPoints: 'Total Points',
+    availablePoints: 'Available Points',
+    level: 'Level',
+    levelNames: {
+      1: 'Beginner',
+      2: 'Improver',
+      3: 'Scholar',
+      4: 'DSE Expert',
+      5: 'Top Star',
+    },
+    toNextLevel: 'Points needed for next level',
+    pointsUnit: 'pts',
+    
+    // Check-in
+    dailyCheckin: 'Daily Check-in',
+    checkinSuccess: 'Check-in successful! Earned',
+    alreadyCheckedIn: 'Already checked in today',
+    checkedIn: 'Checked In ✓',
+    checkinButton: 'Daily Check-in +10 pts',
+    
+    // Statistics
+    statistics: 'Points Statistics',
+    earnPoints: 'Earn Points',
+    recentActivity: 'Recent Activity',
+    viewAll: 'View All',
+    noRecords: 'No points yet. Start learning to earn points!',
+    completed: 'Completed',
+    
+    // Rules
+    rules: {
+      dailyLogin: 'Daily Login',
+      completePractice: 'Complete Practice',
+      completeTest: 'Complete Test',
+      highScore: 'High Score Test',
+      streak5: '5 Correct Streak',
+      streak10: '10 Correct Streak',
+      times: 'times',
+    },
+    
+    // Quick Actions
+    quickActions: 'Quick Actions',
+    goPractice: 'Practice',
+    goTest: 'Level Test',
+    goMall: 'Points Mall',
+    perTime: 'per time',
+    exchangeGifts: 'Redeem Gifts',
+    
+    // Mall
+    mall: {
+      title: 'Points Mall',
+      availableBalance: 'Available Points',
+      itemList: 'Products',
+      myOrders: 'My Orders',
+      exchange: 'Redeem Now',
+      insufficientPoints: 'Insufficient Points',
+      confirmExchange: 'Confirm Redemption',
+      exchangeSuccess: 'Redemption successful! Order ID: ',
+      productName: 'Product Name',
+      requiredPoints: 'Required Points',
+      currentPoints: 'Current Points',
+      afterExchange: 'Balance After',
+      receiverInfo: 'Delivery Info (Required for physical items)',
+      receiverPlaceholder: 'Enter delivery address and contact info',
+      stock: 'Stock',
+      stockSufficient: 'In Stock',
+      remaining: 'Remaining',
+      soldOut: 'Sold Out',
+      virtual: 'Virtual Item',
+      digital: 'Digital Item',
+      physical: 'Physical Item',
+      orderStatus: {
+        pending: 'Pending',
+        paid: 'Points Deducted',
+        fulfilled: 'Completed',
+        cancelled: 'Cancelled',
+      },
+      noItems: 'No products available yet. Stay tuned!',
+      noOrders: 'No order history',
+    },
   },
 }
 

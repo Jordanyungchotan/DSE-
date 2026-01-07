@@ -24,6 +24,7 @@ import {
   RobotOutlined,
 } from '@ant-design/icons'
 import { apiFetch } from '../config/api'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './UniversityAnalysisPage.module.css'
 
 const { Title, Text } = Typography
@@ -97,6 +98,7 @@ const ANALYSIS_STAGES = [
  */
 const UniversityAnalysisPage = () => {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [dseResults, setDseResults] = useState<DseResult[]>([
@@ -209,14 +211,14 @@ const UniversityAnalysisPage = () => {
           icon={<ArrowLeftOutlined />} 
           onClick={() => navigate('/analysis')}
         >
-          返回
+          {t('common.back')}
         </Button>
         <div className={styles.titleSection}>
           <Title level={2} className="gradient-title">
-            <RocketOutlined /> 大学申请分析
+            <RocketOutlined /> {t('analysis.universityTitle')}
           </Title>
           <Text type="secondary">
-            分析您的DSE成绩与目标大学专业的匹配度
+            {t('analysis.universityTitle')}
           </Text>
         </div>
       </div>

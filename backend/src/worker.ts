@@ -404,6 +404,16 @@ function intelligentAnswerMatch(
       userStr, expectedStr, userChoice, expectedChoice, 
       userTrimmed, expectedTrimmed 
     })
+    
+    // 选择题答案不正确，直接返回错误反馈
+    if (userChoice && expectedChoice) {
+      return {
+        isCorrect: false,
+        matchType: 'choice',
+        confidence: 0,
+        feedback: `答案不正确。正确答案是 ${expectedChoice}。`
+      }
+    }
   }
   
   // 4. 智能数值匹配 - 核心改进！

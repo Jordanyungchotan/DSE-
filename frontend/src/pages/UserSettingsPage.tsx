@@ -24,6 +24,7 @@ import {
 } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
 import { useAuthStore } from '../stores/authStore'
+import { useLanguageStore } from '../stores/languageStore'
 import { apiFetch } from '../config/api'
 import styles from './UserSettingsPage.module.css'
 
@@ -35,6 +36,7 @@ const { Title, Text, Paragraph } = Typography
 const UserSettingsPage = () => {
   const navigate = useNavigate()
   const { isAuthenticated, user, token, updateUser } = useAuthStore()
+  const { t } = useLanguageStore()
   const [profileForm] = Form.useForm()
   const [passwordForm] = Form.useForm()
   
@@ -468,10 +470,10 @@ const UserSettingsPage = () => {
       {/* 页面标题 */}
       <div className={styles.pageHeader}>
         <Title level={2}>
-          <UserOutlined /> 账户设置
+          <UserOutlined /> {t('common.save')}
         </Title>
         <Paragraph type="secondary">
-          管理您的个人资料、密码和账户安全
+          {t('auth.name')}
         </Paragraph>
       </div>
 

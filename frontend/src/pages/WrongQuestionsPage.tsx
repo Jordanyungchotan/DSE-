@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import { SUPPORTED_SUBJECTS } from '../stores/quizStore'
+import { useLanguageStore } from '../stores/languageStore'
 import { apiFetch } from '../config/api'
 import styles from './WrongQuestionsPage.module.css'
 
@@ -48,6 +49,7 @@ interface WrongQuestion {
 const WrongQuestionsPage = () => {
   const navigate = useNavigate()
   const { isAuthenticated, token } = useAuthStore()
+  const { t } = useLanguageStore()
   const [wrongQuestions, setWrongQuestions] = useState<WrongQuestion[]>([])
   const [loading, setLoading] = useState(true)
   const [filterSubject, setFilterSubject] = useState<string>('all')
@@ -252,13 +254,13 @@ const WrongQuestionsPage = () => {
       <div className={styles.pageHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerBadge}>
-            <BookOutlined /> 错题本
+            <BookOutlined /> {t('quiz.wrongBook.title')}
           </div>
           <Title level={2} className={styles.pageTitle}>
-            <span className="gradient-title">我的错题本</span>
+            <span className="gradient-title">{t('quiz.wrongBook.title')}</span>
           </Title>
           <Paragraph className={styles.pageDesc}>
-            记录并复习答错的题目，针对性地巩固薄弱知识点
+            {t('quiz.wrongBook.title')}
           </Paragraph>
         </div>
       </div>
@@ -308,7 +310,7 @@ const WrongQuestionsPage = () => {
               value={filterSubject}
               onChange={setFilterSubject}
               style={{ width: 150 }}
-              placeholder="选择科目"
+              placeholder={t('quiz.config.subject')}
             >
               <Option value="all">全部科目</Option>
               {allSubjects.map((subject) => (
@@ -323,7 +325,7 @@ const WrongQuestionsPage = () => {
               刷新
             </Button>
             <Button type="primary" icon={<BulbOutlined />} onClick={() => navigate('/quiz')}>
-              开始刷题
+              {t('quiz.config.start')}
             </Button>
           </div>
         </div>

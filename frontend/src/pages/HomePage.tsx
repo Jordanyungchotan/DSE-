@@ -516,30 +516,30 @@ const HomePage = () => {
             <Col xs={24} lg={14}>
               <div className={styles.levelTestContent}>
                 <div className={styles.levelTestTag}>
-                  <TrophyOutlined /> 全新功能
+                  <TrophyOutlined /> {t('home.levelTest.newFeature')}
                 </div>
                 <Title level={2}>
-                  <span className="gradient-title">DSE水平测试</span>
+                  <span className="gradient-title">{t('home.levelTest.title')}</span>
                 </Title>
                 <Paragraph className={styles.levelTestDesc}>
-                  精准评估您在香港DSE课程中的实际学业水平，获取DSE等级预测和个性化学习建议
+                  {t('home.levelTest.description')}
                 </Paragraph>
                 <div className={styles.levelTestFeatures}>
                   <div className={styles.levelTestFeatureItem}>
                     <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    <span>智能AI出题，符合考评局标准</span>
+                    <span>{t('home.levelTest.feature1')}</span>
                   </div>
                   <div className={styles.levelTestFeatureItem}>
                     <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    <span>多维度能力评估，精准定位</span>
+                    <span>{t('home.levelTest.feature2')}</span>
                   </div>
                   <div className={styles.levelTestFeatureItem}>
                     <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    <span>DSE等级预测 (1-5**)</span>
+                    <span>{t('home.levelTest.feature3')}</span>
                   </div>
                   <div className={styles.levelTestFeatureItem}>
                     <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                    <span>详细报告和学习建议</span>
+                    <span>{t('home.levelTest.feature4')}</span>
                   </div>
                 </div>
                 <div className={styles.levelTestButtons}>
@@ -550,14 +550,14 @@ const HomePage = () => {
                     onClick={() => navigate('/level-test')}
                     className={styles.levelTestPrimaryBtn}
                   >
-                    开始水平测试
+                    {t('home.levelTest.startButton')}
                   </Button>
                   <Button
                     size="large"
                     icon={<FileSearchOutlined />}
                     onClick={() => navigate('/level-test/history')}
                   >
-                    查看测试记录
+                    {t('home.levelTest.viewHistoryButton')}
                   </Button>
                 </div>
               </div>

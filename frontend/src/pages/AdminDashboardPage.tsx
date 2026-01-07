@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { 
   Table, Card, Button, Tag, Space, Typography, message, 
   Modal, Input, Select, Statistic, Row, Col, Tooltip, Divider, List, Avatar,
-  Tabs, Progress, Badge, Empty, Spin
+  Tabs, Progress, Badge, Empty, Spin, Upload
 } from 'antd'
 import { 
   DownloadOutlined, LogoutOutlined, ReloadOutlined, 
@@ -11,9 +11,12 @@ import {
   UserOutlined, MailOutlined, MessageOutlined, DeleteOutlined,
   ExclamationCircleOutlined, TeamOutlined, BarChartOutlined,
   RiseOutlined, BookOutlined, TrophyOutlined, DatabaseOutlined,
-  SafetyOutlined, EditOutlined, CloseCircleOutlined
+  SafetyOutlined, EditOutlined, CloseCircleOutlined, GiftOutlined,
+  DollarOutlined, ShoppingOutlined, LockOutlined, UnlockOutlined,
+  WarningOutlined, StopOutlined, SyncOutlined, CrownOutlined,
+  FundOutlined, PlusOutlined, LoadingOutlined
 } from '@ant-design/icons'
-import { apiFetch } from '../config/api'
+import { apiFetch, ragFetch } from '../config/api'
 import styles from './AdminDashboardPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -70,6 +73,77 @@ interface ReviewItem {
   created_at: string
 }
 
+// 积分系统相关接口
+interface PointsDashboardStats {
+  date: string
+  todayPointsEarned: number
+  todayPointsSpent: number
+  totalUsers: number
+  pendingOrders: number
+  todayFraudEvents: number
+}
+
+interface TopEarner {
+  user_id: string
+  total_earned: number
+  action_count: number
+}
+
+interface FraudRule {
+  id: number
+  rule_code: string
+  name: string
+  description: string
+  check_type: string
+  threshold_value: number
+  time_window_seconds: number
+  is_active: boolean
+  penalty_action: string
+}
+
+interface PointsLedgerItem {
+  id: number
+  user_id: string
+  change_points: number
+  current_points: number
+  type: string
+  description: string
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+interface PointsOrder {
+  id: string
+  user_id: string
+  item_id: number
+  item_name: string
+  item_type: string
+  quantity: number
+  total_cost: number
+  status: string
+  receiver_info: string | null
+  shipping_info: string | null
+  created_at: string
+  fulfilled_at: string | null
+}
+
+// 商城商品接口
+interface MallItem {
+  id: number
+  name: string
+  description: string | null
+  image_url: string | null
+  price: number
+  stock: number
+  item_type: string
+  delivery_info: string | null
+  is_visible: boolean
+  sort_order: number
+  created_at?: string
+  updated_at?: string
+}
+
 interface TestRecord {
   id: string
   user_id: string
@@ -116,6 +190,44 @@ const AdminDashboardPage = () => {
   const [reviewStatus, setReviewStatus] = useState<'approved' | 'rejected' | 'modified'>('approved')
   const [reviewComments, setReviewComments] = useState('')
 
+  // 积分系统管理相关状态
+  const [pointsStats, setPointsStats] = useState<PointsDashboardStats | null>(null)
+  const [topEarners, setTopEarners] = useState<TopEarner[]>([])
+  const [fraudRules, setFraudRules] = useState<FraudRule[]>([])
+  const [pointsLedger, setPointsLedger] = useState<PointsLedgerItem[]>([])
+  const [pointsOrders, setPointsOrders] = useState<PointsOrder[]>([])
+  const [pointsLoading, setPointsLoading] = useState(false)
+  const [ledgerUserId, setLedgerUserId] = useState('')
+  const [orderStatus, setOrderStatus] = useState('')
+  const [ruleModalVisible, setRuleModalVisible] = useState(false)
+  const [selectedRule, setSelectedRule] = useState<FraudRule | null>(null)
+  const [editThreshold, setEditThreshold] = useState(0)
+  const [editRuleActive, setEditRuleActive] = useState(true)
+  const [grantModalVisible, setGrantModalVisible] = useState(false)
+  const [grantUserId, setGrantUserId] = useState('')
+  const [grantPoints, setGrantPoints] = useState(0)
+  const [grantReason, setGrantReason] = useState('')
+  const [userSearchResults, setUserSearchResults] = useState<{user_id: string, total_points: number, available_points: number}[]>([])
+  const [userSearchLoading, setUserSearchLoading] = useState(false)
+
+  // 商城商品管理相关状态
+  const [mallItems, setMallItems] = useState<MallItem[]>([])
+  const [mallItemsLoading, setMallItemsLoading] = useState(false)
+  const [itemModalVisible, setItemModalVisible] = useState(false)
+  const [editingItem, setEditingItem] = useState<MallItem | null>(null)
+  const [itemForm, setItemForm] = useState<Partial<MallItem>>({
+    name: '',
+    description: '',
+    image_url: '',
+    price: 0,
+    stock: -1,
+    item_type: 'VIRTUAL',
+    delivery_info: '',
+    is_visible: true,
+    sort_order: 0,
+  })
+  const [imageUploading, setImageUploading] = useState(false)
+
   const adminKey = sessionStorage.getItem('adminKey')
 
   useEffect(() => {
@@ -132,6 +244,21 @@ const AdminDashboardPage = () => {
       loadLevelTestStats()
       loadReviewQueue()
       loadTestRecords()
+    }
+  }, [activeTab, adminKey])
+
+  useEffect(() => {
+    if (activeTab === 'points' && adminKey) {
+      loadPointsStats()
+      loadTopEarners()
+      loadFraudRules()
+      loadPointsOrders()
+    }
+  }, [activeTab, adminKey])
+
+  useEffect(() => {
+    if (activeTab === 'mallItems' && adminKey) {
+      loadMallItems()
     }
   }, [activeTab, adminKey])
 
@@ -201,6 +328,493 @@ const AdminDashboardPage = () => {
     } catch {
       console.error('加载测试记录失败')
     }
+  }
+
+  // ========== 积分系统管理函数 ==========
+  
+  // 加载积分系统统计
+  const loadPointsStats = async () => {
+    setPointsLoading(true)
+    try {
+      const response = await ragFetch('/admin/dashboard/stats', {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setPointsStats(data.data)
+      }
+    } catch {
+      console.error('加载积分统计失败')
+    } finally {
+      setPointsLoading(false)
+    }
+  }
+
+  // 加载积分获取排行榜
+  const loadTopEarners = async () => {
+    try {
+      const response = await ragFetch('/admin/points/top-earners?limit=10', {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTopEarners(data.data || [])
+      }
+    } catch {
+      console.error('加载排行榜失败')
+    }
+  }
+
+  // 加载防刷规则
+  const loadFraudRules = async () => {
+    try {
+      const response = await ragFetch('/admin/fraud/rules', {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setFraudRules(data.data || [])
+      }
+    } catch {
+      console.error('加载防刷规则失败')
+    }
+  }
+
+  // 加载积分流水
+  const loadPointsLedger = async (userId?: string) => {
+    try {
+      const params = new URLSearchParams()
+      if (userId) params.append('user_id', userId)
+      params.append('limit', '50')
+      
+      const response = await ragFetch(`/admin/points/ledger?${params}`, {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setPointsLedger(data.data || [])
+      }
+    } catch {
+      console.error('加载积分流水失败')
+    }
+  }
+
+  // 加载兑换订单
+  const loadPointsOrders = async (status?: string) => {
+    try {
+      const params = new URLSearchParams()
+      if (status) params.append('status', status)
+      params.append('limit', '50')
+      
+      const response = await ragFetch(`/admin/mall/orders?${params}`, {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setPointsOrders(data.data || [])
+      }
+    } catch {
+      console.error('加载订单失败')
+    }
+  }
+
+  // 更新防刷规则
+  const handleUpdateRule = async () => {
+    if (!selectedRule) return
+    
+    setUpdating(true)
+    try {
+      const response = await ragFetch(`/admin/fraud/rules/${selectedRule.rule_code}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Token': adminKey || '' 
+        },
+        body: JSON.stringify({ 
+          threshold_value: editThreshold,
+          is_active: editRuleActive
+        })
+      })
+      
+      if (response.ok) {
+        message.success('规则更新成功')
+        setRuleModalVisible(false)
+        loadFraudRules()
+      } else {
+        throw new Error('更新失败')
+      }
+    } catch {
+      message.error('规则更新失败')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  // 搜索用户
+  const searchUsers = async (query: string) => {
+    if (!query && query !== '') return
+    setUserSearchLoading(true)
+    try {
+      const response = await ragFetch(`/admin/users/search?q=${encodeURIComponent(query)}&limit=20`, {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setUserSearchResults(data.data || [])
+      }
+    } catch {
+      console.error('搜索用户失败')
+    } finally {
+      setUserSearchLoading(false)
+    }
+  }
+
+  // 加载所有用户（打开弹窗时）
+  const loadAllUsers = async () => {
+    setUserSearchLoading(true)
+    try {
+      const response = await ragFetch('/admin/users/search?limit=50', {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setUserSearchResults(data.data || [])
+      }
+    } catch {
+      console.error('加载用户失败')
+    } finally {
+      setUserSearchLoading(false)
+    }
+  }
+
+  // 手动补发积分
+  const handleGrantPoints = async () => {
+    if (!grantUserId || !grantPoints || !grantReason) {
+      message.warning('请填写完整信息')
+      return
+    }
+    
+    setUpdating(true)
+    try {
+      const response = await ragFetch('/admin/points/grant', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Token': adminKey || '' 
+        },
+        body: JSON.stringify({ 
+          user_id: grantUserId,
+          points: grantPoints,
+          reason: grantReason
+        })
+      })
+      
+      if (response.ok) {
+        message.success('积分补发成功')
+        setGrantModalVisible(false)
+        setGrantUserId('')
+        setGrantPoints(0)
+        setGrantReason('')
+        loadPointsStats()
+        loadTopEarners()
+      } else {
+        throw new Error('补发失败')
+      }
+    } catch {
+      message.error('积分补发失败')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  // 履约订单
+  const handleFulfillOrder = async (orderId: string, status: string) => {
+    try {
+      const response = await ragFetch(`/admin/mall/orders/${orderId}/fulfill`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-Admin-Token': adminKey || '' 
+        },
+        body: JSON.stringify({ status })
+      })
+      
+      if (response.ok) {
+        message.success('订单状态更新成功')
+        loadPointsOrders(orderStatus)
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || '更新失败')
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '订单更新失败')
+    }
+  }
+
+  // ========== 商城商品管理函数 ==========
+
+  // 加载商品列表
+  const loadMallItems = async () => {
+    setMallItemsLoading(true)
+    try {
+      const response = await ragFetch('/admin/mall/items', {
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setMallItems(data.data || [])
+      }
+    } catch {
+      console.error('加载商品列表失败')
+    } finally {
+      setMallItemsLoading(false)
+    }
+  }
+
+  // 打开新建商品弹窗
+  const handleAddItem = () => {
+    setEditingItem(null)
+    setItemForm({
+      name: '',
+      description: '',
+      image_url: '',
+      price: 0,
+      stock: -1,
+      item_type: 'VIRTUAL',
+      delivery_info: '',
+      is_visible: true,
+      sort_order: 0,
+    })
+    setItemModalVisible(true)
+  }
+
+  // 图片上传处理 - 转为 base64
+  const handleImageUpload = (file: File): boolean => {
+    // 限制文件大小 (2MB)
+    const maxSize = 2 * 1024 * 1024
+    if (file.size > maxSize) {
+      message.error('图片大小不能超过 2MB')
+      return false
+    }
+
+    // 限制文件类型
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if (!validTypes.includes(file.type)) {
+      message.error('只支持 JPG、PNG、GIF、WEBP 格式的图片')
+      return false
+    }
+
+    setImageUploading(true)
+    
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string
+      setItemForm(prev => ({ ...prev, image_url: base64 }))
+      setImageUploading(false)
+      message.success('图片上传成功')
+    }
+    reader.onerror = () => {
+      message.error('图片读取失败')
+      setImageUploading(false)
+    }
+    reader.readAsDataURL(file)
+    
+    return false // 阻止默认上传行为
+  }
+
+  // 打开编辑商品弹窗
+  const handleEditItem = (item: MallItem) => {
+    setEditingItem(item)
+    setItemForm({
+      name: item.name,
+      description: item.description || '',
+      image_url: item.image_url || '',
+      price: item.price,
+      stock: item.stock,
+      item_type: item.item_type,
+      delivery_info: item.delivery_info || '',
+      is_visible: item.is_visible,
+      sort_order: item.sort_order,
+    })
+    setItemModalVisible(true)
+  }
+
+  // 保存商品
+  const handleSaveItem = async () => {
+    if (!itemForm.name || itemForm.price === undefined) {
+      message.warning('请填写商品名称和价格')
+      return
+    }
+
+    setUpdating(true)
+    try {
+      if (editingItem) {
+        // 更新商品
+        const response = await ragFetch(`/admin/mall/items/${editingItem.id}`, {
+          method: 'PATCH',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Admin-Token': adminKey || '' 
+          },
+          body: JSON.stringify(itemForm)
+        })
+        
+        if (response.ok) {
+          message.success('商品更新成功')
+          setItemModalVisible(false)
+          loadMallItems()
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || '更新失败')
+        }
+      } else {
+        // 创建商品
+        const response = await ragFetch('/admin/mall/items', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Admin-Token': adminKey || '' 
+          },
+          body: JSON.stringify(itemForm)
+        })
+        
+        if (response.ok) {
+          message.success('商品创建成功')
+          setItemModalVisible(false)
+          loadMallItems()
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || '创建失败')
+        }
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : '保存商品失败')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  // 切换商品上下架状态
+  const handleToggleItem = async (itemId: number) => {
+    try {
+      const response = await ragFetch(`/admin/mall/items/${itemId}/toggle`, {
+        method: 'POST',
+        headers: { 'X-Admin-Token': adminKey || '' }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        message.success(data.message)
+        loadMallItems()
+      } else {
+        throw new Error('操作失败')
+      }
+    } catch {
+      message.error('操作失败')
+    }
+  }
+
+  // 删除商品
+  const handleDeleteItem = (item: MallItem, force: boolean = false) => {
+    const doDelete = async () => {
+      try {
+        const url = force 
+          ? `/admin/mall/items/${item.id}?force=true`
+          : `/admin/mall/items/${item.id}`
+        
+        const response = await ragFetch(url, {
+          method: 'DELETE',
+          headers: { 'X-Admin-Token': adminKey || '' }
+        })
+        
+        if (response.ok) {
+          message.success('商品已删除')
+          loadMallItems()
+        } else {
+          const data = await response.json()
+          
+          // 如果有关联订单，询问是否强制删除
+          if (data.hasOrders) {
+            Modal.confirm({
+              title: '该商品有关联订单',
+              icon: <WarningOutlined style={{ color: '#faad14' }} />,
+              content: (
+                <div>
+                  <p>{data.error}</p>
+                  <p style={{ color: '#f5222d' }}>强制删除后，相关订单记录将无法显示商品信息。</p>
+                </div>
+              ),
+              okText: '强制删除',
+              okType: 'danger',
+              cancelText: '取消',
+              onOk: () => handleDeleteItem(item, true)
+            })
+          } else {
+            message.error(data.error || '删除失败')
+          }
+        }
+      } catch {
+        message.error('删除失败')
+      }
+    }
+
+    if (force) {
+      // 强制删除直接执行
+      doDelete()
+    } else {
+      // 普通删除先确认
+      Modal.confirm({
+        title: '确认删除',
+        icon: <ExclamationCircleOutlined />,
+        content: `确定要删除商品 "${item.name}" 吗？`,
+        okText: '删除',
+        okType: 'danger',
+        cancelText: '取消',
+        onOk: doDelete
+      })
+    }
+  }
+
+  // 冻结/解冻用户
+  const handleFreezeUser = async (userId: string, action: 'freeze' | 'unfreeze' | 'ban') => {
+    Modal.confirm({
+      title: action === 'ban' ? '确认封禁用户' : action === 'freeze' ? '确认冻结用户' : '确认解冻用户',
+      icon: action === 'unfreeze' ? <UnlockOutlined /> : <LockOutlined />,
+      content: `确定要${action === 'ban' ? '封禁' : action === 'freeze' ? '冻结' : '解冻'}用户 ${userId} 吗？`,
+      okText: '确认',
+      okType: action === 'unfreeze' ? 'primary' : 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await ragFetch(`/admin/users/${userId}/freeze`, {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'X-Admin-Token': adminKey || '' 
+            },
+            body: JSON.stringify({ 
+              action,
+              duration_hours: action === 'freeze' ? 24 : undefined,
+              reason: action === 'freeze' ? '管理员手动冻结' : undefined
+            })
+          })
+          
+          if (response.ok) {
+            message.success(`用户${action === 'ban' ? '封禁' : action === 'freeze' ? '冻结' : '解冻'}成功`)
+          } else {
+            throw new Error('操作失败')
+          }
+        } catch {
+          message.error('操作失败')
+        }
+      }
+    })
   }
 
   // 处理题目审核
@@ -935,6 +1549,604 @@ const AdminDashboardPage = () => {
     </Spin>
   )
 
+  // 渲染积分系统管理标签页
+  const renderPointsTab = () => (
+    <Spin spinning={pointsLoading}>
+      {/* 积分系统统计 */}
+      <Row gutter={[16, 16]} className={styles.statsRow}>
+        <Col xs={12} sm={8} md={4}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="今日发放积分" 
+              value={pointsStats?.todayPointsEarned || 0}
+              prefix={<RiseOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={4}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="今日消耗积分" 
+              value={pointsStats?.todayPointsSpent || 0}
+              prefix={<FundOutlined />}
+              valueStyle={{ color: '#fa8c16' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={4}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="积分用户数" 
+              value={pointsStats?.totalUsers || 0}
+              prefix={<TeamOutlined />}
+              valueStyle={{ color: '#722ed1' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={4}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="待处理订单" 
+              value={pointsStats?.pendingOrders || 0}
+              prefix={<ShoppingOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={4}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="今日风控事件" 
+              value={pointsStats?.todayFraudEvents || 0}
+              prefix={<WarningOutlined />}
+              valueStyle={{ color: pointsStats?.todayFraudEvents ? '#f5222d' : '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={8} md={4}>
+          <Card className={styles.statCard}>
+            <Button 
+              type="primary" 
+              icon={<GiftOutlined />}
+              onClick={() => {
+                setGrantModalVisible(true)
+                loadAllUsers()
+              }}
+              block
+            >
+              手动补发积分
+            </Button>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* 今日积分获取 Top 10 */}
+      <Card 
+        title={<><CrownOutlined style={{ color: '#faad14', marginRight: 8 }} />今日积分获取排行</>}
+        className={styles.tableCard}
+        style={{ marginBottom: 24 }}
+        extra={
+          <Button icon={<ReloadOutlined />} onClick={loadTopEarners}>刷新</Button>
+        }
+      >
+        {topEarners.length === 0 ? (
+          <Empty description="暂无数据" />
+        ) : (
+          <Table
+            dataSource={topEarners}
+            rowKey="user_id"
+            pagination={false}
+            size="small"
+            columns={[
+              {
+                title: '排名',
+                key: 'rank',
+                width: 60,
+                render: (_, __, index) => (
+                  <span style={{ 
+                    color: index < 3 ? ['#faad14', '#a0a0a0', '#cd7f32'][index] : undefined,
+                    fontWeight: index < 3 ? 'bold' : 'normal',
+                    fontSize: index < 3 ? 16 : 14
+                  }}>
+                    {index + 1}
+                  </span>
+                )
+              },
+              { title: '用户ID', dataIndex: 'user_id', key: 'user_id', ellipsis: true },
+              { 
+                title: '获得积分', 
+                dataIndex: 'total_earned', 
+                key: 'total_earned',
+                render: (v: number) => <Text strong style={{ color: '#52c41a' }}>+{v}</Text>
+              },
+              { 
+                title: '操作次数', 
+                dataIndex: 'action_count', 
+                key: 'action_count',
+                render: (v: number) => <Tag color="blue">{v} 次</Tag>
+              },
+              {
+                title: '操作',
+                key: 'actions',
+                width: 150,
+                render: (_, record: TopEarner) => (
+                  <Space>
+                    <Button 
+                      size="small" 
+                      onClick={() => {
+                        setLedgerUserId(record.user_id)
+                        loadPointsLedger(record.user_id)
+                      }}
+                    >
+                      查看流水
+                    </Button>
+                  </Space>
+                )
+              }
+            ]}
+          />
+        )}
+      </Card>
+
+      {/* 防刷规则管理 */}
+      <Card 
+        title={<><SafetyOutlined style={{ color: '#1890ff', marginRight: 8 }} />防刷规则配置</>}
+        className={styles.tableCard}
+        style={{ marginBottom: 24 }}
+        extra={
+          <Button icon={<ReloadOutlined />} onClick={loadFraudRules}>刷新</Button>
+        }
+      >
+        <Table
+          dataSource={fraudRules}
+          rowKey="id"
+          pagination={false}
+          size="small"
+          columns={[
+            { title: '规则代码', dataIndex: 'rule_code', key: 'rule_code', width: 180 },
+            { title: '名称', dataIndex: 'name', key: 'name' },
+            { title: '说明', dataIndex: 'description', key: 'description', ellipsis: true },
+            { 
+              title: '阈值', 
+              dataIndex: 'threshold_value', 
+              key: 'threshold_value',
+              render: (v: number) => <Tag color="orange">{v}</Tag>
+            },
+            { 
+              title: '状态', 
+              dataIndex: 'is_active', 
+              key: 'is_active',
+              render: (v: boolean) => v ? 
+                <Tag icon={<CheckCircleOutlined />} color="success">启用</Tag> : 
+                <Tag icon={<StopOutlined />} color="default">禁用</Tag>
+            },
+            {
+              title: '操作',
+              key: 'actions',
+              width: 80,
+              render: (_, record: FraudRule) => (
+                <Button 
+                  size="small" 
+                  icon={<EditOutlined />}
+                  onClick={() => {
+                    setSelectedRule(record)
+                    setEditThreshold(record.threshold_value)
+                    setEditRuleActive(record.is_active)
+                    setRuleModalVisible(true)
+                  }}
+                >
+                  编辑
+                </Button>
+              )
+            }
+          ]}
+        />
+      </Card>
+
+      {/* 积分流水查询 */}
+      <Card 
+        title={<><DollarOutlined style={{ color: '#faad14', marginRight: 8 }} />积分流水查询</>}
+        className={styles.tableCard}
+        style={{ marginBottom: 24 }}
+        extra={
+          <Space>
+            <Input 
+              placeholder="输入用户ID" 
+              value={ledgerUserId}
+              onChange={(e) => setLedgerUserId(e.target.value)}
+              style={{ width: 200 }}
+              allowClear
+            />
+            <Button 
+              type="primary"
+              icon={<SyncOutlined />}
+              onClick={() => loadPointsLedger(ledgerUserId || undefined)}
+            >
+              查询
+            </Button>
+          </Space>
+        }
+      >
+        <Table
+          dataSource={pointsLedger}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          size="small"
+          scroll={{ x: 900 }}
+          columns={[
+            { title: '用户ID', dataIndex: 'user_id', key: 'user_id', width: 150, ellipsis: true },
+            { 
+              title: '变动', 
+              dataIndex: 'change_points', 
+              key: 'change_points',
+              width: 100,
+              render: (v: number) => (
+                <Text strong style={{ color: v > 0 ? '#52c41a' : '#f5222d' }}>
+                  {v > 0 ? `+${v}` : v}
+                </Text>
+              )
+            },
+            { 
+              title: '余额', 
+              dataIndex: 'current_points', 
+              key: 'current_points',
+              width: 80
+            },
+            { 
+              title: '类型', 
+              dataIndex: 'type', 
+              key: 'type',
+              width: 100,
+              render: (v: string) => (
+                <Tag color={v === 'EARN' ? 'green' : v === 'SPEND' ? 'orange' : 'blue'}>{v}</Tag>
+              )
+            },
+            { title: '描述', dataIndex: 'description', key: 'description', ellipsis: true },
+            { title: 'IP', dataIndex: 'ip_address', key: 'ip_address', width: 120, ellipsis: true },
+            { 
+              title: '时间', 
+              dataIndex: 'created_at', 
+              key: 'created_at',
+              width: 160,
+              render: (v: string) => new Date(v).toLocaleString('zh-CN')
+            },
+            {
+              title: '操作',
+              key: 'actions',
+              width: 100,
+              fixed: 'right' as const,
+              render: (_, record: PointsLedgerItem) => (
+                <Space>
+                  <Tooltip title="冻结用户">
+                    <Button 
+                      size="small" 
+                      danger
+                      icon={<LockOutlined />}
+                      onClick={() => handleFreezeUser(record.user_id, 'freeze')}
+                    />
+                  </Tooltip>
+                </Space>
+              )
+            }
+          ]}
+        />
+      </Card>
+
+      {/* 兑换订单管理 */}
+      <Card 
+        title={<><ShoppingOutlined style={{ color: '#722ed1', marginRight: 8 }} />兑换订单管理</>}
+        className={styles.tableCard}
+        extra={
+          <Space>
+            <Select
+              placeholder="订单状态"
+              value={orderStatus || undefined}
+              onChange={(v) => {
+                setOrderStatus(v || '')
+                loadPointsOrders(v || undefined)
+              }}
+              style={{ width: 120 }}
+              allowClear
+              options={[
+                { value: 'PAID', label: '待履约' },
+                { value: 'SHIPPING', label: '发货中' },
+                { value: 'FULFILLED', label: '已履约' },
+                { value: 'COMPLETED', label: '已完成' },
+              ]}
+            />
+            <Button icon={<ReloadOutlined />} onClick={() => loadPointsOrders(orderStatus || undefined)}>
+              刷新
+            </Button>
+          </Space>
+        }
+      >
+        <Table
+          dataSource={pointsOrders}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          size="small"
+          scroll={{ x: 1000 }}
+          columns={[
+            { title: '订单号', dataIndex: 'id', key: 'id', width: 180 },
+            { title: '用户ID', dataIndex: 'user_id', key: 'user_id', width: 150, ellipsis: true },
+            { title: '商品', dataIndex: 'item_name', key: 'item_name', width: 120 },
+            { 
+              title: '类型', 
+              dataIndex: 'item_type', 
+              key: 'item_type',
+              width: 70,
+              render: (v: string) => (
+                <Tag color={v === 'VIRTUAL' ? 'purple' : v === 'DIGITAL' ? 'cyan' : 'orange'}>
+                  {v === 'VIRTUAL' ? '虚拟' : v === 'DIGITAL' ? '数字' : '实物'}
+                </Tag>
+              )
+            },
+            { 
+              title: '收货信息', 
+              dataIndex: 'receiver_info', 
+              key: 'receiver_info',
+              width: 200,
+              render: (v: string | null, record: PointsOrder) => {
+                if (record.item_type !== 'PHYSICAL' || !v) {
+                  return <Text type="secondary">-</Text>
+                }
+                try {
+                  const info = JSON.parse(v)
+                  return (
+                    <Tooltip title={
+                      <div>
+                        <div><strong>姓名：</strong>{info.name}</div>
+                        <div><strong>电话：</strong>{info.phone}</div>
+                        <div><strong>地址：</strong>{info.address}</div>
+                      </div>
+                    }>
+                      <div style={{ cursor: 'pointer' }}>
+                        <div style={{ fontSize: 12 }}>{info.name} / {info.phone}</div>
+                        <div style={{ fontSize: 11, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
+                          {info.address}
+                        </div>
+                      </div>
+                    </Tooltip>
+                  )
+                } catch {
+                  return <Text type="secondary" style={{ fontSize: 12 }}>{v}</Text>
+                }
+              }
+            },
+            { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 60 },
+            { 
+              title: '消耗积分', 
+              dataIndex: 'total_cost', 
+              key: 'total_cost',
+              width: 100,
+              render: (v: number) => <Text type="danger">-{v}</Text>
+            },
+            { 
+              title: '状态', 
+              dataIndex: 'status', 
+              key: 'status',
+              width: 100,
+              render: (v: string) => {
+                const statusMap: Record<string, { color: string; text: string }> = {
+                  'PAID': { color: 'processing', text: '待履约' },
+                  'SHIPPING': { color: 'warning', text: '发货中' },
+                  'FULFILLED': { color: 'success', text: '已履约' },
+                  'COMPLETED': { color: 'default', text: '已完成' },
+                }
+                const s = statusMap[v] || { color: 'default', text: v }
+                return <Tag color={s.color}>{s.text}</Tag>
+              }
+            },
+            { 
+              title: '创建时间', 
+              dataIndex: 'created_at', 
+              key: 'created_at',
+              width: 160,
+              render: (v: string) => new Date(v).toLocaleString('zh-CN')
+            },
+            {
+              title: '操作',
+              key: 'actions',
+              width: 120,
+              fixed: 'right' as const,
+              render: (_, record: PointsOrder) => (
+                <Space>
+                  {record.status === 'PAID' && (
+                    <>
+                      {record.item_type === 'PHYSICAL' ? (
+                        <Button 
+                          size="small" 
+                          type="primary"
+                          onClick={() => handleFulfillOrder(record.id, 'SHIPPING')}
+                        >
+                          发货
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="small" 
+                          type="primary"
+                          onClick={() => handleFulfillOrder(record.id, 'FULFILLED')}
+                        >
+                          履约
+                        </Button>
+                      )}
+                    </>
+                  )}
+                  {record.status === 'SHIPPING' && (
+                    <Button 
+                      size="small" 
+                      onClick={() => handleFulfillOrder(record.id, 'COMPLETED')}
+                    >
+                      完成
+                    </Button>
+                  )}
+                </Space>
+              )
+            }
+          ]}
+        />
+      </Card>
+    </Spin>
+  )
+
+  // 渲染商城商品管理标签页
+  const renderMallItemsTab = () => (
+    <Spin spinning={mallItemsLoading}>
+      {/* 操作按钮 */}
+      <Card 
+        title={<><ShoppingOutlined style={{ color: '#722ed1', marginRight: 8 }} />商城商品管理</>}
+        className={styles.tableCard}
+        extra={
+          <Space>
+            <Button 
+              type="primary" 
+              icon={<GiftOutlined />}
+              onClick={handleAddItem}
+            >
+              添加商品
+            </Button>
+            <Button icon={<ReloadOutlined />} onClick={loadMallItems}>
+              刷新
+            </Button>
+          </Space>
+        }
+      >
+        <Table
+          dataSource={mallItems}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          scroll={{ x: 1200 }}
+          columns={[
+            {
+              title: '图片',
+              dataIndex: 'image_url',
+              key: 'image_url',
+              width: 80,
+              render: (url: string) => (
+                url ? (
+                  <img 
+                    src={url} 
+                    alt="商品" 
+                    style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 4 }}
+                  />
+                ) : (
+                  <div style={{ 
+                    width: 50, 
+                    height: 50, 
+                    backgroundColor: '#f0f0f0', 
+                    borderRadius: 4,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <ShoppingOutlined style={{ color: '#999' }} />
+                  </div>
+                )
+              )
+            },
+            { 
+              title: '商品名称', 
+              dataIndex: 'name', 
+              key: 'name',
+              width: 180,
+              render: (name: string, record: MallItem) => (
+                <div>
+                  <Text strong>{name}</Text>
+                  {!record.is_visible && <Tag color="default" style={{ marginLeft: 8 }}>已下架</Tag>}
+                </div>
+              )
+            },
+            { 
+              title: '描述', 
+              dataIndex: 'description', 
+              key: 'description',
+              ellipsis: true,
+              width: 200
+            },
+            { 
+              title: '价格', 
+              dataIndex: 'price', 
+              key: 'price',
+              width: 100,
+              render: (v: number) => <Text strong style={{ color: '#fa8c16' }}>{v} 积分</Text>
+            },
+            { 
+              title: '库存', 
+              dataIndex: 'stock', 
+              key: 'stock',
+              width: 80,
+              render: (v: number) => v === -1 ? <Tag color="green">无限</Tag> : <Tag color={v > 0 ? 'blue' : 'red'}>{v}</Tag>
+            },
+            { 
+              title: '类型', 
+              dataIndex: 'item_type', 
+              key: 'item_type',
+              width: 80,
+              render: (v: string) => {
+                const types: Record<string, { color: string; text: string }> = {
+                  'VIRTUAL': { color: 'purple', text: '虚拟' },
+                  'DIGITAL': { color: 'cyan', text: '数字' },
+                  'PHYSICAL': { color: 'orange', text: '实物' },
+                }
+                const t = types[v] || { color: 'default', text: v }
+                return <Tag color={t.color}>{t.text}</Tag>
+              }
+            },
+            { 
+              title: '状态', 
+              dataIndex: 'is_visible', 
+              key: 'is_visible',
+              width: 80,
+              render: (v: boolean) => v ? 
+                <Tag icon={<CheckCircleOutlined />} color="success">上架</Tag> : 
+                <Tag icon={<StopOutlined />} color="default">下架</Tag>
+            },
+            { 
+              title: '排序', 
+              dataIndex: 'sort_order', 
+              key: 'sort_order',
+              width: 60
+            },
+            {
+              title: '操作',
+              key: 'actions',
+              width: 200,
+              fixed: 'right' as const,
+              render: (_: unknown, record: MallItem) => (
+                <Space>
+                  <Button 
+                    size="small" 
+                    icon={<EditOutlined />}
+                    onClick={() => handleEditItem(record)}
+                  >
+                    编辑
+                  </Button>
+                  <Button 
+                    size="small"
+                    type={record.is_visible ? 'default' : 'primary'}
+                    icon={record.is_visible ? <StopOutlined /> : <CheckCircleOutlined />}
+                    onClick={() => handleToggleItem(record.id)}
+                  >
+                    {record.is_visible ? '下架' : '上架'}
+                  </Button>
+                  <Button 
+                    size="small" 
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleDeleteItem(record)}
+                  >
+                    删除
+                  </Button>
+                </Space>
+              )
+            }
+          ]}
+        />
+      </Card>
+    </Spin>
+  )
+
   const tabItems = [
     {
       key: 'overview',
@@ -969,6 +2181,29 @@ const AdminDashboardPage = () => {
         </span>
       ),
       children: renderLevelTestTab(),
+    },
+    {
+      key: 'points',
+      label: (
+        <span>
+          <GiftOutlined />
+          积分系统管理
+          {(pointsStats?.pendingOrders || 0) > 0 && (
+            <Badge count={pointsStats?.pendingOrders} style={{ marginLeft: 8 }} />
+          )}
+        </span>
+      ),
+      children: renderPointsTab(),
+    },
+    {
+      key: 'mallItems',
+      label: (
+        <span>
+          <ShoppingOutlined />
+          商城商品管理
+        </span>
+      ),
+      children: renderMallItemsTab(),
     },
   ]
 
@@ -1170,6 +2405,348 @@ const AdminDashboardPage = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 编辑防刷规则弹窗 */}
+      <Modal
+        title="编辑防刷规则"
+        open={ruleModalVisible}
+        onCancel={() => setRuleModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setRuleModalVisible(false)}>
+            取消
+          </Button>,
+          <Button 
+            key="save" 
+            type="primary" 
+            loading={updating}
+            onClick={handleUpdateRule}
+          >
+            保存
+          </Button>
+        ]}
+        width={500}
+      >
+        {selectedRule && (
+          <div className={styles.detailContent}>
+            <div className={styles.detailItem}>
+              <Text type="secondary">规则代码：</Text>
+              <Text strong>{selectedRule.rule_code}</Text>
+            </div>
+            <div className={styles.detailItem}>
+              <Text type="secondary">规则名称：</Text>
+              <Text>{selectedRule.name}</Text>
+            </div>
+            <div className={styles.detailItem}>
+              <Text type="secondary">说明：</Text>
+              <Text>{selectedRule.description}</Text>
+            </div>
+            <Divider />
+            <div className={styles.detailItem}>
+              <Text type="secondary">阈值：</Text>
+              <Input 
+                type="number"
+                value={editThreshold}
+                onChange={(e) => setEditThreshold(Number(e.target.value))}
+                style={{ width: 150 }}
+              />
+            </div>
+            <div className={styles.detailItem}>
+              <Text type="secondary">状态：</Text>
+              <Select
+                value={editRuleActive}
+                onChange={setEditRuleActive}
+                style={{ width: 150 }}
+                options={[
+                  { value: true, label: '启用' },
+                  { value: false, label: '禁用' },
+                ]}
+              />
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* 手动补发积分弹窗 */}
+      <Modal
+        title="手动补发积分"
+        open={grantModalVisible}
+        onCancel={() => {
+          setGrantModalVisible(false)
+          setGrantUserId('')
+          setGrantPoints(0)
+          setGrantReason('')
+        }}
+        footer={[
+          <Button key="cancel" onClick={() => setGrantModalVisible(false)}>
+            取消
+          </Button>,
+          <Button 
+            key="grant" 
+            type="primary" 
+            icon={<GiftOutlined />}
+            loading={updating}
+            onClick={handleGrantPoints}
+          >
+            补发积分
+          </Button>
+        ]}
+        width={500}
+      >
+        <div className={styles.detailContent}>
+          <div className={styles.detailItem}>
+            <Text type="secondary">选择用户：</Text>
+            <Select
+              showSearch
+              value={grantUserId || undefined}
+              onChange={(value) => setGrantUserId(value)}
+              placeholder="搜索或选择用户"
+              style={{ width: '100%', marginTop: 8 }}
+              loading={userSearchLoading}
+              filterOption={false}
+              onSearch={(value) => searchUsers(value)}
+              notFoundContent={userSearchLoading ? <Spin size="small" /> : '暂无用户'}
+              options={userSearchResults.map(user => ({
+                value: user.user_id,
+                label: (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ 
+                      maxWidth: 280, 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {user.user_id}
+                    </span>
+                    <Tag color="gold" style={{ marginLeft: 8 }}>{user.available_points} 积分</Tag>
+                  </div>
+                )
+              }))}
+            />
+            <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+              输入用户邮箱或ID进行搜索
+            </Text>
+          </div>
+          <div className={styles.detailItem}>
+            <Text type="secondary">积分数量：</Text>
+            <Input 
+              type="number"
+              value={grantPoints || ''}
+              onChange={(e) => setGrantPoints(Number(e.target.value))}
+              placeholder="请输入积分数量"
+              style={{ width: '100%', marginTop: 8 }}
+            />
+          </div>
+          <div className={styles.detailItem}>
+            <Text type="secondary">补发原因：</Text>
+            <TextArea
+              value={grantReason}
+              onChange={(e) => setGrantReason(e.target.value)}
+              rows={3}
+              placeholder="请输入补发原因..."
+              style={{ marginTop: 8 }}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* 商品编辑弹窗 */}
+      <Modal
+        title={editingItem ? '编辑商品' : '添加商品'}
+        open={itemModalVisible}
+        onCancel={() => setItemModalVisible(false)}
+        footer={[
+          <Button key="cancel" onClick={() => setItemModalVisible(false)}>
+            取消
+          </Button>,
+          <Button 
+            key="save" 
+            type="primary" 
+            icon={<GiftOutlined />}
+            loading={updating}
+            onClick={handleSaveItem}
+          >
+            保存
+          </Button>
+        ]}
+        width={600}
+      >
+        <div className={styles.detailContent}>
+          <Row gutter={16}>
+            <Col span={24}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">商品名称 *</Text>
+                <Input 
+                  value={itemForm.name}
+                  onChange={(e) => setItemForm({ ...itemForm, name: e.target.value })}
+                  placeholder="请输入商品名称"
+                  style={{ width: '100%', marginTop: 8 }}
+                />
+              </div>
+            </Col>
+            <Col span={24}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">商品描述</Text>
+                <TextArea
+                  value={itemForm.description || ''}
+                  onChange={(e) => setItemForm({ ...itemForm, description: e.target.value })}
+                  rows={2}
+                  placeholder="请输入商品描述..."
+                  style={{ marginTop: 8 }}
+                />
+              </div>
+            </Col>
+            <Col span={24}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">商品图片</Text>
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                  <Upload
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    showUploadList={false}
+                    beforeUpload={handleImageUpload}
+                    disabled={imageUploading}
+                  >
+                    <div style={{ 
+                      width: 120, 
+                      height: 120, 
+                      border: '1px dashed #d9d9d9', 
+                      borderRadius: 8, 
+                      display: 'flex', 
+                      flexDirection: 'column',
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      backgroundColor: '#fafafa',
+                      overflow: 'hidden'
+                    }}>
+                      {itemForm.image_url ? (
+                        <img 
+                          src={itemForm.image_url} 
+                          alt="商品图片" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          onError={(e) => { 
+                            (e.target as HTMLImageElement).src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50"><text x="10" y="30" fill="%23999">?</text></svg>'
+                          }}
+                        />
+                      ) : imageUploading ? (
+                        <>
+                          <LoadingOutlined style={{ fontSize: 24, color: '#999' }} />
+                          <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>上传中...</Text>
+                        </>
+                      ) : (
+                        <>
+                          <PlusOutlined style={{ fontSize: 24, color: '#999' }} />
+                          <Text type="secondary" style={{ fontSize: 12, marginTop: 8 }}>上传图片</Text>
+                        </>
+                      )}
+                    </div>
+                  </Upload>
+                  <div style={{ flex: 1 }}>
+                    <Input 
+                      value={itemForm.image_url || ''}
+                      onChange={(e) => setItemForm({ ...itemForm, image_url: e.target.value })}
+                      placeholder="或输入图片URL"
+                      style={{ width: '100%' }}
+                    />
+                    <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
+                      支持上传 JPG、PNG、GIF、WEBP 格式，最大 2MB
+                    </Text>
+                    {itemForm.image_url && (
+                      <Button 
+                        type="link" 
+                        danger 
+                        size="small" 
+                        style={{ padding: 0, marginTop: 4 }}
+                        onClick={() => setItemForm({ ...itemForm, image_url: '' })}
+                      >
+                        清除图片
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Col>
+            <Col span={12}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">兑换积分 *</Text>
+                <Input 
+                  type="number"
+                  value={itemForm.price || 0}
+                  onChange={(e) => setItemForm({ ...itemForm, price: Number(e.target.value) })}
+                  placeholder="请输入所需积分"
+                  style={{ width: '100%', marginTop: 8 }}
+                  suffix="积分"
+                />
+              </div>
+            </Col>
+            <Col span={12}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">库存（-1表示无限）</Text>
+                <Input 
+                  type="number"
+                  value={itemForm.stock}
+                  onChange={(e) => setItemForm({ ...itemForm, stock: Number(e.target.value) })}
+                  placeholder="库存数量"
+                  style={{ width: '100%', marginTop: 8 }}
+                />
+              </div>
+            </Col>
+            <Col span={12}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">商品类型</Text>
+                <Select
+                  value={itemForm.item_type}
+                  onChange={(v) => setItemForm({ ...itemForm, item_type: v })}
+                  style={{ width: '100%', marginTop: 8 }}
+                  options={[
+                    { value: 'VIRTUAL', label: '虚拟商品（如会员权益）' },
+                    { value: 'DIGITAL', label: '数字商品（如兑换码）' },
+                    { value: 'PHYSICAL', label: '实物商品（需发货）' },
+                  ]}
+                />
+              </div>
+            </Col>
+            <Col span={12}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">排序（数字越小越靠前）</Text>
+                <Input 
+                  type="number"
+                  value={itemForm.sort_order || 0}
+                  onChange={(e) => setItemForm({ ...itemForm, sort_order: Number(e.target.value) })}
+                  style={{ width: '100%', marginTop: 8 }}
+                />
+              </div>
+            </Col>
+            <Col span={24}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">发货/使用说明</Text>
+                <TextArea
+                  value={itemForm.delivery_info || ''}
+                  onChange={(e) => setItemForm({ ...itemForm, delivery_info: e.target.value })}
+                  rows={2}
+                  placeholder="请输入发货或使用说明..."
+                  style={{ marginTop: 8 }}
+                />
+              </div>
+            </Col>
+            <Col span={24}>
+              <div className={styles.detailItem}>
+                <Text type="secondary">上架状态</Text>
+                <div style={{ marginTop: 8 }}>
+                  <Select
+                    value={itemForm.is_visible}
+                    onChange={(v) => setItemForm({ ...itemForm, is_visible: v })}
+                    style={{ width: 150 }}
+                    options={[
+                      { value: true, label: '上架' },
+                      { value: false, label: '下架' },
+                    ]}
+                  />
+                </div>
+              </div>
+            </Col>
+          </Row>
+        </div>
       </Modal>
     </div>
   )

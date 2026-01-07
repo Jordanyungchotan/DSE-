@@ -14,11 +14,37 @@ import {
   SendOutlined,
   SaveOutlined
 } from '@ant-design/icons'
-import { apiFetch } from '../config/api'
+import { apiFetch, ragFetch } from '../config/api'
+import { useLanguageStore } from '../stores/languageStore'
+import { useAuthStore } from '../stores/authStore'
+import MathText from '../components/MathText'
 import styles from './LevelTestPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
+
+// 映射RAG题型到前端题型
+function mapQuestionType(type: string): 'choice' | 'short' | 'long' {
+  const typeMap: Record<string, 'choice' | 'short' | 'long'> = {
+    'multiple_choice': 'choice',
+    'short_answer': 'short',
+    'long_answer': 'long',
+  }
+  return typeMap[type] || 'choice'
+}
+
+// 根据题型获取分值
+function getMaxScore(type: string): number {
+  const scoreMap: Record<string, number> = {
+    'multiple_choice': 2,
+    'short_answer': 4,
+    'long_answer': 8,
+    'choice': 2,
+    'short': 4,
+    'long': 8,
+  }
+  return scoreMap[type] || 2
+}
 
 interface Question {
   id: string
@@ -33,6 +59,7 @@ interface Question {
   topic?: string
   isMarked: boolean
   userAnswer?: string
+  imageUrl?: string // AI生成的题目图片
 }
 
 interface TestData {
@@ -49,6 +76,7 @@ interface TestData {
 export default function LevelTestPage() {
   const { testId } = useParams<{ testId: string }>()
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -71,8 +99,43 @@ export default function LevelTestPage() {
       if (!testId) return
       
       try {
-        const res = await apiFetch(`/api/level-test/${testId}/questions`)
-        const response = await res.json() as TestData & { error?: string }
+        // 首先尝试从localStorage读取RAG服务生成的测试数据
+        const cachedData = localStorage.getItem(`level_test_${testId}`)
+        let response: TestData & { error?: string; source?: string }
+        
+        if (cachedData) {
+          console.log('[LevelTest] 从缓存加载测试数据')
+          const parsed = JSON.parse(cachedData)
+          response = {
+            testId: parsed.testId,
+            grade: parsed.grade || '',
+            subject: parsed.subject || '',
+            testType: parsed.testType || 'full',
+            status: 'active',
+            questions: parsed.questions.map((q: Record<string, unknown>, idx: number) => ({
+              id: q.id || `q_${idx}`,
+              questionIndex: idx,
+              questionText: q.question || q.questionText || q.stem || '',
+              questionType: mapQuestionType(q.questionType as string),
+              options: q.options as string[] | undefined,
+              difficulty: q.difficulty as 'easy' | 'medium' | 'hard' || 'medium',
+              estimatedTime: (q.estimatedTime as number) || 60,
+              maxScore: getMaxScore(q.questionType as string),
+              knowledgePoints: (q.topicTags as string[]) || [],
+              topic: Array.isArray(q.topicTags) ? (q.topicTags as string[])[0] : undefined,
+              isMarked: false,
+              userAnswer: undefined,
+              imageUrl: q.imageUrl as string | undefined, // AI生成的图片
+            })),
+            startedAt: parsed.startedAt,
+            timeLimit: parsed.timeLimit,
+            source: parsed.source,
+          }
+        } else {
+          // 回退到后端API
+          const res = await apiFetch(`/api/level-test/${testId}/questions`)
+          response = await res.json() as TestData & { error?: string }
+        }
         
         if (response.testId) {
           setTestData(response)
@@ -97,12 +160,12 @@ export default function LevelTestPage() {
           setAnswers(savedAnswers)
           setMarkedQuestions(savedMarked)
         } else {
-          message.error('加载测试失败')
+          message.error(t('levelTest.setup.generateFailed'))
           navigate('/level-test')
         }
       } catch (error) {
         console.error('Load test error:', error)
-        message.error('加载测试失败')
+        message.error(t('levelTest.setup.generateFailed'))
         navigate('/level-test')
       } finally {
         setLoading(false)
@@ -173,7 +236,7 @@ export default function LevelTestPage() {
   }, [testId, testData, answers, currentIndex, timeRemaining, markedQuestions])
 
   const handleAutoSubmit = async () => {
-    message.warning('时间到！正在自动提交...')
+    message.warning(t('levelTest.timeUp'))
     await handleSubmit()
   }
 
@@ -182,61 +245,174 @@ export default function LevelTestPage() {
     
     setSubmitting(true)
     setShowSubmitModal(false)
-    setGradingStatus('正在提交答案...')
+    setGradingStatus(t('levelTest.submit.submitting'))
     
     try {
-      const answersArray = Object.entries(answers).map(([questionId, answer]) => ({
-        questionId,
-        answer,
-        timeSpent: 0
-      }))
-      
       const totalTimeSpent = testData.timeLimit - timeRemaining
       
-      // 显示批改进度
-      setGradingStatus('正在批改试卷...')
+      // 检查测试来源
+      const cachedData = localStorage.getItem(`level_test_${testId}`)
+      const isRagTest = cachedData && JSON.parse(cachedData).source === 'rag'
       
-      // 模拟进度更新
-      const progressMessages = [
-        '正在评估选择题...',
-        '正在分析简答题...',
-        '正在评估论述题...',
-        '正在生成学习报告...',
-        '即将完成...'
-      ]
-      let msgIndex = 0
-      const progressInterval = setInterval(() => {
-        if (msgIndex < progressMessages.length) {
-          setGradingStatus(progressMessages[msgIndex])
-          msgIndex++
-        }
-      }, 3000)
-      
-      const res = await apiFetch(`/api/level-test/${testId}/submit`, {
-        method: 'POST',
-        body: JSON.stringify({
-          answers: answersArray,
-          totalTimeSpent
+      if (isRagTest) {
+        // RAG服务生成的测试：本地评分
+        setGradingStatus(t('levelTest.submit.grading'))
+        
+        const parsedCache = JSON.parse(cachedData)
+        const questions = parsedCache.questions || []
+        
+        let correctCount = 0
+        let totalScore = 0
+        let maxScore = 0
+        
+        const gradedQuestions = testData.questions.map((q, idx) => {
+          const originalQ = questions[idx] || {}
+          const userAnswer = answers[q.id]
+          const correctAnswer = originalQ.correctAnswer || originalQ.correct_answer
+          
+          // 计算分数
+          let questionScore = 0
+          const qMaxScore = q.maxScore || getMaxScore(q.questionType)
+          maxScore += qMaxScore
+          
+          if (q.questionType === 'choice') {
+            // 选择题：完全匹配
+            const isCorrect = userAnswer?.toUpperCase() === correctAnswer?.toUpperCase()
+            if (isCorrect) {
+              correctCount++
+              questionScore = qMaxScore
+            }
+          } else {
+            // 简答题/论述题：有答案就给部分分
+            if (userAnswer && userAnswer.trim().length > 10) {
+              questionScore = Math.round(qMaxScore * 0.6) // 给60%的分
+            } else if (userAnswer && userAnswer.trim().length > 0) {
+              questionScore = Math.round(qMaxScore * 0.3) // 给30%的分
+            }
+          }
+          
+          totalScore += questionScore
+          
+          return {
+            ...q,
+            userAnswer,
+            correctAnswer,
+            explanation: originalQ.explanation,
+            score: questionScore,
+            maxScore: qMaxScore,
+            isCorrect: q.questionType === 'choice' ? userAnswer?.toUpperCase() === correctAnswer?.toUpperCase() : null,
+          }
         })
-      })
-      
-      clearInterval(progressInterval)
-      const response = await res.json() as { success?: boolean; error?: string }
-      
-      if (response.success) {
-        setGradingStatus('批改完成！正在跳转到报告页面...')
-        message.success('测试已提交！')
+        
+        // 计算DSE预测等级
+        const percentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0
+        let predictedGrade = '1'
+        if (percentage >= 90) predictedGrade = '5**'
+        else if (percentage >= 80) predictedGrade = '5*'
+        else if (percentage >= 70) predictedGrade = '5'
+        else if (percentage >= 60) predictedGrade = '4'
+        else if (percentage >= 50) predictedGrade = '3'
+        else if (percentage >= 40) predictedGrade = '2'
+        
+        // 保存报告到localStorage
+        const report = {
+          testId,
+          grade: parsedCache.grade,
+          subject: parsedCache.subject,
+          testType: parsedCache.testType,
+          totalQuestions: testData.questions.length,
+          correctCount,
+          totalScore,
+          maxScore,
+          percentage: Math.round(percentage),
+          predictedGrade,
+          timeSpent: totalTimeSpent,
+          completedAt: new Date().toISOString(),
+          questions: gradedQuestions,
+        }
+        
+        localStorage.setItem(`level_test_report_${testId}`, JSON.stringify(report))
+        
+        // 清理测试缓存
+        localStorage.removeItem(`level_test_${testId}`)
+        
+        // 发放积分
+        const userId = useAuthStore.getState().user?.id
+        if (userId) {
+          try {
+            await ragFetch('/api/test/complete', {
+              method: 'POST',
+              body: JSON.stringify({
+                user_id: userId,
+                test_id: testId,
+                total_questions: testData.questions.length,
+                correct_count: correctCount,
+                score: Math.round(percentage),
+                time_spent: totalTimeSpent
+              })
+            })
+            console.log('[LevelTest] Points awarded')
+          } catch (e) {
+            console.warn('Points award failed:', e)
+          }
+        }
+        
+        setGradingStatus(t('levelTest.submit.completed'))
+        message.success(t('levelTest.submit.success'))
         setTimeout(() => {
           navigate(`/level-test/${testId}/report`)
         }, 1000)
       } else {
-        setGradingStatus('')
-        message.error(response.error || '提交失败')
+        // 原有后端测试
+        const answersArray = Object.entries(answers).map(([questionId, answer]) => ({
+          questionId,
+          answer,
+          timeSpent: 0
+        }))
+        
+        setGradingStatus(t('levelTest.submit.grading'))
+        
+        const progressMessages = [
+          t('levelTest.submit.gradingMC'),
+          t('levelTest.submit.gradingSA'),
+          t('levelTest.submit.gradingLA'),
+          t('levelTest.submit.generatingReport'),
+          t('levelTest.submit.almostDone')
+        ]
+        let msgIndex = 0
+        const progressInterval = setInterval(() => {
+          if (msgIndex < progressMessages.length) {
+            setGradingStatus(progressMessages[msgIndex])
+            msgIndex++
+          }
+        }, 3000)
+        
+        const res = await apiFetch(`/api/level-test/${testId}/submit`, {
+          method: 'POST',
+          body: JSON.stringify({
+            answers: answersArray,
+            totalTimeSpent
+          })
+        })
+        
+        clearInterval(progressInterval)
+        const response = await res.json() as { success?: boolean; error?: string }
+        
+        if (response.success) {
+          setGradingStatus(t('levelTest.submit.completed'))
+          message.success(t('levelTest.submit.success'))
+          setTimeout(() => {
+            navigate(`/level-test/${testId}/report`)
+          }, 1000)
+        } else {
+          setGradingStatus('')
+          message.error(response.error || t('levelTest.submit.failed'))
+        }
       }
     } catch (error) {
       console.error('Submit error:', error)
       setGradingStatus('')
-      message.error('提交失败，请重试')
+      message.error(t('levelTest.submit.failed'))
     } finally {
       setSubmitting(false)
     }
@@ -280,18 +456,18 @@ export default function LevelTestPage() {
 
   const getDifficultyLabel = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return '基础'
-      case 'medium': return '中等'
-      case 'hard': return '进阶'
+      case 'easy': return t('quiz.difficulties.basic')
+      case 'medium': return t('quiz.difficulties.standard')
+      case 'hard': return t('quiz.difficulties.challenging')
       default: return difficulty
     }
   }
 
   const getQuestionTypeLabel = (type: string) => {
     switch (type) {
-      case 'choice': return '选择题'
-      case 'short': return '短答题'
-      case 'long': return '论述题'
+      case 'choice': return t('levelTest.questionTypes.choice')
+      case 'short': return t('levelTest.questionTypes.short')
+      case 'long': return t('levelTest.questionTypes.long')
       default: return type
     }
   }
@@ -299,7 +475,7 @@ export default function LevelTestPage() {
   if (loading) {
     return (
       <div className={styles.loadingContainer}>
-        <Spin size="large" tip="加载测试中..." />
+        <Spin size="large" tip={t('common.loading')} />
       </div>
     )
   }
@@ -307,8 +483,8 @@ export default function LevelTestPage() {
   if (!testData) {
     return (
       <div className={styles.errorContainer}>
-        <Text>测试不存在或已过期</Text>
-        <Button onClick={() => navigate('/level-test')}>返回</Button>
+        <Text>{t('levelTest.testNotFound')}</Text>
+        <Button onClick={() => navigate('/level-test')}>{t('common.back')}</Button>
       </div>
     )
   }
@@ -326,11 +502,11 @@ export default function LevelTestPage() {
         <div className={styles.gradingOverlay}>
           <div className={styles.gradingContent}>
             <Spin size="large" />
-            <Title level={3} className={styles.gradingTitle}>正在批改试卷</Title>
+            <Title level={3} className={styles.gradingTitle}>{t('levelTest.submit.grading')}</Title>
             <Text className={styles.gradingStatus}>{gradingStatus}</Text>
             <div className={styles.gradingTips}>
-              <Text type="secondary">批改需要一些时间，请耐心等待...</Text>
-              <Text type="secondary">系统正在使用AI对您的答案进行评估</Text>
+              <Text type="secondary">{t('levelTest.gradingTips.wait')}</Text>
+              <Text type="secondary">{t('levelTest.gradingTips.ai')}</Text>
             </div>
             <Progress 
               type="circle" 
@@ -368,7 +544,7 @@ export default function LevelTestPage() {
             onClick={() => setShowSubmitModal(true)}
             icon={<SendOutlined />}
           >
-            提交测试
+            {t('levelTest.progress.submitTest')}
           </Button>
         </div>
       </div>
@@ -384,7 +560,7 @@ export default function LevelTestPage() {
       <div className={styles.mainContent}>
         {/* 答题卡 */}
         <Card className={styles.answerCard}>
-          <Title level={5}>答题卡</Title>
+          <Title level={5}>{t('levelTest.progress.questionCard')}</Title>
           <div className={styles.questionGrid}>
             {testData.questions.map((q, idx) => {
               const isAnswered = answers[q.id] && answers[q.id].trim() !== ''
@@ -418,21 +594,21 @@ export default function LevelTestPage() {
           <div className={styles.legend}>
             <div className={styles.legendItem}>
               <span className={`${styles.dot} ${styles.answeredDot}`}></span>
-              <Text type="secondary">已答</Text>
+              <Text type="secondary">{t('levelTest.progress.answered')}</Text>
             </div>
             <div className={styles.legendItem}>
               <span className={`${styles.dot} ${styles.markedDot}`}></span>
-              <Text type="secondary">标记</Text>
+              <Text type="secondary">{t('levelTest.progress.marked')}</Text>
             </div>
             <div className={styles.legendItem}>
               <span className={`${styles.dot} ${styles.currentDot}`}></span>
-              <Text type="secondary">当前</Text>
+              <Text type="secondary">{t('levelTest.progress.current')}</Text>
             </div>
           </div>
           
           <div className={styles.stats}>
-            <Text>已答: {answeredCount}/{testData.questions.length}</Text>
-            <Text>标记: {markedQuestions.size}</Text>
+            <Text>{t('levelTest.progress.answered')}: {answeredCount}/{testData.questions.length}</Text>
+            <Text>{t('levelTest.progress.marked')}: {markedQuestions.size}</Text>
           </div>
         </Card>
 
@@ -444,23 +620,39 @@ export default function LevelTestPage() {
                 {getDifficultyLabel(currentQuestion.difficulty)}
               </Tag>
               <Tag>{getQuestionTypeLabel(currentQuestion.questionType)}</Tag>
-              <Tag color="cyan">{currentQuestion.maxScore}分</Tag>
+              <Tag color="cyan">{currentQuestion.maxScore}{t('levelTest.points')}</Tag>
             </div>
             <Button
               type={markedQuestions.has(currentIndex) ? 'primary' : 'default'}
               icon={<FlagOutlined />}
               onClick={() => toggleMark(currentIndex)}
             >
-              {markedQuestions.has(currentIndex) ? '已标记' : '标记'}
+              {t('levelTest.progress.markQuestion')}
             </Button>
           </div>
 
           <div className={styles.questionContent}>
             <Title level={4} className={styles.questionNumber}>
-              第 {currentIndex + 1} 题
+              {t('levelTest.progress.question').replace('{current}', String(currentIndex + 1))}
             </Title>
+            {/* 显示AI生成的题目图片 */}
+            {currentQuestion.imageUrl && (
+              <div className={styles.questionImage}>
+                <img 
+                  src={currentQuestion.imageUrl} 
+                  alt="题目图表" 
+                  style={{ 
+                    maxWidth: '100%', 
+                    maxHeight: '400px', 
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }} 
+                />
+              </div>
+            )}
             <Paragraph className={styles.questionText}>
-              {currentQuestion.questionText}
+              <MathText text={currentQuestion.questionText} />
             </Paragraph>
           </div>
 
@@ -478,7 +670,7 @@ export default function LevelTestPage() {
                     value={String.fromCharCode(65 + idx)}
                     className={styles.optionItem}
                   >
-                    {option}
+                    <MathText text={option} />
                   </Radio>
                 ))}
               </Radio.Group>
@@ -488,7 +680,7 @@ export default function LevelTestPage() {
               <TextArea
                 value={answers[currentQuestion.id] || ''}
                 onChange={e => handleAnswerChange(currentQuestion.id, e.target.value)}
-                placeholder="请输入答案..."
+                placeholder={t('levelTest.progress.pleaseAnswer')}
                 rows={4}
                 className={styles.textInput}
               />
@@ -498,7 +690,7 @@ export default function LevelTestPage() {
               <TextArea
                 value={answers[currentQuestion.id] || ''}
                 onChange={e => handleAnswerChange(currentQuestion.id, e.target.value)}
-                placeholder="请详细作答..."
+                placeholder={t('levelTest.progress.pleaseAnswerLong')}
                 rows={10}
                 className={styles.textInput}
                 showCount
@@ -510,7 +702,7 @@ export default function LevelTestPage() {
           {/* 知识点提示 */}
           {currentQuestion.knowledgePoints.length > 0 && (
             <div className={styles.knowledgeHint}>
-              <Text type="secondary">相关知识点：</Text>
+              <Text type="secondary">{t('levelTest.progress.relatedTopics')}:</Text>
               {currentQuestion.knowledgePoints.map((kp, idx) => (
                 <Tag key={idx} color="default">{kp}</Tag>
               ))}
@@ -524,7 +716,7 @@ export default function LevelTestPage() {
               disabled={currentIndex === 0}
               onClick={() => goToQuestion(currentIndex - 1)}
             >
-              上一题
+              {t('levelTest.progress.previousQuestion')}
             </Button>
             
             <Space>
@@ -533,7 +725,7 @@ export default function LevelTestPage() {
                   type="primary"
                   onClick={() => goToQuestion(currentIndex + 1)}
                 >
-                  下一题 <RightOutlined />
+                  {t('levelTest.progress.nextQuestion')} <RightOutlined />
                 </Button>
               ) : (
                 <Button
@@ -541,7 +733,7 @@ export default function LevelTestPage() {
                   onClick={() => setShowSubmitModal(true)}
                   icon={<SendOutlined />}
                 >
-                  提交测试
+                  {t('levelTest.progress.submitTest')}
                 </Button>
               )}
             </Space>
@@ -551,12 +743,12 @@ export default function LevelTestPage() {
 
       {/* 提交确认弹窗 */}
       <Modal
-        title="确认提交"
+        title={t('levelTest.confirmSubmit.title')}
         open={showSubmitModal}
         onCancel={() => setShowSubmitModal(false)}
         footer={[
           <Button key="cancel" onClick={() => setShowSubmitModal(false)}>
-            继续答题
+            {t('levelTest.confirmSubmit.continue')}
           </Button>,
           <Button 
             key="submit" 
@@ -564,7 +756,7 @@ export default function LevelTestPage() {
             onClick={() => handleSubmit()}
             loading={submitting}
           >
-            确认提交
+            {t('common.confirm')}
           </Button>
         ]}
       >
@@ -572,27 +764,27 @@ export default function LevelTestPage() {
           <div className={styles.submitStats}>
             <div className={styles.submitStatItem}>
               <CheckCircleOutlined className={styles.iconGreen} />
-              <Text>已答题目: {answeredCount}/{testData.questions.length}</Text>
+              <Text>{t('levelTest.confirmSubmit.answered')}: {answeredCount}/{testData.questions.length}</Text>
             </div>
             {testData.questions.length - answeredCount > 0 && (
               <div className={styles.submitStatItem}>
                 <ExclamationCircleOutlined className={styles.iconOrange} />
                 <Text type="warning">
-                  未答题目: {testData.questions.length - answeredCount}
+                  {t('levelTest.confirmSubmit.unanswered')}: {testData.questions.length - answeredCount}
                 </Text>
               </div>
             )}
             {markedQuestions.size > 0 && (
               <div className={styles.submitStatItem}>
                 <FlagOutlined className={styles.iconBlue} />
-                <Text>标记待检查: {markedQuestions.size}</Text>
+                <Text>{t('levelTest.confirmSubmit.marked')}: {markedQuestions.size}</Text>
               </div>
             )}
           </div>
           
           {testData.questions.length - answeredCount > 0 && (
             <Paragraph type="warning" className={styles.submitWarning}>
-              您还有 {testData.questions.length - answeredCount} 道题未作答，确定要提交吗？
+              {t('levelTest.confirmSubmit.warning').replace('{count}', String(testData.questions.length - answeredCount))}
             </Paragraph>
           )}
         </div>

@@ -9,8 +9,15 @@
 // 生产环境直接使用后端 Worker URL
 const PRODUCTION_API_URL = 'https://dse-analysis-api.jordanyungchotan.workers.dev'
 
+// RAG 题库服务 URL
+const PRODUCTION_RAG_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
+
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD ? PRODUCTION_API_URL : '')
+
+// RAG 服务 URL (用于智能组卷和水平测试)
+export const RAG_API_URL = import.meta.env.VITE_RAG_API_URL || 
+  (import.meta.env.PROD ? PRODUCTION_RAG_URL : 'http://localhost:8787')
 
 /**
  * 构建完整的 API URL
@@ -56,6 +63,39 @@ export async function apiFetch(path: string, options?: RequestInit): Promise<Res
   
   // 如果有 token，添加 Authorization header
   if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
+  }
+  
+  return fetch(url, {
+    ...options,
+    headers,
+  })
+}
+
+/**
+ * RAG 服务专用 fetch 函数
+ * 用于智能组卷和水平测试题目生成
+ */
+export async function ragFetch(path: string, options?: RequestInit): Promise<Response> {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const url = `${RAG_API_URL}${normalizedPath}`
+  
+  // 获取 token
+  const token = getAuthToken()
+  
+  // RAG API Token (如果配置了)
+  const ragApiToken = import.meta.env.VITE_RAG_API_TOKEN
+  
+  // 合并 headers
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(options?.headers || {}),
+  }
+  
+  // 添加认证
+  if (ragApiToken) {
+    (headers as Record<string, string>)['X-API-Token'] = ragApiToken
+  } else if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
   }
   

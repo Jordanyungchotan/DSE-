@@ -59,7 +59,7 @@ const LearningChart = ({ recentActivity, subjectMastery }: LearningChartProps) =
     return Math.max(...recentActivity.map(d => d.questionsAnswered), 10)
   }, [recentActivity])
 
-  // 科目颜色映射
+  // 科目颜色映射 - 只包含支持的科目
   const subjectColors: Record<string, string> = {
     math: '#2b6cb0',
     physics: '#805ad5',
@@ -67,11 +67,8 @@ const LearningChart = ({ recentActivity, subjectMastery }: LearningChartProps) =
     biology: '#d69e2e',
     chinese: '#e53e3e',
     english: '#3182ce',
-    ls: '#dd6b20',
-    economics: '#319795',
-    geography: '#718096',
-    history: '#b7791f',
-    chinese_history: '#c53030',
+    mathM1: '#319795',
+    mathM2: '#718096',
   }
 
   const getSubjectColor = (subjectId: string) => {

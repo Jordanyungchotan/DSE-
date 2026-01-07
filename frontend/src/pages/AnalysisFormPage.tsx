@@ -35,6 +35,7 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAnalysisStore, SubjectScore } from '../stores/analysisStore'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './AnalysisFormPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -181,6 +182,7 @@ const ANALYSIS_STAGES = [
 const AnalysisFormPage = () => {
   const navigate = useNavigate()
   const [form] = Form.useForm()
+  const { t } = useLanguageStore()
   const [showSelector, setShowSelector] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
   const [subjects, setSubjects] = useState<SubjectScore[]>([])
@@ -790,13 +792,13 @@ const AnalysisFormPage = () => {
             onClick={() => setShowSelector(true)}
             style={{ padding: 0, marginBottom: 16 }}
           >
-            ← 返回选择
+            ← {t('common.back')}
           </Button>
           <Title level={2} className="gradient-title">
-            DSE插班分析
+            {t('analysis.title')}
           </Title>
           <Paragraph type="secondary">
-            请完整填写以下信息，AI将为您生成专业的插班可行性分析报告
+            {t('analysis.description')}
           </Paragraph>
         </div>
 

@@ -1,0 +1,235 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.loadingWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+
+.loadingText {
+  margin-top: 16px;
+  color: white;
+}
+
+/* 主卡片 */
+.mainCard {
+  border-radius: 16px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #fff 0%, #f8f9ff 100%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.levelBadge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 3px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.headerInfo {
+  flex: 1;
+}
+
+.levelName {
+  font-size: 14px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.pointsValue {
+  margin: 0 !important;
+  font-size: 32px !important;
+  color: #1a1a2e;
+}
+
+.pointsUnit {
+  font-size: 16px;
+  color: #8c8c8c;
+  font-weight: normal;
+}
+
+.mallBtn {
+  background: linear-gradient(135deg, #faad14 0%, #fa8c16 100%);
+  border: none;
+  border-radius: 12px;
+  height: 48px;
+  font-weight: 600;
+}
+
+.mallBtn:hover {
+  background: linear-gradient(135deg, #ffc53d 0%, #faad14 100%);
+}
+
+/* 等级进度 */
+.levelProgress {
+  margin: 16px 0;
+}
+
+.progressHeader {
+  margin-bottom: 8px;
+}
+
+/* 签到区域 */
+.checkinSection {
+  text-align: center;
+  padding-top: 16px;
+}
+
+.checkinBtn {
+  background: linear-gradient(135deg, #52c41a 0%, #389e0d 100%);
+  border: none;
+  border-radius: 12px;
+  height: 48px;
+  font-weight: 600;
+  width: 100%;
+  max-width: 300px;
+}
+
+.checkinBtn:hover {
+  background: linear-gradient(135deg, #73d13d 0%, #52c41a 100%);
+}
+
+.checkedIn {
+  background: linear-gradient(135deg, #8c8c8c 0%, #595959 100%) !important;
+  cursor: not-allowed;
+}
+
+.checkedIn:hover {
+  background: linear-gradient(135deg, #8c8c8c 0%, #595959 100%) !important;
+}
+
+/* 统计卡片 */
+.statsCard {
+  border-radius: 12px;
+  height: 100%;
+}
+
+.earnCard {
+  border-radius: 12px;
+  height: 100%;
+}
+
+.ruleItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.ruleName {
+  display: flex;
+  align-items: center;
+}
+
+.rulePoints {
+  display: flex;
+  align-items: center;
+}
+
+.ruleCompleted {
+  opacity: 0.7;
+  background: linear-gradient(90deg, #f6ffed 0%, transparent 100%);
+  border-radius: 8px;
+  margin: 2px -8px;
+  padding: 8px !important;
+}
+
+/* 历史记录卡片 */
+.historyCard {
+  margin-top: 16px;
+  border-radius: 12px;
+}
+
+.historyItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.historyLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.historyPoints {
+  font-size: 16px;
+}
+
+/* 快捷入口 */
+.quickActions {
+  margin-top: 16px;
+  border-radius: 12px;
+  background: white;
+}
+
+.actionBtn {
+  height: auto !important;
+  padding: 16px 8px !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border-radius: 12px !important;
+  border: 1px solid #f0f0f0 !important;
+  transition: all 0.3s ease;
+}
+
+.actionBtn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: #d9d9d9 !important;
+}
+
+/* 响应式 */
+@media (max-width: 576px) {
+  .container {
+    padding: 16px 12px;
+  }
+
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .mallBtn {
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .pointsValue {
+    font-size: 28px !important;
+  }
+
+  .levelBadge {
+    width: 48px;
+    height: 48px;
+  }
+
+  .actionBtn {
+    padding: 12px 4px !important;
+    font-size: 12px;
+  }
+}

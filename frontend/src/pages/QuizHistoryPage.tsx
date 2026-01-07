@@ -14,6 +14,7 @@ import {
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import { SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
+import { useLanguageStore } from '../stores/languageStore'
 import { apiFetch } from '../config/api'
 import ShareResult from '../components/ShareResult/ShareResult'
 import styles from './QuizHistoryPage.module.css'
@@ -57,6 +58,7 @@ interface QuizHistoryItem {
 const QuizHistoryPage = () => {
   const navigate = useNavigate()
   const { isAuthenticated, token } = useAuthStore()
+  const { t } = useLanguageStore()
   const [history, setHistory] = useState<QuizHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
@@ -486,13 +488,13 @@ const QuizHistoryPage = () => {
       <div className={styles.pageHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerBadge}>
-            <HistoryOutlined /> 刷题记录
+            <HistoryOutlined /> {t('quiz.history.title')}
           </div>
           <Title level={2} className={styles.pageTitle}>
-            <span className="gradient-title">我的刷题历史</span>
+            <span className="gradient-title">{t('quiz.history.title')}</span>
           </Title>
           <Paragraph className={styles.pageDesc}>
-            查看你的刷题记录，追踪学习进度
+            {t('quiz.history.title')}
           </Paragraph>
         </div>
       </div>
@@ -502,7 +504,7 @@ const QuizHistoryPage = () => {
         <Col xs={12} sm={6}>
           <Card className={styles.statCard}>
             <Statistic
-              title="总刷题次数"
+              title={t('leaderboard.totalSessions')}
               value={stats.totalSessions}
               prefix={<TrophyOutlined style={{ color: 'var(--color-primary)' }} />}
               valueStyle={{ color: 'var(--color-primary)' }}
@@ -559,7 +561,7 @@ const QuizHistoryPage = () => {
               刷新
             </Button>
             <Button type="primary" icon={<RightOutlined />} onClick={() => navigate('/quiz')}>
-              开始刷题
+              {t('quiz.config.start')}
             </Button>
           </div>
         </div>

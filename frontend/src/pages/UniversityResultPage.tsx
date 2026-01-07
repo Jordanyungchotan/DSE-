@@ -24,6 +24,7 @@ import {
   LineChartOutlined,
 } from '@ant-design/icons'
 import { apiFetch } from '../config/api'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './UniversityResultPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -73,6 +74,7 @@ interface UniversityResult {
 const UniversityResultPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const [result, setResult] = useState<UniversityResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -150,7 +152,7 @@ const UniversityResultPage = () => {
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/analysis')}
         >
-          返回
+          {t('common.back')}
         </Button>
       </div>
 
@@ -161,7 +163,7 @@ const UniversityResultPage = () => {
           <Row gutter={24} align="middle">
             <Col xs={24} md={16}>
               <Title level={2} className="gradient-title">
-                <RocketOutlined /> 大学申请分析报告
+                <RocketOutlined /> {t('analysis.universityTitle')}
               </Title>
               <Paragraph type="secondary">
                 生成时间：{new Date(result.createdAt).toLocaleString('zh-CN')}

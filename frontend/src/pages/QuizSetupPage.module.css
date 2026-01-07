@@ -212,6 +212,62 @@
   color: var(--text-primary);
 }
 
+/* ===== 课程模块选择 ===== */
+.modulesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.moduleCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  position: relative;
+}
+
+.moduleCard:hover {
+  background: rgba(43, 108, 176, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.moduleCard.selected {
+  background: rgba(43, 108, 176, 0.12);
+  border-color: var(--color-primary);
+}
+
+.moduleCard .checkIcon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 0.85rem;
+  color: var(--color-primary);
+}
+
+.moduleName {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.moduleTopics {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ===== 难度选择 ===== */
 .difficultyGrid {
   display: grid;

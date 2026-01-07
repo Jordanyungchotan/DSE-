@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Row, Col, Typography, Button, message, Spin, Tooltip } from 'antd'
+import { Card, Row, Col, Typography, Button, message, Spin, Tooltip, Modal, Progress } from 'antd'
 import {
   ThunderboltOutlined,
   BookOutlined,
@@ -11,6 +11,7 @@ import {
   CheckCircleOutlined,
   FireOutlined,
   ExperimentOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons'
 import {
   useQuizStore,
@@ -18,7 +19,9 @@ import {
   GRADE_LEVELS,
   DIFFICULTY_LEVELS,
   QUESTION_COUNT_OPTIONS,
+  CurriculumModule,
 } from '../stores/quizStore'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './QuizSetupPage.module.css'
 
 const { Title, Paragraph, Text } = Typography
@@ -28,8 +31,121 @@ const { Title, Paragraph, Text } = Typography
  */
 const QuizSetupPage = () => {
   const navigate = useNavigate()
-  const { config, updateConfig, startQuiz, generating, error, setError } = useQuizStore()
+  const { t, locale } = useLanguageStore()
+  const { 
+    config, updateConfig, startQuiz, generating, error, setError,
+    curriculumModules, modulesLoading, fetchCurriculumModules 
+  } = useQuizStore()
   const [starting, setStarting] = useState(false)
+  const [selectedModules, setSelectedModules] = useState<string[]>([])
+
+  // 支持模块选择的科目列表
+  const subjectsWithModules = ['physics', 'biology', 'chemistry', 'math', 'math_m1']
+  
+  // 当选择物理/生物/化学时，获取课程模块（语言变化时也重新获取）
+  useEffect(() => {
+    if (subjectsWithModules.includes(config.subject)) {
+      fetchCurriculumModules(config.subject)
+    } else {
+      // 切换科目时清空模块选择
+      setSelectedModules([])
+      updateConfig({ moduleCodes: undefined })
+    }
+  }, [config.subject, fetchCurriculumModules, locale])
+
+  // 切换模块选择
+  const handleModuleToggle = (moduleCode: string) => {
+    setSelectedModules(prev => {
+      const newSelection = prev.includes(moduleCode)
+        ? prev.filter(m => m !== moduleCode)
+        : [...prev, moduleCode]
+      // 更新到 config
+      updateConfig({ moduleCodes: newSelection.length > 0 ? newSelection : undefined })
+      return newSelection
+    })
+  }
+
+  // 获取模块名称（根据语言）
+  const getModuleName = (module: CurriculumModule) => {
+    return locale === 'en' ? module.module_name_en : module.module_name_zh
+  }
+
+  // 获取模块描述（根据语言）
+  const getModuleDescription = (module: CurriculumModule) => {
+    return locale === 'en' ? module.description_en : module.description_zh
+  }
+
+  // 翻译年级名称
+  const getGradeName = (gradeId: string) => {
+    const gradeNames: Record<string, string> = {
+      f4: t('quiz.grades.f4'),
+      f5: t('quiz.grades.f5'),
+      f6: t('quiz.grades.f6'),
+    }
+    return gradeNames[gradeId] || gradeId
+  }
+
+  // 翻译年级描述
+  const getGradeDescription = (gradeId: string) => {
+    const gradeDescs: Record<string, string> = {
+      f4: t('quiz.gradeDescs.f4'),
+      f5: t('quiz.gradeDescs.f5'),
+      f6: t('quiz.gradeDescs.f6'),
+    }
+    return gradeDescs[gradeId] || ''
+  }
+
+  // 翻译科目名称
+  const getSubjectName = (subjectId: string) => {
+    const subjectNames: Record<string, string> = {
+      chinese: t('quiz.subjects.chinese'),
+      english: t('quiz.subjects.english'),
+      math: t('quiz.subjects.math'),
+      physics: t('quiz.subjects.physics'),
+      chemistry: t('quiz.subjects.chemistry'),
+      biology: t('quiz.subjects.biology'),
+      math_m1: t('quiz.subjects.mathM1'),
+      math_m2: t('quiz.subjects.mathM2'),
+    }
+    return subjectNames[subjectId] || subjectId
+  }
+
+  // 翻译难度名称
+  const getDifficultyName = (diffId: string) => {
+    const diffNames: Record<string, string> = {
+      basic: t('quiz.difficulties.basic'),
+      standard: t('quiz.difficulties.standard'),
+      challenging: t('quiz.difficulties.challenging'),
+      exam: t('quiz.difficulties.exam'),
+    }
+    return diffNames[diffId] || diffId
+  }
+
+  // 翻译难度描述
+  const getDifficultyDescription = (diffId: string) => {
+    const diffDescs: Record<string, string> = {
+      basic: t('quiz.difficultyDescs.basic'),
+      standard: t('quiz.difficultyDescs.standard'),
+      challenging: t('quiz.difficultyDescs.challenging'),
+      exam: t('quiz.difficultyDescs.exam'),
+    }
+    return diffDescs[diffId] || ''
+  }
+
+  // 翻译题目数量选项
+  const getCountLabel = (value: number) => {
+    const labels: Record<number, string> = {
+      5: t('quiz.countLabels.quick'),
+      10: t('quiz.countLabels.standard'),
+      15: t('quiz.countLabels.deep'),
+      20: t('quiz.countLabels.mock'),
+    }
+    return labels[value] || ''
+  }
+
+  const getCountDescription = (value: number) => {
+    return `${value}${t('quiz.countSuffix')}`
+  }
 
   // 获取所有科目列表
   const allSubjects = [
@@ -41,15 +157,15 @@ const QuizSetupPage = () => {
   // 开始刷题
   const handleStartQuiz = async () => {
     if (!config.subject) {
-      message.warning('请选择一个科目')
+      message.warning(t('quiz.warnings.selectSubject'))
       return
     }
     if (!config.grade) {
-      message.warning('请选择年级')
+      message.warning(t('quiz.warnings.selectGrade'))
       return
     }
     if (!config.difficulty) {
-      message.warning('请选择难度')
+      message.warning(t('quiz.warnings.selectDifficulty'))
       return
     }
 
@@ -60,7 +176,7 @@ const QuizSetupPage = () => {
       await startQuiz()
       navigate('/quiz/practice')
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '开始刷题失败，请重试'
+      const errorMessage = err instanceof Error ? err.message : t('common.error')
       message.error(errorMessage)
     } finally {
       setStarting(false)
@@ -70,34 +186,152 @@ const QuizSetupPage = () => {
   // 获取选中科目的显示名称
   const getSelectedSubjectName = () => {
     const subject = allSubjects.find((s) => s.id === config.subject)
-    return subject ? `${subject.icon} ${subject.name}` : '未选择'
+    return subject ? `${subject.icon} ${getSubjectName(subject.id)}` : t('common.notSelected')
   }
 
   // 获取选中年级的显示名称
   const getSelectedGradeName = () => {
     const grade = GRADE_LEVELS.find((g) => g.id === config.grade)
-    return grade ? grade.name : '未选择'
+    return grade ? getGradeName(grade.id) : t('common.notSelected')
   }
 
   // 获取选中难度的显示
   const getSelectedDifficulty = () => {
-    return DIFFICULTY_LEVELS.find((d) => d.id === config.difficulty)
+    const diff = DIFFICULTY_LEVELS.find((d) => d.id === config.difficulty)
+    if (!diff) return null
+    return {
+      ...diff,
+      name: getDifficultyName(diff.id),
+    }
   }
+
+  // 加载提示文案
+  const loadingTips = [
+    t('quiz.loadingTips.selecting'),
+    t('quiz.loadingTips.adjusting'),
+    t('quiz.loadingTips.generating'),
+    t('quiz.loadingTips.optimizing'),
+    t('quiz.loadingTips.almostDone'),
+  ]
+  const [loadingTipIndex, setLoadingTipIndex] = useState(0)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+
+  // 加载时更新进度条（线性前进，不循环）
+  useEffect(() => {
+    if (starting || generating) {
+      // 重置进度
+      setLoadingProgress(0)
+      setLoadingTipIndex(0)
+      
+      // 进度条平滑前进（15秒内从0到95%）
+      const progressInterval = setInterval(() => {
+        setLoadingProgress((prev) => {
+          if (prev >= 95) return 95 // 最多到95%，等待完成
+          return prev + 1
+        })
+      }, 150) // 每150ms增加1%
+      
+      // 提示文案切换
+      const tipInterval = setInterval(() => {
+        setLoadingTipIndex((prev) => {
+          if (prev >= loadingTips.length - 1) return prev // 到最后一条就停止
+          return prev + 1
+        })
+      }, 3000) // 每3秒切换一次提示
+      
+      return () => {
+        clearInterval(progressInterval)
+        clearInterval(tipInterval)
+      }
+    } else {
+      // 完成时重置
+      setLoadingProgress(0)
+      setLoadingTipIndex(0)
+    }
+  }, [starting, generating, loadingTips.length])
 
   return (
     <div className={styles.setupPage}>
+      {/* 全屏加载覆盖层 */}
+      <Modal
+        open={starting || generating}
+        footer={null}
+        closable={false}
+        centered
+        maskClosable={false}
+        width={420}
+        styles={{
+          body: {
+            padding: '48px 32px',
+            textAlign: 'center',
+          },
+          mask: {
+            backdropFilter: 'blur(4px)',
+          },
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          {/* 动画图标 */}
+          <div style={{ 
+            width: '80px', 
+            height: '80px', 
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
+          }}>
+            <LoadingOutlined style={{ fontSize: 36, color: '#fff' }} spin />
+          </div>
+          
+          {/* 标题 */}
+          <div>
+            <Title level={3} style={{ marginBottom: '8px', background: 'linear-gradient(135deg, #667eea, #764ba2)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              🎯 {t('quiz.aiGenerating')}
+            </Title>
+            <Text style={{ fontSize: '16px', color: '#666' }}>
+              {loadingTips[loadingTipIndex]}
+            </Text>
+          </div>
+          
+          {/* 进度条 - 线性前进 */}
+          <Progress 
+            percent={loadingProgress} 
+            showInfo={false}
+            strokeColor={{
+              '0%': '#667eea',
+              '100%': '#764ba2',
+            }}
+            trailColor="#f0f0f0"
+            style={{ width: '100%' }}
+          />
+          
+          {/* 提示 */}
+          <div style={{ 
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf4 100%)',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            width: '100%',
+          }}>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              💡 {t('quiz.generatingHint')}
+            </Text>
+          </div>
+        </div>
+      </Modal>
+
       {/* 页面标题 */}
       <div className={styles.pageHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerBadge}>
-            <ExperimentOutlined /> AI智能刷题
+            <ExperimentOutlined /> {t('quiz.title')}
           </div>
           <Title level={1} className={styles.pageTitle}>
-            <span className="gradient-title">DSE智能刷题系统</span>
+            <span className="gradient-title">{t('quiz.title')}</span>
           </Title>
           <Paragraph className={styles.pageDesc}>
-            基于DeepSeek AI的动态题目生成，每次刷题都会根据您选择的配置，
-            实时生成符合DSE考试标准的题目，助您高效备考。
+            {t('quiz.description')}
           </Paragraph>
         </div>
       </div>
@@ -112,8 +346,8 @@ const QuizSetupPage = () => {
               <div className={styles.cardHeader}>
                 <BookOutlined className={styles.cardIcon} />
                 <div>
-                  <Title level={4}>选择年级</Title>
-                  <Text type="secondary">根据您当前的学习阶段选择</Text>
+                  <Title level={4}>{t('quiz.config.grade')}</Title>
+                  <Text type="secondary">{t('quiz.config.grade')}</Text>
                 </div>
               </div>
               <div className={styles.optionsGrid}>
@@ -126,12 +360,12 @@ const QuizSetupPage = () => {
                     onClick={() => updateConfig({ grade: grade.id })}
                   >
                     <div className={styles.optionMain}>
-                      <span className={styles.optionTitle}>{grade.name}</span>
+                      <span className={styles.optionTitle}>{getGradeName(grade.id)}</span>
                       {config.grade === grade.id && (
                         <CheckCircleOutlined className={styles.checkIcon} />
                       )}
                     </div>
-                    <span className={styles.optionDesc}>{grade.description}</span>
+                    <span className={styles.optionDesc}>{getGradeDescription(grade.id)}</span>
                   </div>
                 ))}
               </div>
@@ -142,17 +376,17 @@ const QuizSetupPage = () => {
               <div className={styles.cardHeader}>
                 <ThunderboltOutlined className={styles.cardIcon} />
                 <div>
-                  <Title level={4}>选择科目</Title>
-                  <Text type="secondary">选择您想要练习的科目</Text>
+                  <Title level={4}>{t('quiz.config.subject')}</Title>
+                  <Text type="secondary">{t('quiz.config.subjectDesc')}</Text>
                 </div>
               </div>
 
               {/* 核心科目 */}
               <div className={styles.subjectSection}>
-                <Text strong className={styles.sectionLabel}>核心科目（必修）</Text>
+                <Text strong className={styles.sectionLabel}>{t('levelTest.setup.coreSubjects')}</Text>
                 <div className={styles.subjectsGrid}>
                   {SUPPORTED_SUBJECTS.CORE.map((subject) => (
-                    <Tooltip key={subject.id} title={subject.name}>
+                    <Tooltip key={subject.id} title={getSubjectName(subject.id)}>
                       <div
                         className={`${styles.subjectCard} ${
                           config.subject === subject.id ? styles.selected : ''
@@ -160,7 +394,7 @@ const QuizSetupPage = () => {
                         onClick={() => updateConfig({ subject: subject.id })}
                       >
                         <span className={styles.subjectIcon}>{subject.icon}</span>
-                        <span className={styles.subjectName}>{subject.name}</span>
+                        <span className={styles.subjectName}>{getSubjectName(subject.id)}</span>
                         {config.subject === subject.id && (
                           <CheckCircleOutlined className={styles.checkIcon} />
                         )}
@@ -172,10 +406,10 @@ const QuizSetupPage = () => {
 
               {/* 理科选修 */}
               <div className={styles.subjectSection}>
-                <Text strong className={styles.sectionLabel}>理科选修</Text>
+                <Text strong className={styles.sectionLabel}>{t('quiz.config.scienceElectives')}</Text>
                 <div className={styles.subjectsGrid}>
                   {SUPPORTED_SUBJECTS.SCIENCE_ELECTIVES.map((subject) => (
-                    <Tooltip key={subject.id} title={subject.name}>
+                    <Tooltip key={subject.id} title={getSubjectName(subject.id)}>
                       <div
                         className={`${styles.subjectCard} ${
                           config.subject === subject.id ? styles.selected : ''
@@ -183,7 +417,7 @@ const QuizSetupPage = () => {
                         onClick={() => updateConfig({ subject: subject.id })}
                       >
                         <span className={styles.subjectIcon}>{subject.icon}</span>
-                        <span className={styles.subjectName}>{subject.name}</span>
+                        <span className={styles.subjectName}>{getSubjectName(subject.id)}</span>
                         {config.subject === subject.id && (
                           <CheckCircleOutlined className={styles.checkIcon} />
                         )}
@@ -193,37 +427,107 @@ const QuizSetupPage = () => {
                 </div>
               </div>
 
-              {/* 文科选修 */}
-              <div className={styles.subjectSection}>
-                <Text strong className={styles.sectionLabel}>文科选修</Text>
-                <div className={styles.subjectsGrid}>
-                  {SUPPORTED_SUBJECTS.ARTS_ELECTIVES.map((subject) => (
-                    <Tooltip key={subject.id} title={subject.name}>
-                      <div
-                        className={`${styles.subjectCard} ${
-                          config.subject === subject.id ? styles.selected : ''
-                        }`}
-                        onClick={() => updateConfig({ subject: subject.id })}
-                      >
-                        <span className={styles.subjectIcon}>{subject.icon}</span>
-                        <span className={styles.subjectName}>{subject.name}</span>
-                        {config.subject === subject.id && (
-                          <CheckCircleOutlined className={styles.checkIcon} />
-                        )}
-                      </div>
-                    </Tooltip>
-                  ))}
-                </div>
-              </div>
             </Card>
+
+            {/* 课程模块选择 - 物理/生物/化学时显示 */}
+            {subjectsWithModules.includes(config.subject) && (
+              <Card className={styles.configCard}>
+                <div className={styles.cardHeader}>
+                  <BookOutlined className={styles.cardIcon} />
+                  <div>
+                    <Title level={4}>{t('quiz.config.modules') || '知识模块'}</Title>
+                    <Text type="secondary">
+                      {t('quiz.config.modulesDesc') || '选择想要练习的知识模块（可多选，不选则随机）'}
+                    </Text>
+                  </div>
+                </div>
+
+                {modulesLoading ? (
+                  <div style={{ textAlign: 'center', padding: '20px' }}>
+                    <Spin size="small" />
+                    <Text type="secondary" style={{ marginLeft: 8 }}>
+                      {t('common.loading') || '加载中...'}
+                    </Text>
+                  </div>
+                ) : (
+                  <>
+                    {/* 必修部分 */}
+                    {curriculumModules.compulsory.length > 0 && (
+                      <div className={styles.subjectSection}>
+                        <Text strong className={styles.sectionLabel}>
+                          {t('quiz.config.compulsory') || '必修部分'}
+                        </Text>
+                        <div className={styles.modulesGrid}>
+                          {curriculumModules.compulsory.map((module) => (
+                            <Tooltip 
+                              key={module.module_code} 
+                              title={getModuleDescription(module)}
+                            >
+                              <div
+                                className={`${styles.moduleCard} ${
+                                  selectedModules.includes(module.module_code) ? styles.selected : ''
+                                }`}
+                                onClick={() => handleModuleToggle(module.module_code)}
+                              >
+                                <span className={styles.moduleName}>{getModuleName(module)}</span>
+                                <span className={styles.moduleTopics}>
+                                  {module.topics?.slice(0, 3).join('、')}
+                                  {module.topics?.length > 3 ? '...' : ''}
+                                </span>
+                                {selectedModules.includes(module.module_code) && (
+                                  <CheckCircleOutlined className={styles.checkIcon} />
+                                )}
+                              </div>
+                            </Tooltip>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 选修部分 */}
+                    {curriculumModules.elective.length > 0 && (
+                      <div className={styles.subjectSection}>
+                        <Text strong className={styles.sectionLabel}>
+                          {t('quiz.config.elective') || '选修部分（四选二）'}
+                        </Text>
+                        <div className={styles.modulesGrid}>
+                          {curriculumModules.elective.map((module) => (
+                            <Tooltip 
+                              key={module.module_code} 
+                              title={getModuleDescription(module)}
+                            >
+                              <div
+                                className={`${styles.moduleCard} ${
+                                  selectedModules.includes(module.module_code) ? styles.selected : ''
+                                }`}
+                                onClick={() => handleModuleToggle(module.module_code)}
+                              >
+                                <span className={styles.moduleName}>{getModuleName(module)}</span>
+                                <span className={styles.moduleTopics}>
+                                  {module.topics?.slice(0, 3).join('、')}
+                                  {module.topics?.length > 3 ? '...' : ''}
+                                </span>
+                                {selectedModules.includes(module.module_code) && (
+                                  <CheckCircleOutlined className={styles.checkIcon} />
+                                )}
+                              </div>
+                            </Tooltip>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </Card>
+            )}
 
             {/* 难度选择 */}
             <Card className={styles.configCard}>
               <div className={styles.cardHeader}>
                 <FireOutlined className={styles.cardIcon} />
                 <div>
-                  <Title level={4}>选择难度</Title>
-                  <Text type="secondary">根据您的水平选择合适的难度</Text>
+                  <Title level={4}>{t('quiz.config.difficulty')}</Title>
+                  <Text type="secondary">{t('quiz.config.difficultyDesc')}</Text>
                 </div>
               </div>
               <div className={styles.difficultyGrid}>
@@ -243,10 +547,10 @@ const QuizSetupPage = () => {
                       style={{ background: diff.color }}
                     />
                     <div className={styles.difficultyContent}>
-                      <span className={styles.difficultyName}>{diff.name}</span>
-                      <span className={styles.difficultyDesc}>{diff.description}</span>
+                      <span className={styles.difficultyName}>{getDifficultyName(diff.id)}</span>
+                      <span className={styles.difficultyDesc}>{getDifficultyDescription(diff.id)}</span>
                       <span className={styles.difficultyTarget}>
-                        目标正确率: {diff.targetAccuracy}
+                        {t('quiz.targetAccuracy')}: {diff.targetAccuracy}
                       </span>
                     </div>
                     {config.difficulty === diff.id && (
@@ -265,8 +569,8 @@ const QuizSetupPage = () => {
               <div className={styles.cardHeader}>
                 <ClockCircleOutlined className={styles.cardIcon} />
                 <div>
-                  <Title level={4}>题目数量</Title>
-                  <Text type="secondary">选择本次练习的题目数量</Text>
+                  <Title level={4}>{t('quiz.config.questionCount')}</Title>
+                  <Text type="secondary">{t('quiz.config.questionCountDesc')}</Text>
                 </div>
               </div>
               <div className={styles.countGrid}>
@@ -279,8 +583,8 @@ const QuizSetupPage = () => {
                     onClick={() => updateConfig({ questionCount: option.value })}
                   >
                     <span className={styles.countValue}>{option.value}</span>
-                    <span className={styles.countLabel}>{option.label}</span>
-                    <span className={styles.countDesc}>{option.description}</span>
+                    <span className={styles.countLabel}>{getCountLabel(option.value)}</span>
+                    <span className={styles.countDesc}>{getCountDescription(option.value)}</span>
                     {config.questionCount === option.value && (
                       <CheckCircleOutlined className={styles.checkIcon} />
                     )}
@@ -296,30 +600,30 @@ const QuizSetupPage = () => {
               <Card className={styles.summaryCard}>
                 <div className={styles.summaryHeader}>
                   <RocketOutlined className={styles.summaryIcon} />
-                  <Title level={4}>刷题配置</Title>
+                  <Title level={4}>{t('quiz.config.title')}</Title>
                 </div>
 
                 <div className={styles.summaryList}>
                   <div className={styles.summaryItem}>
-                    <span className={styles.summaryLabel}>年级</span>
+                    <span className={styles.summaryLabel}>{t('quiz.config.grade')}</span>
                     <span className={styles.summaryValue}>{getSelectedGradeName()}</span>
                   </div>
                   <div className={styles.summaryItem}>
-                    <span className={styles.summaryLabel}>科目</span>
+                    <span className={styles.summaryLabel}>{t('quiz.config.subject')}</span>
                     <span className={styles.summaryValue}>{getSelectedSubjectName()}</span>
                   </div>
                   <div className={styles.summaryItem}>
-                    <span className={styles.summaryLabel}>难度</span>
+                    <span className={styles.summaryLabel}>{t('quiz.config.difficulty')}</span>
                     <span
                       className={styles.summaryValue}
                       style={{ color: getSelectedDifficulty()?.color }}
                     >
-                      {getSelectedDifficulty()?.name || '未选择'}
+                      {getSelectedDifficulty()?.name || t('common.notSelected')}
                     </span>
                   </div>
                   <div className={styles.summaryItem}>
-                    <span className={styles.summaryLabel}>题目数量</span>
-                    <span className={styles.summaryValue}>{config.questionCount} 题</span>
+                    <span className={styles.summaryLabel}>{t('quiz.config.questionCount')}</span>
+                    <span className={styles.summaryValue}>{config.questionCount} {t('common.questions')}</span>
                   </div>
                 </div>
 
@@ -338,16 +642,16 @@ const QuizSetupPage = () => {
                   onClick={handleStartQuiz}
                   disabled={starting || generating || !config.subject || !config.grade}
                 >
-                  {starting || generating ? '正在生成题目...' : '开始刷题'}
+                  {starting || generating ? t('common.generatingQuestions') : t('quiz.config.start')}
                 </Button>
 
                 <div className={styles.tipBox}>
                   <TrophyOutlined className={styles.tipIcon} />
                   <div>
-                    <Text strong>AI智能生成</Text>
+                    <Text strong>{t('quiz.config.aiGenerated')}</Text>
                     <br />
                     <Text type="secondary" style={{ fontSize: '0.85rem' }}>
-                      题目将根据DSE近五年考试标准实时生成，每次练习都是全新题目
+                      {t('quiz.config.aiGeneratedDesc')}
                     </Text>
                   </div>
                 </div>
@@ -355,27 +659,27 @@ const QuizSetupPage = () => {
 
               {/* 特色说明 */}
               <Card className={styles.featureCard}>
-                <Title level={5}>刷题特色</Title>
+                <Title level={5}>{t('quiz.config.features')}</Title>
                 <div className={styles.featureList}>
                   <div className={styles.featureItem}>
                     <CheckCircleOutlined className={styles.featureCheck} />
-                    <span>符合DSE考试标准</span>
+                    <span>{t('quiz.features.dseStandard')}</span>
                   </div>
                   <div className={styles.featureItem}>
                     <CheckCircleOutlined className={styles.featureCheck} />
-                    <span>AI动态生成题目</span>
+                    <span>{t('quiz.features.aiGenerated')}</span>
                   </div>
                   <div className={styles.featureItem}>
                     <CheckCircleOutlined className={styles.featureCheck} />
-                    <span>即时批改与解析</span>
+                    <span>{t('quiz.features.instantGrading')}</span>
                   </div>
                   <div className={styles.featureItem}>
                     <CheckCircleOutlined className={styles.featureCheck} />
-                    <span>详细学习报告</span>
+                    <span>{t('quiz.features.detailedReport')}</span>
                   </div>
                   <div className={styles.featureItem}>
                     <CheckCircleOutlined className={styles.featureCheck} />
-                    <span>随时暂停继续</span>
+                    <span>{t('quiz.features.pauseResume')}</span>
                   </div>
                 </div>
               </Card>

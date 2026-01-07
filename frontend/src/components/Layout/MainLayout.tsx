@@ -16,6 +16,7 @@ import {
   SettingOutlined,
   SafetyCertificateOutlined,
   FileSearchOutlined,
+  GiftOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import { useLanguageStore } from '../../stores/languageStore'
@@ -35,7 +36,7 @@ const MainLayout = () => {
   const { isAuthenticated, user, logout } = useAuthStore()
   const { t } = useLanguageStore()
 
-  // 导航菜单项
+  // 导航菜单项 - 精简版
   const menuItems = [
     {
       key: '/',
@@ -48,94 +49,98 @@ const MainLayout = () => {
       label: t('nav.analysis'),
     },
     {
-      key: 'quiz-group',
+      key: 'learning-center',
       icon: <ExperimentOutlined />,
-      label: t('nav.smartQuiz'),
+      label: '📚 ' + t('nav.learningCenter'),
       children: [
         {
           key: '/quiz',
           icon: <ExperimentOutlined />,
-          label: t('nav.startQuiz'),
+          label: '🧪 ' + t('nav.startQuiz'),
+        },
+        {
+          key: '/level-test',
+          icon: <SafetyCertificateOutlined />,
+          label: '📊 ' + t('nav.startLevelTest'),
         },
         {
           key: '/quiz/wrong-questions',
           icon: <BookOutlined />,
-          label: t('nav.wrongQuestions'),
-        },
-        {
-          key: '/quiz/history',
-          icon: <HistoryOutlined />,
-          label: t('nav.quizHistory'),
+          label: '📖 ' + t('nav.wrongQuestions'),
         },
         {
           key: '/quiz/profile',
           icon: <LineChartOutlined />,
-          label: t('nav.learningProfile'),
-        },
-      ],
-    },
-    {
-      key: 'level-test-group',
-      icon: <SafetyCertificateOutlined />,
-      label: '水平测试',
-      children: [
-        {
-          key: '/level-test',
-          icon: <SafetyCertificateOutlined />,
-          label: '开始测试',
-        },
-        {
-          key: '/level-test/history',
-          icon: <FileSearchOutlined />,
-          label: '测试记录',
+          label: '📈 ' + t('nav.learningProfile'),
         },
       ],
     },
     {
       key: '/leaderboard',
       icon: <TrophyOutlined />,
-      label: `🏆 ${t('nav.leaderboard')}`,
+      label: '🏆 ' + t('nav.leaderboard'),
     },
     {
-      key: '/history',
-      icon: <HistoryOutlined />,
-      label: t('nav.history'),
+      key: '/points',
+      icon: <GiftOutlined />,
+      label: '🎁 ' + t('nav.points'),
     },
   ]
 
-  // 用户下拉菜单
+  // 用户下拉菜单 - 整合更多功能
   const userMenuItems = [
+    {
+      key: 'points',
+      icon: <GiftOutlined />,
+      label: '🎁 ' + t('nav.myPoints'),
+      onClick: () => navigate('/points'),
+    },
     {
       key: 'profile',
       icon: <LineChartOutlined />,
-      label: t('nav.learningProfile'),
+      label: '📈 ' + t('nav.learningProfile'),
       onClick: () => navigate('/quiz/profile'),
     },
     {
       key: 'achievements',
       icon: <TrophyOutlined />,
-      label: t('leaderboard.myRank'),
-      onClick: () => navigate('/quiz/profile?tab=achievements'),
-    },
-    {
-      key: 'history',
-      icon: <HistoryOutlined />,
-      label: t('nav.myRecords'),
-      onClick: () => navigate('/history'),
-    },
-    {
-      key: 'settings',
-      icon: <SettingOutlined />,
-      label: '账户设置',
-      onClick: () => navigate('/settings'),
+      label: '🏆 ' + t('nav.myRanking'),
+      onClick: () => navigate('/leaderboard'),
     },
     {
       type: 'divider' as const,
     },
     {
+      key: 'quiz-history',
+      icon: <ExperimentOutlined />,
+      label: '📝 ' + t('nav.quizHistory'),
+      onClick: () => navigate('/quiz/history'),
+    },
+    {
+      key: 'test-history',
+      icon: <FileSearchOutlined />,
+      label: '📊 ' + t('nav.levelTestHistory'),
+      onClick: () => navigate('/level-test/history'),
+    },
+    {
+      key: 'history',
+      icon: <HistoryOutlined />,
+      label: '📋 ' + t('nav.analysisHistory'),
+      onClick: () => navigate('/history'),
+    },
+    {
+      type: 'divider' as const,
+    },
+    {
+      key: 'settings',
+      icon: <SettingOutlined />,
+      label: '⚙️ ' + t('nav.accountSettings'),
+      onClick: () => navigate('/settings'),
+    },
+    {
       key: 'logout',
       icon: <LogoutOutlined />,
-      label: t('nav.logout'),
+      label: '🚪 ' + t('nav.logout'),
       onClick: () => {
         logout()
         navigate('/')
@@ -284,7 +289,7 @@ const MainLayout = () => {
         </div>
       </Footer>
 
-      {/* 移动端底部导航栏 */}
+      {/* 移动端底部导航栏 - 5个核心入口 */}
       <div className={styles.mobileBottomBar}>
         <Link 
           to="/" 
@@ -298,21 +303,21 @@ const MainLayout = () => {
           className={`${styles.bottomNavItem} ${location.pathname.startsWith('/quiz') ? styles.active : ''}`}
         >
           <ExperimentOutlined className={styles.icon} />
-          <span>{t('nav.startQuiz')}</span>
+          <span>{t('nav.smartQuiz')}</span>
         </Link>
         <Link 
           to="/level-test" 
           className={`${styles.bottomNavItem} ${location.pathname.startsWith('/level-test') ? styles.active : ''}`}
         >
           <SafetyCertificateOutlined className={styles.icon} />
-          <span>测试</span>
+          <span>{t('nav.levelTest')}</span>
         </Link>
         <Link 
-          to="/leaderboard" 
-          className={`${styles.bottomNavItem} ${location.pathname === '/leaderboard' ? styles.active : ''}`}
+          to="/points" 
+          className={`${styles.bottomNavItem} ${location.pathname.startsWith('/points') ? styles.active : ''}`}
         >
-          <TrophyOutlined className={styles.icon} />
-          <span>{t('nav.leaderboard')}</span>
+          <GiftOutlined className={styles.icon} />
+          <span>{t('nav.myPoints')}</span>
         </Link>
         {isAuthenticated ? (
           <Link 
@@ -320,7 +325,7 @@ const MainLayout = () => {
             className={`${styles.bottomNavItem} ${location.pathname === '/settings' ? styles.active : ''}`}
           >
             <UserOutlined className={styles.icon} />
-            <span>我的</span>
+            <span>{t('nav.myRecords')}</span>
           </Link>
         ) : (
           <Link 

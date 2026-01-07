@@ -20,6 +20,7 @@ import {
 } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useAnalysisStore, HistoryItem } from '../stores/analysisStore'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './HistoryPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -30,6 +31,7 @@ const { Title, Text, Paragraph } = Typography
  */
 const HistoryPage = () => {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const { history, loading, loadHistory, deleteHistoryItem } = useAnalysisStore()
 
   // 加载历史记录
@@ -177,10 +179,10 @@ const HistoryPage = () => {
             <HistoryOutlined className={styles.headerIcon} />
             <div>
               <Title level={2} className="gradient-title">
-                分析历史记录
+                {t('history.title')}
               </Title>
               <Paragraph type="secondary">
-                查看您的所有DSE插班分析记录，可随时查看详细报告或删除记录
+                {t('history.title')}
               </Paragraph>
             </div>
           </div>

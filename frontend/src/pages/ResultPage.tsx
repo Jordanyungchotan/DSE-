@@ -45,6 +45,7 @@ import {
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 import { useAnalysisStore } from '../stores/analysisStore'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './ResultPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -57,6 +58,7 @@ const { Panel } = Collapse
 const ResultPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const reportRef = useRef<HTMLDivElement>(null)
   const { currentResult, loading, error, loadResult } = useAnalysisStore()
 
@@ -298,12 +300,12 @@ const ResultPage = () => {
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/analysis')}
         >
-          返回
+          {t('common.back')}
         </Button>
         <Space>
-          <Tooltip title="分享报告链接">
+          <Tooltip title={t('result.shareResult')}>
             <Button icon={<ShareAltOutlined />} onClick={handleShare}>
-              分享
+              {t('result.shareResult')}
             </Button>
           </Tooltip>
           <Button
@@ -311,7 +313,7 @@ const ResultPage = () => {
             icon={<DownloadOutlined />}
             onClick={handleExportPDF}
           >
-            导出PDF
+            {t('result.downloadPDF')}
           </Button>
         </Space>
       </div>
@@ -323,7 +325,7 @@ const ResultPage = () => {
           <Row gutter={24} align="middle">
             <Col xs={24} md={16}>
               <Title level={2} className="gradient-title">
-                DSE插班分析报告
+                {t('result.title')}
               </Title>
               <Paragraph type="secondary">
                 生成时间：{new Date(result.createdAt).toLocaleString('zh-CN')}

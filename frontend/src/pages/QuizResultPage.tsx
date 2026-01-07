@@ -15,6 +15,7 @@ import {
   ShareAltOutlined,
 } from '@ant-design/icons'
 import { useQuizStore, SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
+import { useLanguageStore } from '../stores/languageStore'
 import ShareResult from '../components/ShareResult/ShareResult'
 import styles from './QuizResultPage.module.css'
 
@@ -26,6 +27,7 @@ const { Panel } = Collapse
  */
 const QuizResultPage = () => {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const { currentSession, currentReport, generateReport, clearSession } = useQuizStore()
   const [showShareModal, setShowShareModal] = useState(false)
 
@@ -156,7 +158,7 @@ const QuizResultPage = () => {
               </div>
               <div className={styles.accuracyBar}>
                 <div className={styles.accuracyLabel}>
-                  <span>正确率</span>
+                  <span>{t('quiz.result.accuracy')}</span>
                   <span className={styles.accuracyValue}>{scores.accuracy}%</span>
                 </div>
                 <Progress

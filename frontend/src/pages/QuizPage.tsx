@@ -17,6 +17,8 @@ import {
   WarningOutlined,
 } from '@ant-design/icons'
 import { useQuizStore, SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
+import { useLanguageStore } from '../stores/languageStore'
+import MathText from '../components/MathText'
 import styles from './QuizPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -54,6 +56,7 @@ const cleanOptionPrefix = (option: string): string => {
 
 const QuizPage = () => {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const {
     currentSession,
     submitAnswer,
@@ -108,17 +111,17 @@ const QuizPage = () => {
   useEffect(() => {
     if (remainingTime !== null && remainingTime <= 60 && remainingTime > 0 && !showTimeWarning) {
       setShowTimeWarning(true)
-      message.warning('⏰ 剩余时间不足1分钟！')
+      message.warning(t('quiz.timeWarning'))
     }
-  }, [remainingTime, showTimeWarning])
+  }, [remainingTime, showTimeWarning, t])
 
   // 时间到自动提交
   useEffect(() => {
     if (remainingTime === 0) {
-      message.error('时间到！自动提交答案...')
+      message.error(t('quiz.timeUp'))
       handleFinishQuiz()
     }
-  }, [remainingTime])
+  }, [remainingTime, t])
 
   // 当切换题目时，重置当前答案
   useEffect(() => {
@@ -142,10 +145,10 @@ const QuizPage = () => {
       const newSet = new Set(prev)
       if (newSet.has(questionId)) {
         newSet.delete(questionId)
-        message.info('已取消收藏')
+        message.info(t('quiz.unfavorited'))
       } else {
         newSet.add(questionId)
-        message.success('已收藏题目')
+        message.success(t('quiz.favorited'))
       }
       return newSet
     })
@@ -179,7 +182,7 @@ const QuizPage = () => {
   // 提交当前答案
   const handleSubmitAnswer = async () => {
     if (currentAnswer === '' || currentAnswer === undefined) {
-      message.warning('请先选择或输入答案')
+      message.warning(t('quiz.pleaseAnswer'))
       return
     }
     
@@ -223,9 +226,9 @@ const QuizPage = () => {
         submitAnswer(currentAnswer, isCorrect)
         
         if (isCorrect) {
-          message.success('答案正确！✅')
+          message.success(t('quiz.correctAnswer') + ' ✅')
         } else {
-          message.error('答案不正确')
+          message.error(t('quiz.incorrectAnswer'))
           saveWrongQuestion(currentQ, currentAnswer).catch(() => {})
         }
       }
@@ -235,7 +238,7 @@ const QuizPage = () => {
       submitAnswer(currentAnswer, isCorrect)
       
       if (isCorrect) {
-        message.success('答案正确！✅')
+        message.success(t('quiz.correctAnswer') + ' ✅')
       } else {
         message.error('答案不正确')
         saveWrongQuestion(currentQ, currentAnswer).catch(() => {})
@@ -323,7 +326,7 @@ const QuizPage = () => {
       await finishQuiz()
       navigate('/quiz/result')
     } catch {
-      message.error('结束刷题失败')
+      message.error(t('common.error'))
     } finally {
       setSubmitting(false)
       setShowExitModal(false)
@@ -478,8 +481,24 @@ const QuizPage = () => {
 
           {/* 题目内容 */}
           <div className={styles.questionContent}>
+            {/* 显示AI生成的题目图片 */}
+            {currentQuestion.imageUrl && (
+              <div className={styles.questionImage}>
+                <img 
+                  src={currentQuestion.imageUrl} 
+                  alt="题目图表" 
+                  style={{ 
+                    maxWidth: '100%', 
+                    maxHeight: '400px', 
+                    borderRadius: '8px',
+                    marginBottom: '16px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }} 
+                />
+              </div>
+            )}
             <Title level={4} className={styles.questionText}>
-              {currentQuestion.question}
+              <MathText text={currentQuestion.question} />
             </Title>
           </div>
 
@@ -532,7 +551,7 @@ const QuizPage = () => {
                         <span className={styles.optionLabel}>
                           {String.fromCharCode(65 + index)}.
                         </span>
-                        <span className={styles.optionText}>{cleanOptionPrefix(option)}</span>
+                        <span className={styles.optionText}><MathText text={cleanOptionPrefix(option)} /></span>
                         {isAnswered && isCorrectOption && (
                           <span style={{ marginLeft: 8, color: '#52c41a', fontWeight: 'bold' }}>✓ 正确答案</span>
                         )}
@@ -656,7 +675,7 @@ const QuizPage = () => {
           disabled={currentSession.currentQuestionIndex === 0}
           className={styles.navButton}
         >
-          上一题
+          {t('common.previous')}
         </Button>
 
         <div className={styles.navCenter}>
@@ -669,7 +688,7 @@ const QuizPage = () => {
               className={styles.submitButton}
               disabled={currentAnswer === ''}
             >
-              提交答案
+              {t('quiz.submitAnswer')}
             </Button>
           ) : isLastQuestion ? (
             <Button
@@ -679,7 +698,7 @@ const QuizPage = () => {
               loading={submitting}
               className={styles.finishButton}
             >
-              查看结果
+              {t('quiz.result.review')}
             </Button>
           ) : null}
         </div>
@@ -691,7 +710,7 @@ const QuizPage = () => {
           disabled={isLastQuestion && currentQuestion.userAnswer !== undefined}
           className={styles.navButton}
         >
-          {isLastQuestion ? '最后一题' : '下一题'}
+          {t('quiz.nextQuestion')}
         </Button>
       </div>
 

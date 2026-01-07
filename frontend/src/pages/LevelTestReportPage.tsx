@@ -18,6 +18,7 @@ import {
   RedoOutlined
 } from '@ant-design/icons'
 import { apiFetch } from '../config/api'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './LevelTestReportPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -86,6 +87,7 @@ interface ReportData {
 export default function LevelTestReportPage() {
   const { testId } = useParams<{ testId: string }>()
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   
   const [loading, setLoading] = useState(true)
   const [report, setReport] = useState<ReportData | null>(null)
@@ -95,6 +97,63 @@ export default function LevelTestReportPage() {
       if (!testId) return
       
       try {
+        // 首先尝试从localStorage读取RAG服务生成的报告
+        const cachedReport = localStorage.getItem(`level_test_report_${testId}`)
+        
+        if (cachedReport) {
+          console.log('[Report] 从缓存加载报告')
+          const parsed = JSON.parse(cachedReport)
+          
+          // 转换为ReportData格式
+          const reportData: ReportData = {
+            testId: parsed.testId,
+            grade: parsed.grade,
+            subject: parsed.subject,
+            testType: parsed.testType,
+            completedAt: parsed.completedAt,
+            timeSpent: parsed.timeSpent,
+            overallLevel: parsed.predictedGrade,
+            overallScore: parsed.percentage,
+            gradeEquivalent: parsed.predictedGrade,
+            abilityRadar: {
+              knowledge: Math.min(100, parsed.percentage + 5),
+              application: parsed.percentage,
+              analysis: Math.max(0, parsed.percentage - 5),
+              synthesis: Math.max(0, parsed.percentage - 10),
+              evaluation: Math.max(0, parsed.percentage - 8),
+            },
+            strengthPoints: parsed.percentage >= 60 ? ['基础知识掌握良好', '能够完成基本题型'] : ['有完成测试的耐心'],
+            weaknessPoints: parsed.percentage < 60 ? ['需要加强基础知识复习', '建议多做练习题'] : [],
+            recommendations: [
+              {
+                priority: 1,
+                topic: '继续练习',
+                suggestion: '每天坚持做题，巩固知识点',
+                resources: ['刷题模块', '错题本'],
+              }
+            ],
+            questions: parsed.questions.map((q: Record<string, unknown>, idx: number) => ({
+              id: q.id || `q_${idx}`,
+              questionIndex: idx,
+              questionText: (q.questionText as string) || '',
+              questionType: (q.questionType as 'choice' | 'short' | 'long') || 'choice',
+              options: (q.options as string[]) || [],
+              correctAnswer: (q.correctAnswer as string) || '',
+              userAnswer: (q.userAnswer as string) || '',
+              score: (q.score as number) || 0,
+              maxScore: (q.maxScore as number) || 2,
+              feedback: (q.explanation as string) || '继续努力！',
+              difficulty: (q.difficulty as string) || 'medium',
+              knowledgePoints: (q.knowledgePoints as string[]) || [],
+            })),
+          }
+          
+          setReport(reportData)
+          setLoading(false)
+          return
+        }
+        
+        // 回退到后端API
         const res = await apiFetch(`/api/level-test/${testId}/report`)
         const response = await res.json() as ReportData & { error?: string }
         
@@ -179,10 +238,10 @@ export default function LevelTestReportPage() {
           icon={<ArrowLeftOutlined />} 
           onClick={() => navigate('/level-test/history')}
         >
-          返回历史
+          {t('common.back')}
         </Button>
         <Title level={2} className={styles.title}>
-          <FileTextOutlined /> 水平测试报告
+          <FileTextOutlined /> {t('levelTest.report.title')}
         </Title>
         <div className={styles.headerMeta}>
           <Tag color="blue">{report.grade}</Tag>
@@ -202,7 +261,7 @@ export default function LevelTestReportPage() {
                 {report.overallLevel}
               </span>
             </div>
-            <Title level={3} className={styles.levelTitle}>DSE预测等级</Title>
+            <Title level={3} className={styles.levelTitle}>{t('levelTest.report.predictedLevel')}</Title>
             <Text type="secondary">{getLevelDescription(report.overallLevel)}</Text>
           </Col>
           

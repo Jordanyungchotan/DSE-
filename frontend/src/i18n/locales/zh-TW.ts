@@ -16,6 +16,9 @@ export const zhTW = {
     error: '錯誤',
     warning: '警告',
     info: '提示',
+    notSelected: '未選擇',
+    questions: '題',
+    generatingQuestions: '正在生成題目...',
   },
 
   // 導航
@@ -38,6 +41,15 @@ export const zhTW = {
     levelTest: '水平測試',
     startLevelTest: '開始測試',
     levelTestHistory: '測試記錄',
+    // 學習中心
+    learningCenter: '學習中心',
+    // 積分系統
+    points: '積分',
+    myPoints: '我的積分',
+    pointsMall: '積分商城',
+    analysisHistory: '分析記錄',
+    accountSettings: '帳戶設定',
+    myRanking: '我的排名',
   },
 
   // 系統名稱
@@ -292,6 +304,19 @@ export const zhTW = {
       startFree: '🚀 免費開始分析',
       register: '👇 免費註冊體驗',
     },
+    
+    // 水平測試卡片
+    levelTest: {
+      newFeature: '全新功能',
+      title: 'DSE水平測試',
+      description: '精準評估您在香港DSE課程中的實際學業水平，獲取DSE等級預測和個性化學習建議',
+      feature1: '智能AI出題，符合考評局標準',
+      feature2: '多維度能力評估，精準定位',
+      feature3: 'DSE等級預測 (1-5**)',
+      feature4: '詳細報告和學習建議',
+      startButton: '開始水平測試',
+      viewHistoryButton: '查看測試記錄',
+    },
   },
 
   // 分析頁面
@@ -379,6 +404,8 @@ export const zhTW = {
     registerSuccess: '註冊成功',
     loginFailed: '登入失敗',
     registerFailed: '註冊失敗',
+    login: '立即登入',
+    loginToViewRank: '登入後查看您的排名',
   },
 
   // 頁尾
@@ -417,11 +444,53 @@ export const zhTW = {
     // 刷題配置
     config: {
       title: '刷題配置',
-      subject: '選擇科目',
-      grade: '選擇年級',
-      difficulty: '選擇難度',
+      subject: '科目',
+      subjectDesc: '選擇您想要練習的科目',
+      grade: '年級',
+      difficulty: '難度',
+      difficultyDesc: '根據您的水平選擇合適的難度',
       questionCount: '題目數量',
+      questionCountDesc: '選擇本次練習的題目數量',
       start: '開始刷題',
+      scienceElectives: '理科選修',
+      artsElectives: '文科選修',
+      aiGenerated: 'AI智能生成',
+      aiGeneratedDesc: '題目將根據DSE近五年考試標準實時生成，每次練習都是全新題目',
+      features: '刷題特色',
+      modules: '知識模組',
+      modulesDesc: '選擇想要練習的知識模組（可多選，不選則隨機）',
+      compulsory: '必修部分',
+      elective: '選修部分（四選二）',
+    },
+    
+    // 警告消息
+    warnings: {
+      selectSubject: '請選擇一個科目',
+      selectGrade: '請選擇年級',
+      selectDifficulty: '請選擇難度',
+    },
+    
+    // 加載提示
+    loadingTips: {
+      selecting: '正在從題庫中精選題目...',
+      adjusting: '正在根據您的年級調整難度...',
+      generating: '正在生成答案解析...',
+      optimizing: '正在優化題目內容...',
+      almostDone: '即將完成，請稍候...',
+    },
+    
+    // AI生成
+    aiGenerating: 'AI 智能生成中',
+    generatingHint: '題目將根據 DSE 真題標準實時生成，包含詳細答案解析',
+    targetAccuracy: '目標正確率',
+    
+    // 特色
+    features: {
+      dseStandard: '符合DSE考試標準',
+      aiGenerated: 'AI動態生成題目',
+      instantGrading: '即時批改與解析',
+      detailedReport: '詳細學習報告',
+      pauseResume: '隨時暫停繼續',
     },
     
     // 年級
@@ -431,26 +500,48 @@ export const zhTW = {
       f6: '中六',
     },
     
+    // 年級描述
+    gradeDescs: {
+      f4: 'DSE第一年課程',
+      f5: 'DSE第二年課程',
+      f6: 'DSE第三年/應考年',
+    },
+    
     // 難度
     difficulties: {
       basic: '基礎',
       standard: '標準',
       challenging: '挑戰',
-      exam: '考試',
+      exam: '考試難度',
     },
+    
+    // 難度描述
+    difficultyDescs: {
+      basic: '基礎知識鞏固',
+      standard: '常規練習難度',
+      challenging: '能力提升訓練',
+      exam: 'DSE真題模擬',
+    },
+    
+    // 題目數量標籤
+    countLabels: {
+      quick: '快速練習',
+      standard: '標準練習',
+      deep: '深度練習',
+      mock: '模擬測試',
+    },
+    countSuffix: '題',
     
     // 科目
     subjects: {
       math: '數學',
-      chinese: '中文',
-      english: '英文',
+      chinese: '中國語文',
+      english: '英國語文',
       physics: '物理',
       chemistry: '化學',
       biology: '生物',
-      economics: '經濟',
-      bafs: '企業會計與財務概論',
-      history: '歷史',
-      geography: '地理',
+      mathM1: '數學M1',
+      mathM2: '數學M2',
     },
     
     // 答題頁面
@@ -462,7 +553,13 @@ export const zhTW = {
     correct: '回答正確',
     incorrect: '回答錯誤',
     correctAnswer: '正確答案',
+    incorrectAnswer: '答案不正確',
     explanation: '解析',
+    pleaseAnswer: '請先選擇或輸入答案',
+    timeWarning: '⏰ 剩餘時間不足1分鐘！',
+    timeUp: '時間到！自動提交答案...',
+    favorited: '已收藏題目',
+    unfavorited: '已取消收藏',
     
     // 結果頁面
     result: {
@@ -501,6 +598,173 @@ export const zhTW = {
       score: '得分',
       accuracy: '正確率',
       view: '查看詳情',
+    },
+  },
+
+  // 水平測試
+  levelTest: {
+    title: 'DSE水平測試',
+    subtitle: '精準評估您在香港DSE課程中的實際學業水平，獲取個性化學習建議',
+    testNotFound: '測試不存在或已過期',
+    timeUp: '時間到！正在自動提交...',
+    points: '分',
+    
+    // 題型
+    questionTypes: {
+      choice: '選擇題',
+      short: '短答題',
+      long: '論述題',
+    },
+    
+    // 確認提交
+    confirmSubmit: {
+      title: '確認提交',
+      continue: '繼續答題',
+      answered: '已答題目',
+      unanswered: '未答題目',
+      marked: '標記待檢查',
+      warning: '您還有 {count} 道題未作答，確定要提交嗎？',
+    },
+    
+    // 批改提示
+    gradingTips: {
+      wait: '批改需要一些時間，請耐心等待...',
+      ai: '系統正在使用AI對您的答案進行評估',
+    },
+    
+    // 測試須知
+    testNotice: {
+      title: '測試須知',
+      tip1: '測試開始後請確保網絡穩定，系統會每30秒自動保存進度',
+      tip2: '測試題目包含選擇題（40%）、短答題（40%）、論述題（20%）',
+      tip3: '請在規定時間內完成測試，超時將自動提交',
+      tip4: '測試結果將生成詳細的分析報告和學習建議',
+    },
+    
+    // DSE等級說明
+    dseLevels: {
+      title: 'DSE等級說明',
+      '5star2': '優異',
+      '5star': '優良',
+      '5': '良好',
+      '4': '中等',
+      '3': '基本達標',
+      '2': '部分達標',
+      '1': '未達標',
+      'U': '不予評級',
+    },
+    
+    // 特性介紹
+    features: {
+      aiTitle: '智能AI出題',
+      aiDesc: '基於DeepSeek AI，嚴格遵循香港考評局DSE課程綱要生成題目',
+      multiTitle: '多維度評估',
+      multiDesc: '選擇題、短答題、論述題綜合評估，全面了解知識掌握情況',
+      predictTitle: 'DSE等級預測',
+      predictDesc: '根據測試表現預測DSE等級（1-5**），提供精準定位',
+    },
+    
+    // 設置頁
+    setup: {
+      startTest: '開始測試',
+      selectGrade: '選擇年級',
+      selectSubject: '選擇科目',
+      selectType: '選擇測試類型',
+      selectBoth: '請先選擇年級和科目',
+      coreSubjects: '核心科目',
+      electiveSubjects: '選修科目',
+      quickTest: '基礎測試',
+      quickDesc: '15-20題，約30分鐘',
+      fullTest: '完整評估',
+      fullDesc: '25-30題，約60分鐘',
+      recommended: '推薦',
+      pleaseSelectGrade: '請選擇年級',
+      pleaseSelectSubject: '請選擇科目',
+      noQuestionsError: '該科目暫無題目，請選擇其他科目',
+      generateFailed: '生成測試失敗',
+    },
+    
+    // 測試進行中
+    progress: {
+      question: '第 {current} 題',
+      questionCard: '答題卡',
+      answered: '已答',
+      marked: '標記',
+      current: '當前',
+      submitTest: '提交測試',
+      markQuestion: '標記',
+      previousQuestion: '上一題',
+      nextQuestion: '下一題',
+      relatedTopics: '相關知識點',
+      pleaseAnswer: '請輸入答案...',
+      pleaseAnswerLong: '請詳細作答...',
+    },
+    
+    // 測試提交
+    submit: {
+      submitting: '正在提交答案...',
+      grading: '正在批改試卷...',
+      gradingMC: '正在評估選擇題...',
+      gradingSA: '正在分析簡答題...',
+      gradingLA: '正在評估論述題...',
+      generatingReport: '正在生成學習報告...',
+      almostDone: '即將完成...',
+      completed: '批改完成！正在跳轉到報告頁面...',
+      success: '測試已提交！',
+      failed: '提交失敗',
+    },
+    
+    // 報告頁
+    report: {
+      title: '水平測試報告',
+      overallScore: '綜合得分',
+      predictedLevel: '預測DSE等級',
+      timeSpent: '答題用時',
+      correctRate: '正確率',
+      totalQuestions: '總題數',
+      correctCount: '答對題數',
+      
+      // 能力分析
+      abilityAnalysis: '能力分析',
+      knowledge: '知識',
+      application: '應用',
+      analysis: '分析',
+      synthesis: '綜合',
+      evaluation: '評估',
+      
+      // 優劣勢
+      strengths: '優勢領域',
+      weaknesses: '待提升領域',
+      
+      // 建議
+      recommendations: '學習建議',
+      priority: '優先級',
+      topic: '知識點',
+      resources: '推薦資源',
+      
+      // 題目詳情
+      questionDetails: '題目詳情',
+      yourAnswer: '你的答案',
+      correctAnswer: '正確答案',
+      notAnswered: '未作答',
+      feedback: '評價',
+      
+      // 操作
+      backToSetup: '返回測試設置',
+      backHome: '返回首頁',
+      retakeTest: '重新測試',
+    },
+    
+    // 歷史記錄
+    history: {
+      title: '測試記錄',
+      empty: '暫無測試記錄',
+      testDate: '測試日期',
+      subject: '科目',
+      grade: '年級',
+      score: '得分',
+      level: '等級',
+      viewReport: '查看報告',
     },
   },
 
@@ -543,6 +807,93 @@ export const zhTW = {
     loading: '載入中...',
     empty: '暫無數據',
     error: '載入失敗',
+    completeToJoin: '完成一次刷題即可加入排名',
+    beFirstToRank: '成為第一個上榜的用戶吧！',
+  },
+
+  // 積分系統
+  points: {
+    title: '積分中心',
+    myPoints: '我的積分',
+    totalPoints: '總積分',
+    availablePoints: '可用積分',
+    level: '等級',
+    levelNames: {
+      1: '學習新手',
+      2: '進步達人',
+      3: '學霸精英',
+      4: 'DSE高手',
+      5: '狀元之星',
+    },
+    toNextLevel: '距離下一等級還需',
+    pointsUnit: '積分',
+    
+    // 簽到
+    dailyCheckin: '每日簽到',
+    checkinSuccess: '簽到成功！獲得',
+    alreadyCheckedIn: '今日已簽到',
+    checkedIn: '今日已簽到 ✓',
+    checkinButton: '每日簽到 +10積分',
+    
+    // 統計
+    statistics: '積分統計',
+    earnPoints: '獲取積分',
+    recentActivity: '最近積分記錄',
+    viewAll: '查看全部',
+    noRecords: '暫無積分記錄，快去學習獲取積分吧！',
+    completed: '已完成',
+    
+    // 規則
+    rules: {
+      dailyLogin: '每日登錄',
+      completePractice: '完成刷題',
+      completeTest: '完成測試',
+      highScore: '測試高分',
+      streak5: '連續答對5題',
+      streak10: '連續答對10題',
+      times: '次',
+    },
+    
+    // 快捷入口
+    quickActions: '快捷入口',
+    goPractice: '去刷題',
+    goTest: '水平測試',
+    goMall: '積分商城',
+    perTime: '每次',
+    exchangeGifts: '兌換好禮',
+    
+    // 商城
+    mall: {
+      title: '積分商城',
+      availableBalance: '積分可用',
+      itemList: '商品列表',
+      myOrders: '我的訂單',
+      exchange: '立即兌換',
+      insufficientPoints: '積分不足',
+      confirmExchange: '確認兌換',
+      exchangeSuccess: '兌換成功！訂單號：',
+      productName: '商品名稱',
+      requiredPoints: '所需積分',
+      currentPoints: '當前積分',
+      afterExchange: '兌換後餘額',
+      receiverInfo: '收貨資訊（實物商品必填）',
+      receiverPlaceholder: '請填寫收貨地址、聯繫方式等',
+      stock: '庫存',
+      stockSufficient: '庫存充足',
+      remaining: '剩餘',
+      soldOut: '已售罄',
+      virtual: '虛擬商品',
+      digital: '數位商品',
+      physical: '實物商品',
+      orderStatus: {
+        pending: '待處理',
+        paid: '已扣積分',
+        fulfilled: '已完成',
+        cancelled: '已取消',
+      },
+      noItems: '商城暫無商品，敬請期待！',
+      noOrders: '暫無訂單記錄',
+    },
   },
 }
 

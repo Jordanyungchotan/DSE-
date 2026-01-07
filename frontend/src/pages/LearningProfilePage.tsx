@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
 import { SUPPORTED_SUBJECTS } from '../stores/quizStore'
+import { useLanguageStore } from '../stores/languageStore'
 import { apiFetch } from '../config/api'
 import LearningReport from '../components/LearningReport/LearningReport'
 import LearningChart from '../components/LearningChart/LearningChart'
@@ -95,6 +96,7 @@ interface LearningProfile {
 const LearningProfilePage = () => {
   const navigate = useNavigate()
   const { isAuthenticated, user, token } = useAuthStore()
+  const { t } = useLanguageStore()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<LearningProfile | null>(null)
   const [activeTab, setActiveTab] = useState('recommendations')
@@ -238,7 +240,7 @@ const LearningProfilePage = () => {
       <div className={styles.emptyContainer}>
         <Empty description="暂无学习数据" />
         <Button type="primary" onClick={() => navigate('/quiz')}>
-          开始刷题
+          {t('quiz.config.start')}
         </Button>
       </div>
     )
@@ -254,13 +256,13 @@ const LearningProfilePage = () => {
       <div className={styles.pageHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerBadge}>
-            <LineChartOutlined /> 学习档案
+            <LineChartOutlined /> {t('nav.learningProfile')}
           </div>
           <Title level={2} className={styles.pageTitle}>
-            <span className="gradient-title">{user?.name || '学习者'}的学习档案</span>
+            <span className="gradient-title">{user?.name || t('nav.learningProfile')}</span>
           </Title>
           <Paragraph className={styles.pageDesc}>
-            追踪学习进度，分析掌握情况，持续进步
+            {t('nav.learningProfile')}
           </Paragraph>
         </div>
       </div>

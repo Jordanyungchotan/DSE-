@@ -19,6 +19,7 @@ import {
   ArrowLeftOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../stores/authStore'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './LoginPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -28,6 +29,7 @@ const { Title, Text, Paragraph } = Typography
  */
 const LoginPage = () => {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const [activeTab, setActiveTab] = useState('login')
   const [loginForm] = Form.useForm()
   const [registerForm] = Form.useForm()
@@ -39,13 +41,13 @@ const LoginPage = () => {
   const handleLogin = async (values: { email: string; password: string }) => {
     try {
       await login(values.email, values.password)
-      message.success('登录成功！')
+      message.success(t('auth.loginSuccess'))
       navigate('/')
     } catch (error) {
       if (error instanceof Error) {
         message.error(error.message)
       } else {
-        message.error('登录失败，请检查邮箱和密码')
+        message.error(t('auth.loginFailed'))
       }
     }
   }
@@ -75,7 +77,7 @@ const LoginPage = () => {
   const tabItems = [
     {
       key: 'login',
-      label: '登录',
+      label: t('nav.login'),
       children: (
         <Form
           form={loginForm}
@@ -86,13 +88,13 @@ const LoginPage = () => {
           <Form.Item
             name="email"
             rules={[
-              { required: true, message: '请输入邮箱' },
-              { type: 'email', message: '请输入有效的邮箱地址' },
+              { required: true, message: t('auth.email') },
+              { type: 'email', message: t('auth.email') },
             ]}
           >
             <Input
               prefix={<MailOutlined />}
-              placeholder="邮箱地址"
+              placeholder={t('auth.email')}
               size="large"
             />
           </Form.Item>
@@ -100,22 +102,22 @@ const LoginPage = () => {
           <Form.Item
             name="password"
             rules={[
-              { required: true, message: '请输入密码' },
-              { min: 6, message: '密码至少6个字符' },
+              { required: true, message: t('auth.password') },
+              { min: 6, message: t('auth.password') },
             ]}
           >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="密码"
+              placeholder={t('auth.password')}
               size="large"
             />
           </Form.Item>
 
           <Form.Item>
             <div className={styles.formExtras}>
-              <Checkbox>记住我</Checkbox>
+              <Checkbox>{t('auth.rememberMe')}</Checkbox>
               <Link to="/" className={styles.forgotLink}>
-                忘记密码？
+                {t('auth.forgotPassword')}
               </Link>
             </div>
           </Form.Item>
@@ -128,7 +130,7 @@ const LoginPage = () => {
               block
               loading={loading}
             >
-              登录
+              {t('nav.login')}
             </Button>
           </Form.Item>
         </Form>
@@ -136,7 +138,7 @@ const LoginPage = () => {
     },
     {
       key: 'register',
-      label: '注册',
+      label: t('nav.register'),
       children: (
         <Form
           form={registerForm}

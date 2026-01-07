@@ -35,6 +35,7 @@ import {
 } from '../stores/leaderboardStore'
 import { SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
 import { useAuthStore } from '../stores/authStore'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './LeaderboardPage.module.css'
 
 const { Option } = Select
@@ -109,15 +110,16 @@ const UserRankCard: React.FC<{
 }> = ({ userRank, userPosition, totalParticipants }) => {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuthStore()
+  const { t } = useLanguageStore()
 
   if (!isAuthenticated) {
     return (
       <Card className={styles.userRankCard}>
         <div className={styles.noRank}>
           <UserOutlined className={styles.noRankIcon} />
-          <p>登录后查看你的排名</p>
+          <p>{t('auth.loginToViewRank')}</p>
           <Button type="primary" onClick={() => navigate('/login')}>
-            立即登录
+            {t('auth.login')}
           </Button>
         </div>
       </Card>
@@ -129,10 +131,10 @@ const UserRankCard: React.FC<{
       <Card className={styles.userRankCard}>
         <div className={styles.noRank}>
           <TrophyOutlined className={styles.noRankIcon} />
-          <p>你还没有上榜记录</p>
-          <p className={styles.noRankHint}>完成一次刷题即可加入排名</p>
+          <p>{t('leaderboard.notRanked')}</p>
+          <p className={styles.noRankHint}>{t('leaderboard.completeToJoin')}</p>
           <Button type="primary" onClick={() => navigate('/quiz')}>
-            🚀 开始刷题
+            🚀 {t('quiz.config.start')}
           </Button>
         </div>
       </Card>
@@ -212,6 +214,7 @@ const UserRankCard: React.FC<{
  */
 const LeaderboardPage: React.FC = () => {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const { 
     currentLeaderboard, 
     userRank,
@@ -383,15 +386,15 @@ const LeaderboardPage: React.FC = () => {
       <div className={styles.pageHeader}>
         <div className={styles.headerContent}>
           <div className={styles.headerLeft}>
-            <h1><TrophyOutlined /> DSE刷题排行榜</h1>
-            <p>与全港DSE学生一较高下，挑战自我极限！</p>
+            <h1><TrophyOutlined /> {t('leaderboard.title')}</h1>
+            <p>{t('leaderboard.title')}</p>
           </div>
           <div className={styles.headerRight}>
             <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
-              刷新
+              {t('common.loading')}
             </Button>
             <Button type="primary" onClick={() => navigate('/quiz')}>
-              <ThunderboltOutlined /> 开始刷题
+              <ThunderboltOutlined /> {t('nav.startQuiz')}
             </Button>
           </div>
         </div>
@@ -455,7 +458,7 @@ const LeaderboardPage: React.FC = () => {
               value={filters.subject}
               onChange={(value) => updateFilters({ subject: value })}
               className={styles.filterSelect}
-              placeholder="选择科目"
+              placeholder={t('quiz.config.subject')}
             >
               <Option value="all">全部科目</Option>
               {allSubjects.map(sub => (
@@ -485,9 +488,9 @@ const LeaderboardPage: React.FC = () => {
                 description="暂无排行数据" 
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
-              <p>成为第一个上榜的用户吧！</p>
+              <p>{t('leaderboard.beFirstToRank')}</p>
               <Button type="primary" onClick={() => navigate('/quiz')}>
-                开始刷题
+                {t('quiz.config.start')}
               </Button>
             </div>
           ) : (

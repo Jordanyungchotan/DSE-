@@ -36,6 +36,10 @@ const LevelTestHistoryPage = lazy(() => import('./pages/LevelTestHistoryPage'))
 const AdminLoginPage = lazy(() => import('./pages/AdminLoginPage'))
 const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
 
+// 积分系统页面
+const PointsPage = lazy(() => import('./pages/PointsPage'))
+const PointsMallPage = lazy(() => import('./pages/PointsMallPage'))
+
 // 加载中组件
 const LoadingFallback = () => (
   <div style={{ 
@@ -103,6 +107,10 @@ function App() {
           <Route path="level-test/history" element={<LevelTestHistoryPage />} />
           <Route path="level-test/:testId" element={<LevelTestPage />} />
           <Route path="level-test/:testId/report" element={<LevelTestReportPage />} />
+          
+          {/* 积分系统 */}
+          <Route path="points" element={<PointsPage />} />
+          <Route path="points/mall" element={<PointsMallPage />} />
         </Route>
         
         {/* 404重定向到首页 */}
