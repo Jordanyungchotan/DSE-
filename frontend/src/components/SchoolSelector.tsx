@@ -111,7 +111,7 @@ export default function SchoolSelector({
       {/* 搜索框 */}
       <Input
         prefix={<SearchOutlined />}
-          placeholder={isEn ? 'Search school by name...' : '搜索学校名称...'}
+        placeholder={isEn ? 'Search school by name...' : '搜索学校名称...'}
         value={searchQuery}
         onChange={e => handleSearch(e.target.value)}
         allowClear
@@ -138,9 +138,9 @@ export default function SchoolSelector({
             </div>
           ) : searchResults.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {searchResults.map(school => (
+              {searchResults.map((school, index) => (
                 <div
-                  key={school.id}
+                  key={school.id || index}
                   onClick={() => handleSelectSchool(school)}
                   style={{
                     padding: '8px 12px',
@@ -172,7 +172,9 @@ export default function SchoolSelector({
                   )}
                   <div style={{ fontSize: 12, color: '#999', marginLeft: 22 }}>
                     <EnvironmentOutlined style={{ marginRight: 4 }} />
-                    {school.region_name} · {school.district_name}
+                    {school.district_name || school.district}
+                    {school.type && <Tag style={{ marginLeft: 8, fontSize: 12 }}>{school.type}</Tag>}
+                    {school.gender && <Tag style={{ fontSize: 12 }}>{school.gender}</Tag>}
                   </div>
                 </div>
               ))}
@@ -187,7 +189,7 @@ export default function SchoolSelector({
       )}
 
       <Divider style={{ margin: '12px 0' }}>
-        {isEn ? 'Or browse by district' : '或按区域浏览'}
+        {isEn ? 'Or browse by district' : '或按18区浏览学校'}
       </Divider>
 
       {/* 区域选择 */}
@@ -202,7 +204,7 @@ export default function SchoolSelector({
         >
           {regions.map(region => (
             <Select.Option key={region.code} value={region.code}>
-              <Tag color={REGION_COLORS[region.code]} style={{ marginRight: 8 }}>
+              <Tag color={REGION_COLORS[region.code] || REGION_COLORS[region.name_zh]} style={{ marginRight: 8 }}>
                 {isEn ? region.name_en : region.name_zh}
               </Tag>
             </Select.Option>
@@ -219,7 +221,7 @@ export default function SchoolSelector({
         >
           {districts.map(district => (
             <Select.Option key={district.code} value={district.code}>
-              {isEn ? district.name_en : district.name_zh}
+              {district.name_zh}
             </Select.Option>
           ))}
         </Select>
@@ -233,12 +235,8 @@ export default function SchoolSelector({
           title={
             <Space>
               <BankOutlined />
-              <span>
-                {isEn ? 'Schools in ' : ''}
-                {districts.find(d => d.code === selectedDistrict)?.[isEn ? 'name_en' : 'name_zh']}
-                {!isEn && '的学校'}
-              </span>
-              <Tag>{schools.length}</Tag>
+              <span>{selectedDistrict}的学校</span>
+              <Tag>{schools.length}所</Tag>
             </Space>
           }
         >
@@ -248,9 +246,9 @@ export default function SchoolSelector({
             </div>
           ) : schools.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {schools.map(school => (
+              {schools.map((school, index) => (
                 <div
-                  key={school.id}
+                  key={school.id || index}
                   onClick={() => handleSelectSchool(school)}
                   style={{
                     padding: '8px 12px',
@@ -271,12 +269,14 @@ export default function SchoolSelector({
                     }
                   }}
                 >
-                  <div style={{ fontWeight: 500 }}>
-                    <BankOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                    {school.name_zh}
+                  <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <BankOutlined style={{ color: '#1890ff' }} />
+                    <span>{school.name_zh}</span>
+                    {school.type && <Tag color={school.type === '直資' ? 'blue' : school.type === '官立' ? 'green' : 'default'} style={{ fontSize: 11 }}>{school.type}</Tag>}
+                    {school.gender && <Tag color={school.gender === '男' ? 'cyan' : school.gender === '女' ? 'magenta' : 'default'} style={{ fontSize: 11 }}>{school.gender}</Tag>}
                   </div>
                   {school.name_en && (
-                    <div style={{ fontSize: 12, color: '#666', marginLeft: 22 }}>
+                    <div style={{ fontSize: 12, color: '#666', marginLeft: 22, marginTop: 4 }}>
                       {school.name_en}
                     </div>
                   )}

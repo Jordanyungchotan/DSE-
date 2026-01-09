@@ -2807,6 +2807,277 @@ export default {
       }
 
       // =====================
+      // 插班可行性评估 API
+      // =====================
+
+      // 可行性评估
+      if (path === '/api/analysis/feasibility' && request.method === 'POST') {
+        const body = await request.json() as {
+          student: {
+            age: number
+            gender: 'male' | 'female'
+            currentGrade: string
+            scores: Record<string, number>
+            currentSchool?: string
+            currentBand?: number
+            strengths?: string[]
+            extracurriculars?: string[]
+          }
+          targetSchool: {
+            schoolId?: string
+            schoolName: string
+            bandLevel: 1 | 2 | 3
+            district: string
+            gender?: 'boys' | 'girls' | 'coed'
+            type?: 'government' | 'aided' | 'dss' | 'private'
+            englishRequirement?: 'high' | 'medium' | 'low'
+          }
+        }
+
+        // Band等级对应的基准分数要求
+        const BAND_SCORE_THRESHOLDS: Record<number, { chinese: number; english: number; math: number; minAverage: number }> = {
+          1: { chinese: 70, english: 75, math: 70, minAverage: 72 },
+          2: { chinese: 55, english: 60, math: 55, minAverage: 58 },
+          3: { chinese: 40, english: 45, math: 40, minAverage: 42 },
+        }
+
+        // 区域竞争强度系数
+        const DISTRICT_COMPETITION: Record<string, number> = {
+          '中西區': 1.15, '灣仔區': 1.12, '東區': 1.05, '南區': 1.02,
+          '九龍城區': 1.18, '油尖旺區': 1.10, '深水埗區': 1.05, '黃大仙區': 1.00, '觀塘區': 1.02,
+          '沙田區': 1.12, '大埔區': 1.05, '北區': 0.98, '西貢區': 1.08,
+          '葵青區': 1.00, '荃灣區': 1.02, '屯門區': 1.00, '元朗區': 0.98, '離島區': 0.95,
+        }
+
+        // 年级插班难度系数
+        const GRADE_DIFFICULTY: Record<string, number> = {
+          'S1': 0.90, 'S2': 0.95, 'S3': 1.00, 'S4': 1.15, 'S5': 1.25, 'S6': 1.40,
+        }
+
+        // 科目名称映射
+        const SUBJECT_NAMES: Record<string, string> = {
+          'chinese': '中文', 'english': '英文', 'math': '数学', 'science': '科学/常识',
+          'liberal': '公民与社会发展', 'physics': '物理', 'chemistry': '化学', 'biology': '生物',
+          'economics': '经济', 'geography': '地理', 'history': '历史',
+        }
+
+        const { student, targetSchool } = body
+        const thresholds = BAND_SCORE_THRESHOLDS[targetSchool.bandLevel]
+        const districtFactor = DISTRICT_COMPETITION[targetSchool.district] || 1.0
+        const gradeFactor = GRADE_DIFFICULTY[student.currentGrade] || 1.0
+
+        // 分析学生能力
+        const coreSubjects = ['chinese', 'english', 'math']
+        const scores = student.scores
+        const allScores = Object.values(scores)
+        const averageScore = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0
+
+        const weakSubjects: string[] = []
+        const strongSubjects: string[] = []
+        for (const [subject, score] of Object.entries(scores)) {
+          if (score < 50) weakSubjects.push(SUBJECT_NAMES[subject] || subject)
+          else if (score >= 75) strongSubjects.push(SUBJECT_NAMES[subject] || subject)
+        }
+
+        const hasSignificantWeakness = coreSubjects.some(s => scores[s] !== undefined && scores[s] < 50)
+
+        // 计算调整后的要求分数
+        const adjustedMinAverage = thresholds.minAverage * districtFactor * gradeFactor
+        const scoreDiff = averageScore - adjustedMinAverage
+
+        // 评估风险因素
+        const riskFactors: string[] = []
+        const positiveFactors: string[] = []
+        let riskScore = 0
+
+        if (scoreDiff < -15) { riskScore += 3; riskFactors.push('整体成绩与该校常见插班要求有较大差距') }
+        else if (scoreDiff < -5) { riskScore += 2; riskFactors.push('整体成绩略低于该校一般要求') }
+        else if (scoreDiff >= 5) { positiveFactors.push('整体成绩达到该校期望水平') }
+
+        const englishScore = scores['english'] || 0
+        if (targetSchool.bandLevel === 1 && englishScore < thresholds.english) {
+          riskScore += 2; riskFactors.push('英文成绩可能未达Band 1学校的较高要求')
+        } else if (englishScore >= 80) {
+          positiveFactors.push('英文成绩优秀，符合该层次学校期望')
+        }
+
+        if (hasSignificantWeakness) { riskScore += 2; riskFactors.push('存在核心科目明显短板，需重点加强') }
+        if (['S5', 'S6'].includes(student.currentGrade)) { riskScore += 1; riskFactors.push('高年级插班名额通常较少，竞争较激烈') }
+        if (student.currentBand && student.currentBand > targetSchool.bandLevel) {
+          const bandGap = student.currentBand - targetSchool.bandLevel
+          if (bandGap >= 2) { riskScore += 3; riskFactors.push(`从Band ${student.currentBand}跨越至Band ${targetSchool.bandLevel}难度较大`) }
+          else { riskScore += 1; riskFactors.push('跨Band插班需要更充分的准备') }
+        }
+        if (districtFactor >= 1.1) { riskFactors.push(`${targetSchool.district}属于竞争较激烈区域`) }
+        if (strongSubjects.length >= 2) { positiveFactors.push(`多个科目表现突出（${strongSubjects.join('、')}）`) }
+
+        // 确定可行性等级
+        type FeasibilityLevel = 'A' | 'B' | 'C' | 'D'
+        let feasibilityLevel: FeasibilityLevel
+        if (riskScore <= 1 && scoreDiff >= 0) feasibilityLevel = 'A'
+        else if (riskScore <= 3 && scoreDiff >= -10) feasibilityLevel = 'B'
+        else if (riskScore <= 5) feasibilityLevel = 'C'
+        else feasibilityLevel = 'D'
+
+        const LEVEL_DESCRIPTIONS: Record<FeasibilityLevel, string> = {
+          'A': '可行性较高 - 学生条件与目标学校要求匹配度良好，通过适当准备有较大机会',
+          'B': '可行性中等 - 需要在部分方面加强，建议重点提升短板科目',
+          'C': '可行性一般 - 存在较明显差距，需要较长时间准备和显著提升',
+          'D': '可行性较低 - 差距较大，建议重新评估目标或制定长期计划',
+        }
+
+        // 生成科目分析
+        const subjectAnalysis = Object.entries(scores).map(([subject, score]) => {
+          const subjectName = SUBJECT_NAMES[subject] || subject
+          let threshold = thresholds.minAverage
+          if (subject === 'english') threshold = thresholds.english
+          if (subject === 'chinese') threshold = thresholds.chinese
+          if (subject === 'math') threshold = thresholds.math
+
+          let status: 'strong' | 'adequate' | 'weak' | 'critical'
+          let statusDescription: string
+          let recommendation: string
+
+          if (score >= threshold + 15) {
+            status = 'strong'; statusDescription = '表现优秀，是明显优势科目'; recommendation = '保持现有水平，可作为加分项展示'
+          } else if (score >= threshold) {
+            status = 'adequate'; statusDescription = '达到基本要求'; recommendation = '继续巩固，争取进一步提升'
+          } else if (score >= threshold - 15) {
+            status = 'weak'; statusDescription = '略低于期望水平，需要加强'; recommendation = `建议每天额外投入30-45分钟进行${subjectName}专项训练`
+          } else {
+            status = 'critical'; statusDescription = '与期望水平有较大差距，是主要短板'; recommendation = `${subjectName}是目前最需要突破的科目，建议寻求专业辅导`
+          }
+
+          return { subject: subjectName, score, status, statusDescription, recommendation }
+        }).sort((a, b) => {
+          const statusOrder: Record<string, number> = { critical: 0, weak: 1, adequate: 2, strong: 3 }
+          return statusOrder[a.status] - statusOrder[b.status]
+        })
+
+        // 生成综合评估描述
+        const gradeMap: Record<string, string> = { 'S1': '中一', 'S2': '中二', 'S3': '中三', 'S4': '中四', 'S5': '中五', 'S6': '中六' }
+        const gradeName = gradeMap[student.currentGrade] || student.currentGrade
+        const genderText = student.gender === 'female' ? '女' : '男'
+        
+        let overallAssessment = `该${gradeName}${genderText}生，${student.age}岁，目前各科平均分约${Math.round(averageScore)}分。`
+        if (feasibilityLevel === 'A') {
+          overallAssessment += `整体学术表现良好，与目标Band ${targetSchool.bandLevel}学校（${targetSchool.schoolName}）的期望水平较为匹配。通过适当的准备和保持现有水平，有较大机会获得面试机会。`
+        } else if (feasibilityLevel === 'B') {
+          overallAssessment += `学术表现中等偏上，基本符合Band ${targetSchool.bandLevel}学校的要求，但仍有提升空间。建议在接下来的准备期间，重点加强薄弱环节，同时保持优势科目的水平。`
+        } else if (feasibilityLevel === 'C') {
+          overallAssessment += `与目标学校（Band ${targetSchool.bandLevel}）的期望水平存在一定差距。需要在多个方面进行较大幅度的提升，建议制定3-6个月的系统性准备计划。`
+        } else {
+          overallAssessment += `目前条件与目标学校差距较大，建议考虑调整目标学校层次，或制定更长期的提升计划。也可以先从相对容易达到的学校开始，逐步实现升学目标。`
+        }
+
+        // 生成建议
+        const recommendations: string[] = []
+        const criticalSubjects = subjectAnalysis.filter(s => s.status === 'critical')
+        const weakSubjs = subjectAnalysis.filter(s => s.status === 'weak')
+        if (criticalSubjects.length > 0) recommendations.push(`优先提升${criticalSubjects.map(s => s.subject).join('和')}，这是目前最需要突破的领域`)
+        if (weakSubjs.length > 0) recommendations.push(`加强${weakSubjs.map(s => s.subject).join('、')}的训练，确保达到目标学校期望水平`)
+        if (targetSchool.bandLevel === 1) {
+          recommendations.push('提升英语综合能力，包括阅读理解和写作表达')
+          recommendations.push('培养批判性思维，准备可能的面试环节')
+        }
+        recommendations.push('定期进行模拟测试，检验学习成效')
+        recommendations.push('了解目标学校的办学理念和特色，准备个人陈述')
+        recommendations.push('保持良好作息和学习习惯，确保稳定发挥')
+
+        // 生成准备计划
+        const preparationPlan = {
+          priorityActions: [
+            criticalSubjects.length > 0 ? `立即开始${criticalSubjects.map(s => s.subject).join('、')}的强化训练` : '保持各科目稳定表现',
+            '收集目标学校的插班信息和要求',
+            '准备个人简历和过往成绩单',
+          ].filter(Boolean),
+          shortTermGoals: [
+            ...criticalSubjects.map(s => `${s.subject}成绩提升至及格线以上`),
+            '完成各科知识点梳理，建立知识框架',
+            '每周进行一次模拟测试，检验学习效果',
+          ],
+          mediumTermGoals: [
+            ...weakSubjs.map(s => `${s.subject}达到目标学校期望水平`),
+            '全面提升综合能力，准备面试',
+            '培养良好学习习惯，适应更高强度学习',
+          ],
+          resources: ['历年插班试题（如有）', '各科精编练习册', '在线学习平台', '专业补习班或私人导师', '学校开放日和咨询活动'],
+        }
+
+        const DISCLAIMER = '⚠️ 免责声明：本系统基于公开教育资料与经验模型进行分析，仅作为升学参考，不构成任何录取保证。实际录取结果受多种因素影响，包括但不限于学校当年招生名额、面试表现、其他申请者情况等。建议结合学校官方信息和专业教育顾问意见做出决策。'
+
+        // 获取用户ID
+        let userId: string | null = null
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          userId = tokenData?.userId || null
+        }
+
+        const recordId = crypto.randomUUID()
+        const now = new Date().toISOString()
+
+        // 保存到数据库
+        await env.DB.prepare(
+          `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+           VALUES (?, ?, 'feasibility', ?, ?, ?)`
+        ).bind(recordId, userId, JSON.stringify(body), JSON.stringify({
+          feasibilityLevel,
+          levelDescription: LEVEL_DESCRIPTIONS[feasibilityLevel],
+          overallAssessment,
+          mainRisks: riskFactors,
+          keyStrengths: positiveFactors,
+          recommendations: recommendations.slice(0, 6),
+          subjectAnalysis,
+          preparationPlan,
+          disclaimer: DISCLAIMER,
+        }), now).run()
+
+        return jsonResponse({
+          success: true,
+          result: {
+            id: recordId,
+            createdAt: now,
+            feasibilityLevel,
+            levelDescription: LEVEL_DESCRIPTIONS[feasibilityLevel],
+            overallAssessment,
+            mainRisks: riskFactors,
+            keyStrengths: positiveFactors,
+            recommendations: recommendations.slice(0, 6),
+            subjectAnalysis,
+            preparationPlan,
+            disclaimer: DISCLAIMER,
+          },
+        }, 200, origin)
+      }
+
+      // 获取可行性评估结果
+      if (path.startsWith('/api/analysis/feasibility/') && request.method === 'GET') {
+        const id = path.split('/').pop()
+        
+        const record = await env.DB.prepare(
+          'SELECT id, student_info, result, created_at FROM analysis_records WHERE id = ?'
+        ).bind(id).first() as { id: string; student_info: string; result: string; created_at: string } | null
+        
+        if (!record) {
+          return errorResponse('评估记录不存在', 404, origin)
+        }
+
+        const studentInfo = JSON.parse(record.student_info)
+        const result = JSON.parse(record.result)
+
+        return jsonResponse({
+          success: true,
+          result: {
+            id: record.id,
+            createdAt: record.created_at,
+            request: studentInfo,
+            ...result,
+          },
+        }, 200, origin)
+      }
+
+      // =====================
       // 学生信息相关 API
       // =====================
 
@@ -2960,29 +3231,194 @@ export default {
         return jsonResponse({ recommendations: recommendations.slice(0, 10) }, 200, origin)
       }
 
-      // 获取香港18区列表
+      // 获取香港18区列表（按区域分类）
       if (path === '/api/districts' && request.method === 'GET') {
-        const districts = [
-          { code: 'central_western', name: '中西区' },
-          { code: 'wan_chai', name: '湾仔区' },
-          { code: 'eastern', name: '东区' },
-          { code: 'southern', name: '南区' },
-          { code: 'yau_tsim_mong', name: '油尖旺区' },
-          { code: 'sham_shui_po', name: '深水埗区' },
-          { code: 'kowloon_city', name: '九龙城区' },
-          { code: 'wong_tai_sin', name: '黄大仙区' },
-          { code: 'kwun_tong', name: '观塘区' },
-          { code: 'tsuen_wan', name: '荃湾区' },
-          { code: 'tuen_mun', name: '屯门区' },
-          { code: 'yuen_long', name: '元朗区' },
-          { code: 'north', name: '北区' },
-          { code: 'tai_po', name: '大埔区' },
-          { code: 'sha_tin', name: '沙田区' },
-          { code: 'sai_kung', name: '西贡区' },
-          { code: 'kwai_tsing', name: '葵青区' },
-          { code: 'islands', name: '离岛区' },
-        ]
+        const districts = {
+          regions: [
+            {
+              name: '香港島',
+              name_en: 'Hong Kong Island',
+              districts: ['中西區', '灣仔區', '東區', '南區']
+            },
+            {
+              name: '九龍',
+              name_en: 'Kowloon',
+              districts: ['油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區']
+            },
+            {
+              name: '新界',
+              name_en: 'New Territories',
+              districts: ['葵青區', '荃灣區', '屯門區', '元朗區', '北區', '大埔區', '沙田區', '西貢區', '離島區']
+            }
+          ],
+          list: [
+            { code: 'central_western', name: '中西區', region: '香港島' },
+            { code: 'wan_chai', name: '灣仔區', region: '香港島' },
+            { code: 'eastern', name: '東區', region: '香港島' },
+            { code: 'southern', name: '南區', region: '香港島' },
+            { code: 'yau_tsim_mong', name: '油尖旺區', region: '九龍' },
+            { code: 'sham_shui_po', name: '深水埗區', region: '九龍' },
+            { code: 'kowloon_city', name: '九龍城區', region: '九龍' },
+            { code: 'wong_tai_sin', name: '黃大仙區', region: '九龍' },
+            { code: 'kwun_tong', name: '觀塘區', region: '九龍' },
+            { code: 'kwai_tsing', name: '葵青區', region: '新界' },
+            { code: 'tsuen_wan', name: '荃灣區', region: '新界' },
+            { code: 'tuen_mun', name: '屯門區', region: '新界' },
+            { code: 'yuen_long', name: '元朗區', region: '新界' },
+            { code: 'north', name: '北區', region: '新界' },
+            { code: 'tai_po', name: '大埔區', region: '新界' },
+            { code: 'sha_tin', name: '沙田區', region: '新界' },
+            { code: 'sai_kung', name: '西貢區', region: '新界' },
+            { code: 'islands', name: '離島區', region: '新界' },
+          ]
+        }
         return jsonResponse({ districts }, 200, origin)
+      }
+
+      // 获取指定区的学校列表
+      if (path === '/api/schools/by-district' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const district = url.searchParams.get('district')
+        
+        // 完整的学校数据（从chsc.hk爬取）
+        const SCHOOLS_BY_DISTRICT: Record<string, Array<{name: string; name_en: string; type: string; gender: string}>> = {
+          '中西區': [
+            { name: '英皇書院', name_en: 'King\'s College', type: '官立', gender: '男' },
+            { name: '聖保羅男女中學', name_en: 'St. Paul\'s Co-educational College', type: '直資', gender: '男女' },
+            { name: '聖保羅書院', name_en: 'St. Paul\'s College', type: '直資', gender: '男' },
+            { name: '聖若瑟書院', name_en: 'St. Joseph\'s College', type: '資助', gender: '男' },
+            { name: '聖士提反女子中學', name_en: 'St. Stephen\'s Girls\' College', type: '資助', gender: '女' },
+            { name: '英華女學校', name_en: 'Ying Wa Girls\' School', type: '資助', gender: '女' },
+            { name: '聖類斯中學', name_en: 'St. Louis School', type: '資助', gender: '男' },
+            { name: '高主教書院', name_en: 'Raimondi College', type: '資助', gender: '男女' },
+          ],
+          '灣仔區': [
+            { name: '皇仁書院', name_en: 'Queen\'s College', type: '官立', gender: '男' },
+            { name: '香港華仁書院', name_en: 'Wah Yan College Hong Kong', type: '資助', gender: '男' },
+            { name: '聖公會鄧肇堅中學', name_en: 'S.K.H. Tang Shiu Kin Secondary School', type: '資助', gender: '男女' },
+            { name: '玫瑰崗中學', name_en: 'Rosaryhill Secondary School', type: '資助', gender: '男女' },
+            { name: '佛教黃鳳翎中學', name_en: 'Buddhist Wong Fung Ling College', type: '資助', gender: '男女' },
+          ],
+          '東區': [
+            { name: '庇理羅士女子中學', name_en: 'Belilios Public School', type: '官立', gender: '女' },
+            { name: '筲箕灣官立中學', name_en: 'Shau Kei Wan Government Secondary School', type: '官立', gender: '男女' },
+            { name: '張祝珊英文中學', name_en: 'Cheung Chuk Shan College', type: '資助', gender: '男女' },
+            { name: '港島民生書院', name_en: 'Munsang College (Hong Kong Island)', type: '資助', gender: '男女' },
+            { name: '嘉諾撒書院', name_en: 'Canossa College', type: '資助', gender: '女' },
+          ],
+          '南區': [
+            { name: '香港仔浸信會呂明才書院', name_en: 'Aberdeen Baptist Lui Ming Choi College', type: '資助', gender: '男女' },
+            { name: '嘉諾撒培德書院', name_en: 'Pui Tak Canossian College', type: '資助', gender: '女' },
+            { name: '聖伯多祿中學', name_en: 'St. Peter\'s Secondary School', type: '資助', gender: '男女' },
+            { name: '新會商會陳白沙紀念中學', name_en: 'San Wui Commercial Society Chan Pak Sha School', type: '資助', gender: '男女' },
+          ],
+          '油尖旺區': [
+            { name: '拔萃女書院', name_en: 'Diocesan Girls\' School', type: '直資', gender: '女' },
+            { name: '伊利沙伯中學', name_en: 'Queen Elizabeth School', type: '官立', gender: '男女' },
+            { name: '循道中學', name_en: 'Methodist College', type: '資助', gender: '男女' },
+            { name: '真光女書院', name_en: 'True Light Girls\' College', type: '資助', gender: '女' },
+            { name: '香港管理專業協會李國寶中學', name_en: 'HKMA David Li Kwok Po College', type: '直資', gender: '男女' },
+            { name: '中華基督教會銘基書院', name_en: 'CCC Ming Kei College', type: '資助', gender: '男女' },
+          ],
+          '深水埗區': [
+            { name: '聖瑪加利男女英文中小學', name_en: 'St. Margaret\'s Co-educational English Secondary & Primary School', type: '直資', gender: '男女' },
+            { name: '長沙灣天主教英文中學', name_en: 'Cheung Sha Wan Catholic Secondary School', type: '資助', gender: '男' },
+            { name: '德雅中學', name_en: 'Tak Nga Secondary School', type: '資助', gender: '女' },
+            { name: '英華書院', name_en: 'Ying Wa College', type: '直資', gender: '男' },
+            { name: '聖公會聖馬利亞堂莫慶堯中學', name_en: 'S.K.H. St. Mary\'s Church Mok Hing Yiu College', type: '資助', gender: '男女' },
+          ],
+          '九龍城區': [
+            { name: '拔萃男書院', name_en: 'Diocesan Boys\' School', type: '直資', gender: '男' },
+            { name: '喇沙書院', name_en: 'La Salle College', type: '資助', gender: '男' },
+            { name: '瑪利諾修院學校', name_en: 'Maryknoll Convent School', type: '資助', gender: '女' },
+            { name: '協恩中學', name_en: 'Heep Yunn School', type: '直資', gender: '女' },
+            { name: '民生書院', name_en: 'Munsang College', type: '資助', gender: '男女' },
+            { name: '九龍華仁書院', name_en: 'Wah Yan College Kowloon', type: '資助', gender: '男' },
+            { name: '培正中學', name_en: 'Pui Ching Middle School', type: '資助', gender: '男女' },
+            { name: '何明華會督銀禧中學', name_en: 'Bishop Hall Jubilee School', type: '資助', gender: '男女' },
+          ],
+          '黃大仙區': [
+            { name: '聖母書院', name_en: 'Our Lady\'s College', type: '資助', gender: '女' },
+            { name: '德望學校', name_en: 'Good Hope School', type: '直資', gender: '女' },
+            { name: '保良局第一張永慶中學', name_en: 'Po Leung Kuk No.1 W.H. Cheung College', type: '資助', gender: '男女' },
+            { name: '中華基督教會協和書院', name_en: 'CCC Heep Woh College', type: '資助', gender: '男女' },
+          ],
+          '觀塘區': [
+            { name: '觀塘官立中學', name_en: 'Kwun Tong Government Secondary School', type: '官立', gender: '男女' },
+            { name: '聖言中學', name_en: 'Sing Yin Secondary School', type: '資助', gender: '男' },
+            { name: '觀塘瑪利諾書院', name_en: 'Kwun Tong Maryknoll College', type: '資助', gender: '男' },
+            { name: '聖傑靈女子中學', name_en: 'St. Catharine\'s School for Girls', type: '資助', gender: '女' },
+            { name: '藍田聖保祿中學', name_en: 'St. Paul\'s School (Lam Tin)', type: '資助', gender: '女' },
+          ],
+          '葵青區': [
+            { name: '聖公會林護紀念中學', name_en: 'S.K.H. Lam Woo Memorial Secondary School', type: '資助', gender: '男女' },
+            { name: '天主教母佑會蕭明中學', name_en: 'Daughters of Mary Help of Christians Siu Ming Catholic Secondary School', type: '資助', gender: '女' },
+            { name: '佛教善德英文中學', name_en: 'Buddhist Sin Tak College', type: '資助', gender: '男女' },
+            { name: '順德聯誼總會李兆基中學', name_en: 'Shun Tak Fraternal Association Lee Shau Kee College', type: '資助', gender: '男女' },
+          ],
+          '荃灣區': [
+            { name: '荃灣官立中學', name_en: 'Tsuen Wan Government Secondary School', type: '官立', gender: '男女' },
+            { name: '可風中學（嗇色園主辦）', name_en: 'Ho Fung College (Sponsored by Sik Sik Yuen)', type: '資助', gender: '男女' },
+            { name: '保良局李城璧中學', name_en: 'Po Leung Kuk Lee Shing Pik College', type: '資助', gender: '男女' },
+          ],
+          '屯門區': [
+            { name: '順德聯誼總會梁銶琚中學', name_en: 'Shun Tak Fraternal Association Leung Kau Kui College', type: '資助', gender: '男女' },
+            { name: '保良局百周年李兆忠紀念中學', name_en: 'Po Leung Kuk Centenary Li Shiu Chung Memorial College', type: '資助', gender: '男女' },
+            { name: '屯門官立中學', name_en: 'Tuen Mun Government Secondary School', type: '官立', gender: '男女' },
+            { name: '妙法寺劉金龍中學', name_en: 'Madam Lau Kam Lung Secondary School of MFBM', type: '資助', gender: '男女' },
+          ],
+          '元朗區': [
+            { name: '聖公會白約翰會督中學', name_en: 'SKH Bishop Baker Secondary School', type: '資助', gender: '男女' },
+            { name: '新界鄉議局元朗區中學', name_en: 'NT Heung Yee Kuk Yuen Long District Secondary School', type: '資助', gender: '男女' },
+            { name: '趙聿修紀念中學', name_en: 'Chiu Lut Sau Memorial Secondary School', type: '官立', gender: '男女' },
+            { name: '元朗商會中學', name_en: 'Yuen Long Merchants Association Secondary School', type: '資助', gender: '男女' },
+          ],
+          '北區': [
+            { name: '風采中學（教育評議會主辦）', name_en: 'Elegantia College (Sponsored by Education Convergence)', type: '資助', gender: '男女' },
+            { name: '東華三院李嘉誠中學', name_en: 'TWGHs Li Ka Shing College', type: '資助', gender: '男女' },
+            { name: '粉嶺救恩書院', name_en: 'Fanling Kau Yan College', type: '資助', gender: '男女' },
+          ],
+          '大埔區': [
+            { name: '迦密柏雨中學', name_en: 'Carmel Pak U Secondary School', type: '資助', gender: '男女' },
+            { name: '聖公會莫壽增會督中學', name_en: 'S.K.H. Bishop Mok Sau Tseng Secondary School', type: '資助', gender: '男女' },
+            { name: '恩主教書院', name_en: 'Valtorta College', type: '資助', gender: '男女' },
+            { name: '王肇枝中學', name_en: 'Wong Shiu Chi Secondary School', type: '資助', gender: '男女' },
+          ],
+          '沙田區': [
+            { name: '聖公會曾肇添中學', name_en: 'S.K.H. Tsang Shiu Tim Secondary School', type: '資助', gender: '男女' },
+            { name: '浸信會呂明才中學', name_en: 'Baptist Lui Ming Choi Secondary School', type: '資助', gender: '男女' },
+            { name: '沙田官立中學', name_en: 'Sha Tin Government Secondary School', type: '官立', gender: '男女' },
+            { name: '沙田培英中學', name_en: 'Pui Ying College', type: '資助', gender: '男女' },
+            { name: '聖母無玷聖心書院', name_en: 'Immaculate Heart of Mary College', type: '資助', gender: '男女' },
+            { name: '天主教郭得勝中學', name_en: 'Kwok Tak Seng Catholic Secondary School', type: '資助', gender: '男女' },
+          ],
+          '西貢區': [
+            { name: '迦密主恩中學', name_en: 'Carmel Divine Grace Foundation Secondary School', type: '資助', gender: '男女' },
+            { name: '將軍澳官立中學', name_en: 'Tseung Kwan O Government Secondary School', type: '官立', gender: '男女' },
+            { name: '播道書院', name_en: 'Evangel College', type: '直資', gender: '男女' },
+            { name: '景嶺書院', name_en: 'King Ling College', type: '資助', gender: '男女' },
+          ],
+          '離島區': [
+            { name: '佛教筏可紀念中學', name_en: 'Buddhist Fat Ho Memorial College', type: '直資', gender: '男女' },
+            { name: '長洲官立中學', name_en: 'Cheung Chau Government Secondary School', type: '官立', gender: '男女' },
+            { name: '東涌天主教學校', name_en: 'Tung Chung Catholic School', type: '資助', gender: '男女' },
+            { name: '靈糧堂怡文中學', name_en: 'Ling Liang Church E Wun Secondary School', type: '資助', gender: '男女' },
+          ],
+        }
+        
+        if (district && SCHOOLS_BY_DISTRICT[district]) {
+          return jsonResponse({ 
+            success: true, 
+            district,
+            schools: SCHOOLS_BY_DISTRICT[district] 
+          }, 200, origin)
+        }
+        
+        // 如果没有指定区，返回所有学校
+        return jsonResponse({ 
+          success: true,
+          districts: SCHOOLS_BY_DISTRICT 
+        }, 200, origin)
       }
 
       // =====================
