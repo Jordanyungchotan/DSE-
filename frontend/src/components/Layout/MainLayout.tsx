@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
-import { Layout, Menu, Button, Drawer, Avatar, Dropdown } from 'antd'
+import { Layout, Menu, Button, Drawer, Avatar, Dropdown, Badge, Tooltip } from 'antd'
 import {
   HomeOutlined,
   FormOutlined,
@@ -17,9 +17,13 @@ import {
   SafetyCertificateOutlined,
   FileSearchOutlined,
   GiftOutlined,
+  TeamOutlined,
+  CommentOutlined,
+  BellOutlined,
 } from '@ant-design/icons'
 import { useAuthStore } from '../../stores/authStore'
 import { useLanguageStore } from '../../stores/languageStore'
+import { getUnreadCount } from '../../services/messageApi'
 import LanguageSwitch from '../LanguageSwitch/LanguageSwitch'
 import styles from './MainLayout.module.css'
 
@@ -35,6 +39,27 @@ const MainLayout = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { isAuthenticated, user, logout } = useAuthStore()
   const { t } = useLanguageStore()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  // 获取未读消息数量
+  useEffect(() => {
+    const fetchUnread = async () => {
+      if (isAuthenticated && user?.id) {
+        try {
+          const result = await getUnreadCount(user.id)
+          if (result.success) {
+            setUnreadCount(result.data.total)
+          }
+        } catch (error) {
+          console.error('获取未读消息数失败:', error)
+        }
+      }
+    }
+    fetchUnread()
+    // 每30秒刷新一次
+    const interval = setInterval(fetchUnread, 30000)
+    return () => clearInterval(interval)
+  }, [isAuthenticated, user?.id])
 
   // 导航菜单项 - 精简版
   const menuItems = [
@@ -73,6 +98,11 @@ const MainLayout = () => {
           icon: <LineChartOutlined />,
           label: '📈 ' + t('nav.learningProfile'),
         },
+        {
+          key: '/community',
+          icon: <CommentOutlined />,
+          label: '💬 ' + (t('nav.community') || '量子纠缠'),
+        },
       ],
     },
     {
@@ -109,6 +139,12 @@ const MainLayout = () => {
     },
     {
       type: 'divider' as const,
+    },
+    {
+      key: 'friends',
+      icon: <TeamOutlined />,
+      label: '👥 ' + (t('nav.friends') || '好友'),
+      onClick: () => navigate('/friends'),
     },
     {
       key: 'quiz-history',
@@ -177,22 +213,36 @@ const MainLayout = () => {
             <LanguageSwitch />
 
             {isAuthenticated ? (
-              <Dropdown
-                menu={{ items: userMenuItems }}
-                placement="bottomRight"
-                trigger={['click']}
-              >
-                <div className={styles.userInfo}>
-                  <Avatar
-                    key={user?.avatar || 'default-avatar'}
-                    size="small"
-                    src={user?.avatar}
-                    icon={<UserOutlined />}
-                    style={{ backgroundColor: 'var(--color-primary)' }}
-                  />
-                  <span className={styles.userName}>{user?.name || t('common.loading')}</span>
-                </div>
-              </Dropdown>
+              <>
+                {/* 消息通知图标 */}
+                <Tooltip title={t('nav.messages') || '消息'}>
+                  <Badge count={unreadCount} size="small" offset={[-2, 2]}>
+                    <Button
+                      type="text"
+                      icon={<BellOutlined style={{ fontSize: 18 }} />}
+                      onClick={() => navigate('/messages')}
+                      className={styles.messageBtn}
+                    />
+                  </Badge>
+                </Tooltip>
+
+                <Dropdown
+                  menu={{ items: userMenuItems }}
+                  placement="bottomRight"
+                  trigger={['click']}
+                >
+                  <div className={styles.userInfo}>
+                    <Avatar
+                      key={user?.avatar || 'default-avatar'}
+                      size="small"
+                      src={user?.avatar}
+                      icon={<UserOutlined />}
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    />
+                    <span className={styles.userName}>{user?.name || t('common.loading')}</span>
+                  </div>
+                </Dropdown>
+              </>
             ) : (
               <Button
                 type="primary"

@@ -1,5 +1,5 @@
 .pageContainer {
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -50,7 +50,8 @@
 
 .submitSection {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
   padding: 24px 0;
 }
 
@@ -134,3 +135,210 @@
   border: 1px solid #ffe58f;
 }
 
+/* 分析结果区域 - 全宽显示 */
+.resultSection {
+  margin-top: 24px;
+  padding: 0;
+  animation: fadeInResult 0.5s ease-out;
+}
+
+@keyframes fadeInResult {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.resultCard {
+  margin-bottom: 16px;
+  border-radius: 12px;
+}
+
+.analysisResultContent {
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.summaryCard {
+  background: linear-gradient(135deg, #f0f5ff 0%, #e6f4ff 100%);
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.statItem {
+  text-align: center;
+  padding: 8px 0;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1890ff;
+}
+
+.statValueSmall {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1890ff;
+}
+
+/* 课程网格 - 3列显示更多 */
+.programmesGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+  .programmesGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .programmesGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.programmeCard {
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-left: 4px solid #1890ff;
+  border-radius: 8px;
+  padding: 12px;
+  transition: all 0.2s;
+}
+
+.programmeCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.programmeHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.programmeTitle {
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.programmeUniversity {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.programmeScores {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.scoreItem {
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* AI 报告样式 */
+.aiReportContainer {
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 24px;
+  max-height: none;
+  overflow-y: visible;
+}
+
+.aiReport {
+  font-size: 15px;
+  line-height: 1.9;
+  color: #333;
+}
+
+.reportH3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1890ff;
+  margin: 24px 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e6f4ff;
+}
+
+.reportH4 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #333;
+  margin: 20px 0 12px;
+}
+
+.reportH5 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #555;
+  margin: 16px 0 8px;
+}
+
+.reportListItem {
+  margin: 6px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.reportListItem::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: #1890ff;
+}
+
+.reportParagraph {
+  margin: 12px 0;
+  text-align: justify;
+}
+
+/* 免责声明 */
+.disclaimer {
+  margin-top: 24px;
+  padding: 16px;
+  background: #fffbe6;
+  border-radius: 8px;
+  border: 1px solid #ffe58f;
+}
+
+/* 新分析按钮 */
+.newAnalysisButton {
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+/* 重新分析按钮区域 - 居中 */
+.reanalyzeSection {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+  margin-bottom: 24px;
+}

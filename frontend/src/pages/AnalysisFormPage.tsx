@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Form,
@@ -18,6 +18,8 @@ import {
   Tag,
   Modal,
   Progress,
+  Spin,
+  Empty,
 } from 'antd'
 import {
   CalendarOutlined,
@@ -32,10 +34,20 @@ import {
   RightOutlined,
   LoadingOutlined,
   RobotOutlined,
+  SearchOutlined,
+  EnvironmentOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAnalysisStore, SubjectScore } from '../stores/analysisStore'
 import { useLanguageStore } from '../stores/languageStore'
+import {
+  getRegions,
+  getSchoolsByDistrict,
+  searchSchools,
+  Region,
+  School,
+  REGION_COLORS,
+} from '../services/schoolsApi'
 import styles from './AnalysisFormPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -94,74 +106,6 @@ const SEMESTER_OPTIONS = [
   { value: '2025-2026-2', label: '2025-2026年度 下学期' },
 ]
 
-/**
- * 香港著名中学列表（按地区分类）
- */
-/**
- * 香港中学列表（按区域分类）
- */
-const HK_SCHOOLS = {
-  hongKongIsland: [
-    // 中西区
-    '皇仁书院', '英皇书院', '圣保罗男女中学', '圣若瑟书院', '圣士提反女子中学',
-    '英华女学校', '圣类斯中学', '高主教书院', '圣嘉勒女书院', '圣保罗书院',
-    // 湾仔区
-    '香港华仁书院', '玛利曼中学', '圣保禄学校', '嘉诺撒圣方济各书院', '香港真光中学',
-    '皇仁旧生会中学', '邓肇坚维多利亚官立中学',
-    // 东区
-    '庇理罗士女子中学', '筲箕湾官立中学', '张祝珊英文中学', '港岛民生书院', '中华基金中学',
-    '卫理中学', '嘉诺撒书院', '圣马可中学', '文理书院(香港)',
-    // 南区
-    '嘉诺撒圣心书院', '圣士提反书院', '港大同学会书院', '余振强纪念第二中学',
-    '金文泰中学', '明爱庄月明中学',
-  ],
-  kowloon: [
-    // 油尖旺区
-    '拔萃女书院', '真光女书院', '循道中学', '伊利沙伯中学', '九龙华仁书院',
-    '官立嘉道理爵士中学', '中华基督教会铭基书院', '油麻地天主教小学(中学部)',
-    // 深水埗区
-    '英华书院', '圣芳济书院', '德雅中学', '宝血会上智英文书院', '长沙湾天主教英文中学',
-    '惠侨英文中学', '香港四邑商工总会黄棣珊纪念中学',
-    // 九龙城区
-    '喇沙书院', '拔萃男书院', '玛利诺修院学校', '协恩中学', '华英中学',
-    '民生书院', '何明华会督银禧中学', '旺角劳工子弟学校', '迦密中学',
-    '东华三院黄笏南中学', '保良局颜宝铃书院', '圣公会圣三一堂中学',
-    // 黄大仙区
-    '德望学校', '保良局第一张永庆中学', '中华基督教会协和书院', '圣文德书院',
-    '可立中学(啬色园主办)', '佛教孔仙洲纪念中学',
-    // 观塘区
-    '圣杰灵女子中学', '圣言中学', '观塘玛利诺书院', '顺利天主教中学',
-    '梁式芝书院', '观塘官立中学', '宁波公学', '圣傑灵女子中学',
-  ],
-  newTerritories: [
-    // 沙田区
-    '沙田官立中学', '浸信会吕明才中学', '圣公会曾肇添中学', '沙田培英中学',
-    '沙田循道卫理中学', '圣罗撒书院', '天主教郭得胜中学', '五旬节林汉光中学',
-    '圣母无玷圣心书院', '培侨中学', '香港浸会大学附属学校王锦辉中小学',
-    // 大埔区
-    '圣公会莫寿增会督中学', '迦密柏雨中学', '恩主教书院', '王肇枝中学',
-    '南亚路德会沐恩中学', '罗定邦中学',
-    // 北区
-    '圣芳济各书院', '风采中学(教育评议会主办)', '东华三院李嘉诚中学',
-    '田家炳中学', '保良局马锦明中学',
-    // 元朗区
-    '天主教崇德英文书院', '圣公会白约翰会督中学', '新界乡议局元朗区中学',
-    '元朗公立中学', '东华三院卢干庭纪念中学', '基督教香港信义会元朗信义中学',
-    // 屯门区
-    '保良局百周年李兆忠纪念中学', '屯门官立中学', '顺德联谊总会谭伯羽中学',
-    '妙法寺刘金龙中学', '南屯门官立中学', '保良局董玉娣中学',
-    // 荃湾区
-    '荃湾官立中学', '保良局李城璧中学', '廖宝珊纪念书院', '宝安商会王少清中学',
-    // 葵青区
-    '圣公会林护纪念中学', '顺德联谊总会李兆基中学', '东华三院伍若瑜夫人纪念中学',
-    '佛教善德英文中学', '皇仁旧生会中学',
-    // 西贡区
-    '迦密主恩中学', '将军澳官立中学', '景岭书院', '宝觉中学',
-    '仁济医院王华湘中学', '西贡崇真天主教学校(中学部)',
-    // 离岛区
-    '长洲官立中学', '东涌天主教学校', '灵粮堂怡文中学',
-  ],
-}
 
 /**
  * 分析进度阶段
@@ -185,13 +129,31 @@ const AnalysisFormPage = () => {
   const { t } = useLanguageStore()
   const [showSelector, setShowSelector] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
-  const [subjects, setSubjects] = useState<SubjectScore[]>([])
+  // 核心科目（必填）
+  const CORE_SUBJECTS = ['chinese', 'english', 'math', 'liberal']
+  
+  const [subjects, setSubjects] = useState<SubjectScore[]>([
+    { subject: 'chinese', currentScore: '', targetScore: '' },
+    { subject: 'english', currentScore: '', targetScore: '' },
+    { subject: 'math', currentScore: '', targetScore: '' },
+    { subject: 'liberal', currentScore: '', targetScore: '' },
+  ])
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
   const { updateFormData, submitAnalysis, loading } = useAnalysisStore()
 
   // 分析进度状态
   const [analysisProgress, setAnalysisProgress] = useState(0)
   const [analysisStage, setAnalysisStage] = useState('')
+
+  // 18区学校选择状态
+  const [regions, setRegions] = useState<Region[]>([])
+  const [selectedRegion, setSelectedRegion] = useState<string>('')
+  const [selectedDistrict, setSelectedDistrict] = useState<string>('')
+  const [districtSchools, setDistrictSchools] = useState<School[]>([])
+  const [schoolsLoading, setSchoolsLoading] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<School[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
 
   // 模拟分析进度
   useEffect(() => {
@@ -214,6 +176,64 @@ const AnalysisFormPage = () => {
       setAnalysisStage('')
     }
   }, [loading])
+
+  // 加载18区数据
+  useEffect(() => {
+    async function loadRegions() {
+      const result = await getRegions()
+      if (result.success && result.data) {
+        setRegions(result.data)
+      }
+    }
+    loadRegions()
+  }, [])
+
+  // 加载区内学校
+  useEffect(() => {
+    async function loadSchools() {
+      if (!selectedDistrict) {
+        setDistrictSchools([])
+        return
+      }
+      setSchoolsLoading(true)
+      const result = await getSchoolsByDistrict(selectedDistrict)
+      if (result.success && result.data) {
+        setDistrictSchools(result.data)
+      }
+      setSchoolsLoading(false)
+    }
+    loadSchools()
+  }, [selectedDistrict])
+
+  // 搜索学校
+  const handleSchoolSearch = useCallback(async (query: string) => {
+    setSearchQuery(query)
+    if (query.length < 2) {
+      setSearchResults([])
+      return
+    }
+    setSearchLoading(true)
+    const result = await searchSchools(query)
+    if (result.success && result.data) {
+      setSearchResults(result.data)
+    }
+    setSearchLoading(false)
+  }, [])
+
+  // 选择学校（从搜索或列表）
+  const handleSelectSchool = (school: School) => {
+    const schoolName = school.name_zh
+    if (!selectedSchools.includes(schoolName)) {
+      setSelectedSchools([...selectedSchools, schoolName])
+    }
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
+  // 移除已选学校
+  const handleRemoveSchool = (schoolName: string) => {
+    setSelectedSchools(selectedSchools.filter(s => s !== schoolName))
+  }
 
   // 处理分析类型选择
   const handleSelectType = (type: 'transfer' | 'university') => {
@@ -327,9 +347,14 @@ const AnalysisFormPage = () => {
   }
 
   /**
-   * 删除科目
+   * 删除科目（不能删除核心科目）
    */
   const handleRemoveSubject = (index: number) => {
+    const subjectToRemove = subjects[index]
+    // 核心科目不能删除
+    if (CORE_SUBJECTS.includes(subjectToRemove.subject)) {
+      return
+    }
     setSubjects(subjects.filter((_, i) => i !== index))
   }
 
@@ -524,6 +549,20 @@ const AnalysisFormPage = () => {
     </div>
   )
 
+  // 获取科目显示名称
+  const getSubjectLabel = (subjectValue: string) => {
+    const found = DSE_SUBJECTS.find(s => s.value === subjectValue)
+    return found?.label || subjectValue
+  }
+
+  // 获取可选的选修科目（排除已选的）
+  const getAvailableElectives = () => {
+    const selectedSubjects = subjects.map(s => s.subject)
+    return DSE_SUBJECTS.filter(s => 
+      s.category === 'elective' && !selectedSubjects.includes(s.value)
+    )
+  }
+
   /**
    * 渲染步骤3 - 科目成绩
    */
@@ -531,80 +570,108 @@ const AnalysisFormPage = () => {
     <div className={styles.stepContent}>
       <Title level={4}>科目成绩录入</Title>
       <Paragraph type="secondary">
-        请添加并填写各科目的当前成绩和目标成绩
+        核心科目（中文、英文、数学、公民与社会发展）为必填项，可添加其他选修科目
       </Paragraph>
 
       <div className={styles.subjectsContainer}>
-        {subjects.map((subject, index) => (
-          <Card
-            key={index}
-            size="small"
-            className={styles.subjectCard}
-            extra={
-              <Button
-                type="text"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleRemoveSubject(index)}
-              >
-                删除
-              </Button>
-            }
-          >
-            <Row gutter={16}>
-              <Col xs={24} sm={8}>
-                <Form.Item label="科目" required>
-                  <Select
-                    placeholder="选择科目"
-                    value={subject.subject || undefined}
-                    onChange={(value) => handleSubjectChange(index, 'subject', value)}
-                    options={DSE_SUBJECTS.map((s) => ({
-                      value: s.value,
-                      label: (
-                        <span>
-                          {s.label}
-                          {s.category === 'core' && (
-                            <Tag color="blue" style={{ marginLeft: 8 }}>核心</Tag>
-                          )}
-                        </span>
-                      ),
-                    }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={12} sm={8}>
-                <Form.Item label="当前成绩" required>
-                  <Select
-                    placeholder="选择成绩"
-                    value={subject.currentScore || undefined}
-                    onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
-                    options={DSE_GRADES}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={12} sm={8}>
-                <Form.Item label="目标成绩" required>
-                  <Select
-                    placeholder="选择目标"
-                    value={subject.targetScore || undefined}
-                    onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
-                    options={DSE_GRADES}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Card>
-        ))}
+        {subjects.map((subject, index) => {
+          const isCore = CORE_SUBJECTS.includes(subject.subject)
+          
+          return (
+            <Card
+              key={index}
+              size="small"
+              className={styles.subjectCard}
+              style={isCore ? { borderLeft: '3px solid #1890ff' } : undefined}
+              extra={
+                isCore ? (
+                  <Tag color="blue">必修</Tag>
+                ) : (
+                  <Button
+                    type="text"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={() => handleRemoveSubject(index)}
+                  >
+                    删除
+                  </Button>
+                )
+              }
+            >
+              <Row gutter={16}>
+                <Col xs={24} sm={8}>
+                  <Form.Item label="科目" required>
+                    {isCore ? (
+                      <Select
+                        value={subject.subject}
+                        disabled
+                        options={[{
+                          value: subject.subject,
+                          label: (
+                            <span>
+                              {getSubjectLabel(subject.subject)}
+                              <Tag color="blue" style={{ marginLeft: 8 }}>核心</Tag>
+                            </span>
+                          ),
+                        }]}
+                      />
+                    ) : (
+                      <Select
+                        placeholder="选择科目"
+                        value={subject.subject || undefined}
+                        onChange={(value) => handleSubjectChange(index, 'subject', value)}
+                        options={[
+                          // 当前已选的科目
+                          ...(subject.subject ? [{
+                            value: subject.subject,
+                            label: getSubjectLabel(subject.subject)
+                          }] : []),
+                          // 其他可选的选修科目
+                          ...getAvailableElectives().map((s) => ({
+                            value: s.value,
+                            label: s.label,
+                          }))
+                        ]}
+                      />
+                    )}
+                  </Form.Item>
+                </Col>
+                <Col xs={12} sm={8}>
+                  <Form.Item label="当前成绩" required>
+                    <Select
+                      placeholder="选择成绩"
+                      value={subject.currentScore || undefined}
+                      onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
+                      options={DSE_GRADES}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={12} sm={8}>
+                  <Form.Item label="目标成绩" required>
+                    <Select
+                      placeholder="选择目标"
+                      value={subject.targetScore || undefined}
+                      onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
+                      options={DSE_GRADES}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Card>
+          )
+        })}
 
-        <Button
-          type="dashed"
-          block
-          icon={<PlusOutlined />}
-          onClick={handleAddSubject}
-          className={styles.addSubjectBtn}
-        >
-          添加科目
-        </Button>
+        {getAvailableElectives().length > 0 && (
+          <Button
+            type="dashed"
+            block
+            icon={<PlusOutlined />}
+            onClick={handleAddSubject}
+            className={styles.addSubjectBtn}
+          >
+            添加选修科目
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -623,15 +690,185 @@ const AnalysisFormPage = () => {
     }
   }
 
+  // 获取当前区域的区列表
+  const currentRegion = regions.find(r => r.code === selectedRegion)
+  const districts = currentRegion?.districts || []
+
   const renderStep4 = () => (
     <div className={styles.stepContent}>
       <Title level={4}>选择目标学校</Title>
       <Paragraph type="secondary">
-        请选择您期望入读的学校（可多选），也可以手动输入学校名称
+        请选择您期望入读的学校（可多选），支持按18区浏览或直接搜索
       </Paragraph>
 
-      {/* 手动输入学校 */}
-      <div style={{ marginBottom: 24 }}>
+      {/* 搜索框 */}
+      <div style={{ marginBottom: 20 }}>
+        <Input
+          prefix={<SearchOutlined />}
+          placeholder="🔍 搜索学校名称..."
+          value={searchQuery}
+          onChange={e => handleSchoolSearch(e.target.value)}
+          allowClear
+          size="large"
+          style={{ maxWidth: 500 }}
+        />
+      </div>
+
+      {/* 搜索结果 */}
+      {searchQuery.length >= 2 && (
+        <Card 
+          size="small" 
+          style={{ marginBottom: 20, maxHeight: 250, overflow: 'auto' }}
+          title={<><SearchOutlined /> 搜索结果 <Tag>{searchResults.length}</Tag></>}
+        >
+          {searchLoading ? (
+            <div style={{ textAlign: 'center', padding: 20 }}><Spin /></div>
+          ) : searchResults.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {searchResults.map(school => (
+                <div
+                  key={school.id}
+                  onClick={() => handleSelectSchool(school)}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    background: selectedSchools.includes(school.name_zh) ? '#e6f4ff' : '#fafafa',
+                    border: selectedSchools.includes(school.name_zh) ? '1px solid #1890ff' : '1px solid #f0f0f0',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <div style={{ fontWeight: 500 }}>
+                    <BankOutlined style={{ marginRight: 8, color: '#1890ff' }} />
+                    {school.name_zh}
+                    {selectedSchools.includes(school.name_zh) && (
+                      <Tag color="success" style={{ marginLeft: 8 }}>已选</Tag>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#888', marginLeft: 22 }}>
+                    <EnvironmentOutlined style={{ marginRight: 4 }} />
+                    {school.region_name} · {school.district_name}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Empty description="未找到匹配的学校" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          )}
+        </Card>
+      )}
+
+      <Divider>按18区浏览学校</Divider>
+
+      {/* 区域和区选择器 */}
+      <Row gutter={16} style={{ marginBottom: 20 }}>
+        <Col xs={24} sm={12}>
+          <Text strong style={{ display: 'block', marginBottom: 8 }}>选择区域：</Text>
+          <Select
+            placeholder="选择区域"
+            value={selectedRegion || undefined}
+            onChange={(v) => { setSelectedRegion(v); setSelectedDistrict(''); }}
+            style={{ width: '100%' }}
+            allowClear
+            size="large"
+          >
+            {regions.map(region => (
+              <Select.Option key={region.code} value={region.code}>
+                <Tag color={REGION_COLORS[region.code]} style={{ marginRight: 8 }}>
+                  {region.name_zh}
+                </Tag>
+              </Select.Option>
+            ))}
+          </Select>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Text strong style={{ display: 'block', marginBottom: 8 }}>选择区：</Text>
+          <Select
+            placeholder="选择区"
+            value={selectedDistrict || undefined}
+            onChange={setSelectedDistrict}
+            style={{ width: '100%' }}
+            disabled={!selectedRegion}
+            allowClear
+            size="large"
+          >
+            {districts.map(district => (
+              <Select.Option key={district.code} value={district.code}>
+                {district.name_zh}
+              </Select.Option>
+            ))}
+          </Select>
+        </Col>
+      </Row>
+
+      {/* 区内学校列表 */}
+      {selectedDistrict && (
+        <Card 
+          size="small"
+          style={{ maxHeight: 300, overflow: 'auto', marginBottom: 20 }}
+          title={
+            <Space>
+              <BankOutlined />
+              <span>{districts.find(d => d.code === selectedDistrict)?.name_zh}的学校</span>
+              <Tag color="blue">{districtSchools.length}所</Tag>
+            </Space>
+          }
+        >
+          {schoolsLoading ? (
+            <div style={{ textAlign: 'center', padding: 20 }}><Spin /></div>
+          ) : districtSchools.length > 0 ? (
+            <div className={styles.schoolTags}>
+              {districtSchools.map(school => (
+                <Tag.CheckableTag
+                  key={school.id}
+                  checked={selectedSchools.includes(school.name_zh)}
+                  onChange={(checked) => {
+                    if (checked) {
+                      setSelectedSchools([...selectedSchools, school.name_zh])
+                    } else {
+                      setSelectedSchools(selectedSchools.filter(s => s !== school.name_zh))
+                    }
+                  }}
+                  className={styles.schoolTag}
+                >
+                  {school.name_zh}
+                </Tag.CheckableTag>
+              ))}
+            </div>
+          ) : (
+            <Empty description="该区暂无学校数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          )}
+        </Card>
+      )}
+
+      <Divider />
+
+      {/* 已选学校 */}
+      <div className={styles.selectedSchools}>
+        <Text strong>✅ 已选学校 ({selectedSchools.length})：</Text>
+        <div className={styles.selectedTags} style={{ marginTop: 12 }}>
+          {selectedSchools.length > 0 ? (
+            selectedSchools.map((school) => (
+              <Tag
+                key={school}
+                closable
+                color="blue"
+                style={{ marginBottom: 8, padding: '4px 10px', fontSize: 14 }}
+                onClose={() => handleRemoveSchool(school)}
+              >
+                {school}
+              </Tag>
+            ))
+          ) : (
+            <Text type="secondary">暂未选择学校，请从上方搜索或浏览选择</Text>
+          )}
+        </div>
+      </div>
+
+      <Divider />
+
+      {/* 手动添加学校 */}
+      <div style={{ marginBottom: 20 }}>
         <Text strong>手动添加学校：</Text>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <Input
@@ -646,104 +883,6 @@ const AnalysisFormPage = () => {
           </Button>
         </div>
       </div>
-
-      <Divider>或从列表中选择</Divider>
-
-      <div className={styles.schoolsContainer}>
-        {/* 港岛区 */}
-        <div className={styles.schoolRegion}>
-          <Title level={5}>🏝️ 港岛区 ({HK_SCHOOLS.hongKongIsland.length}所)</Title>
-          <div className={styles.schoolTags}>
-            {HK_SCHOOLS.hongKongIsland.map((school) => (
-              <Tag.CheckableTag
-                key={school}
-                checked={selectedSchools.includes(school)}
-                onChange={(checked) => {
-                  if (checked) {
-                    setSelectedSchools([...selectedSchools, school])
-                  } else {
-                    setSelectedSchools(selectedSchools.filter((s) => s !== school))
-                  }
-                }}
-                className={styles.schoolTag}
-              >
-                {school}
-              </Tag.CheckableTag>
-            ))}
-          </div>
-        </div>
-
-        {/* 九龙区 */}
-        <div className={styles.schoolRegion}>
-          <Title level={5}>🏙️ 九龙区 ({HK_SCHOOLS.kowloon.length}所)</Title>
-          <div className={styles.schoolTags}>
-            {HK_SCHOOLS.kowloon.map((school) => (
-              <Tag.CheckableTag
-                key={school}
-                checked={selectedSchools.includes(school)}
-                onChange={(checked) => {
-                  if (checked) {
-                    setSelectedSchools([...selectedSchools, school])
-                  } else {
-                    setSelectedSchools(selectedSchools.filter((s) => s !== school))
-                  }
-                }}
-                className={styles.schoolTag}
-              >
-                {school}
-              </Tag.CheckableTag>
-            ))}
-          </div>
-        </div>
-
-        {/* 新界区 */}
-        <div className={styles.schoolRegion}>
-          <Title level={5}>🌿 新界区 ({HK_SCHOOLS.newTerritories.length}所)</Title>
-          <div className={styles.schoolTags}>
-            {HK_SCHOOLS.newTerritories.map((school) => (
-              <Tag.CheckableTag
-                key={school}
-                checked={selectedSchools.includes(school)}
-                onChange={(checked) => {
-                  if (checked) {
-                    setSelectedSchools([...selectedSchools, school])
-                  } else {
-                    setSelectedSchools(selectedSchools.filter((s) => s !== school))
-                  }
-                }}
-                className={styles.schoolTag}
-              >
-                {school}
-              </Tag.CheckableTag>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <Divider />
-
-      {/* 已选学校 */}
-      <div className={styles.selectedSchools}>
-        <Text strong>已选学校 ({selectedSchools.length})：</Text>
-        <div className={styles.selectedTags}>
-          {selectedSchools.length > 0 ? (
-            selectedSchools.map((school) => (
-              <Tag
-                key={school}
-                closable
-                color="blue"
-                onClose={() => setSelectedSchools(selectedSchools.filter((s) => s !== school))}
-              >
-                {school}
-              </Tag>
-            ))
-          ) : (
-            <Text type="secondary">暂未选择学校</Text>
-          )}
-        </div>
-      </div>
-
-      <Divider />
 
       {/* 备注 */}
       <Form.Item name="notes" label="备注信息">

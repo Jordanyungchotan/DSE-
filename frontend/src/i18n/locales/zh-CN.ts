@@ -50,14 +50,20 @@ export const zhCN = {
     analysisHistory: '分析记录',
     accountSettings: '账户设置',
     myRanking: '我的排名',
+    // 社交系统
+    social: '社交',
+    community: '量子纠缠',
+    friends: '好友',
+    messages: '消息',
+    notifications: '通知',
   },
 
   // 系统名称
   system: {
-    name: '质心DSE升学分析系统',
+    name: '香港质心教育',
     shortName: '质心教育',
     slogan: '专业的香港DSE升学辅导平台',
-    copyright: '© 2024 质心教育科技',
+    copyright: '© 2024 香港质心教育',
   },
 
   // 首页

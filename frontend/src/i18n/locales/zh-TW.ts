@@ -50,14 +50,20 @@ export const zhTW = {
     analysisHistory: '分析記錄',
     accountSettings: '帳戶設定',
     myRanking: '我的排名',
+    // 社交系統
+    social: '社交',
+    community: '量子糾纏',
+    friends: '好友',
+    messages: '訊息',
+    notifications: '通知',
   },
 
   // 系統名稱
   system: {
-    name: '質心DSE升學分析系統',
+    name: '香港質心教育',
     shortName: '質心教育',
     slogan: '專業的香港DSE升學輔導平台',
-    copyright: '© 2024 質心教育科技',
+    copyright: '© 2024 香港質心教育',
   },
 
   // 首頁

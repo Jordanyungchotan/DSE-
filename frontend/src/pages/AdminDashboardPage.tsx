@@ -14,7 +14,8 @@ import {
   SafetyOutlined, EditOutlined, CloseCircleOutlined, GiftOutlined,
   DollarOutlined, ShoppingOutlined, LockOutlined, UnlockOutlined,
   WarningOutlined, StopOutlined, SyncOutlined, CrownOutlined,
-  FundOutlined, PlusOutlined, LoadingOutlined
+  FundOutlined, PlusOutlined, LoadingOutlined, CommentOutlined,
+  PushpinOutlined
 } from '@ant-design/icons'
 import { apiFetch, ragFetch } from '../config/api'
 import styles from './AdminDashboardPage.module.css'
@@ -228,6 +229,49 @@ const AdminDashboardPage = () => {
   })
   const [imageUploading, setImageUploading] = useState(false)
 
+  // 社区管理相关状态
+  interface CommunityPost {
+    id: number
+    user_id: string
+    user_name: string | null
+    title: string
+    content: string
+    category: string
+    view_count: number
+    like_count: number
+    comment_count: number
+    is_pinned: number
+    is_deleted: number
+    created_at: string
+  }
+  interface CommunityStats {
+    totalPosts: number
+    totalComments: number
+    todayPosts: number
+    todayComments: number
+  }
+  const [communityPosts, setCommunityPosts] = useState<CommunityPost[]>([])
+  const [communityStats, setCommunityStats] = useState<CommunityStats | null>(null)
+  const [communityLoading, setCommunityLoading] = useState(false)
+
+  // 用户管理相关状态
+  interface AdminUser {
+    id: string
+    name: string
+    email: string
+    phone: string | null
+    avatar: string | null
+    created_at: string
+    points: number
+    analysis_count: number
+    test_count: number
+    post_count: number
+  }
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersPagination, setUsersPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 0 })
+  const [usersSearchTerm, setUsersSearchTerm] = useState('')
+
   const adminKey = sessionStorage.getItem('adminKey')
 
   useEffect(() => {
@@ -261,6 +305,151 @@ const AdminDashboardPage = () => {
       loadMallItems()
     }
   }, [activeTab, adminKey])
+
+  useEffect(() => {
+    if (activeTab === 'community' && adminKey) {
+      loadCommunityData()
+    }
+  }, [activeTab, adminKey])
+
+  useEffect(() => {
+    if (activeTab === 'users' && adminKey) {
+      loadAdminUsers()
+    }
+  }, [activeTab, adminKey])
+
+  // 加载用户列表
+  const loadAdminUsers = async (page = 1, search = usersSearchTerm) => {
+    setUsersLoading(true)
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(usersPagination.pageSize),
+        ...(search && { search })
+      })
+      const response = await apiFetch(`/api/admin/users?${params}`, {
+        headers: { 'X-Admin-Key': adminKey || '' }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setAdminUsers(data.users || [])
+        setUsersPagination(data.pagination || { page: 1, pageSize: 20, total: 0, totalPages: 0 })
+      } else {
+        message.error('获取用户列表失败')
+      }
+    } catch (error) {
+      console.error('加载用户列表失败:', error)
+      message.error('加载用户列表失败')
+    } finally {
+      setUsersLoading(false)
+    }
+  }
+
+  // 删除用户
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    Modal.confirm({
+      title: '⚠️ 确认删除用户',
+      content: (
+        <div>
+          <p>确定要删除用户 <strong>{userName}</strong> 吗？</p>
+          <p style={{ color: '#ff4d4f' }}>此操作将删除该用户的所有数据，包括：</p>
+          <ul style={{ color: '#666', fontSize: 12 }}>
+            <li>帖子和评论</li>
+            <li>好友关系</li>
+            <li>积分和交易记录</li>
+            <li>分析记录</li>
+            <li>测试记录</li>
+            <li>通知和消息</li>
+          </ul>
+          <p style={{ color: '#ff4d4f', fontWeight: 'bold' }}>此操作不可恢复！</p>
+        </div>
+      ),
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await apiFetch(`/api/admin/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'X-Admin-Key': adminKey || '' }
+          })
+          if (response.ok) {
+            message.success('用户删除成功')
+            loadAdminUsers(usersPagination.page)
+            loadSystemStats() // 刷新统计
+          } else {
+            const data = await response.json()
+            message.error(data.error || '删除失败')
+          }
+        } catch (error) {
+          console.error('删除用户失败:', error)
+          message.error('删除用户失败')
+        }
+      }
+    })
+  }
+
+  // 加载社区数据
+  const loadCommunityData = async () => {
+    setCommunityLoading(true)
+    try {
+      const [postsResponse, statsResponse] = await Promise.all([
+        ragFetch('/api/posts?limit=50'),
+        ragFetch('/api/admin/community/stats')
+      ])
+      
+      const postsRes = await postsResponse.json()
+      const statsRes = await statsResponse.json()
+      
+      if (postsRes.success) {
+        setCommunityPosts(postsRes.data.posts || [])
+      }
+      if (statsRes.success) {
+        setCommunityStats(statsRes.data)
+      }
+    } catch (error) {
+      console.error('加载社区数据失败:', error)
+    } finally {
+      setCommunityLoading(false)
+    }
+  }
+
+  // 管理员删除帖子
+  const handleAdminDeletePost = async (postId: number) => {
+    try {
+      const response = await ragFetch(`/api/admin/community/posts/${postId}?admin_id=${adminKey}`, {
+        method: 'DELETE'
+      })
+      const res = await response.json()
+      if (res.success) {
+        message.success('帖子已删除')
+        loadCommunityData()
+      } else {
+        message.error(res.error || '删除失败')
+      }
+    } catch (error) {
+      message.error('删除失败')
+    }
+  }
+
+  // 管理员置顶帖子
+  const handleAdminPinPost = async (postId: number) => {
+    try {
+      const response = await ragFetch(`/api/admin/community/posts/${postId}/pin`, {
+        method: 'POST',
+        headers: { 'X-Admin-Key': adminKey || '' }
+      })
+      const res = await response.json()
+      if (res.success) {
+        message.success(res.is_pinned ? '已置顶' : '已取消置顶')
+        loadCommunityData()
+      } else {
+        message.error(res.error || '操作失败')
+      }
+    } catch (error) {
+      message.error('操作失败')
+    }
+  }
 
   // 加载系统统计数据
   const loadSystemStats = async () => {
@@ -2147,6 +2336,307 @@ const AdminDashboardPage = () => {
     </Spin>
   )
 
+  // 社区管理标签页
+  const renderCommunityTab = () => (
+    <Spin spinning={communityLoading}>
+      <Row gutter={16} style={{ marginBottom: 24 }}>
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title="总帖子数" 
+              value={communityStats?.totalPosts || 0}
+              prefix={<CommentOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title="总评论数" 
+              value={communityStats?.totalComments || 0}
+              prefix={<MessageOutlined />}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title="今日新帖" 
+              value={communityStats?.todayPosts || 0}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col span={6}>
+          <Card>
+            <Statistic 
+              title="今日评论" 
+              value={communityStats?.todayComments || 0}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Card 
+        title="帖子管理" 
+        extra={
+          <Button icon={<ReloadOutlined />} onClick={loadCommunityData}>
+            刷新
+          </Button>
+        }
+      >
+        <Table
+          dataSource={communityPosts}
+          rowKey="id"
+          pagination={{ pageSize: 10 }}
+          columns={[
+            {
+              title: 'ID',
+              dataIndex: 'id',
+              width: 60
+            },
+            {
+              title: '标题',
+              dataIndex: 'title',
+              ellipsis: true,
+              width: 200,
+              render: (title, record) => (
+                <Space>
+                  {record.is_pinned ? <Tag color="orange" icon={<PushpinOutlined />}>置顶</Tag> : null}
+                  <span>{title}</span>
+                </Space>
+              )
+            },
+            {
+              title: '作者',
+              dataIndex: 'user_name',
+              width: 100,
+              render: (name, record) => name || record.user_id
+            },
+            {
+              title: '分类',
+              dataIndex: 'category',
+              width: 100,
+              render: (cat) => {
+                const colors: Record<string, string> = {
+                  general: 'blue',
+                  study_method: 'green',
+                  review_experience: 'orange',
+                  practice_share: 'purple',
+                  help: 'red'
+                }
+                const labels: Record<string, string> = {
+                  general: '综合',
+                  study_method: '学习方法',
+                  review_experience: '复习经验',
+                  practice_share: '刷题分享',
+                  help: '求助'
+                }
+                return <Tag color={colors[cat] || 'default'}>{labels[cat] || cat}</Tag>
+              }
+            },
+            {
+              title: '浏览',
+              dataIndex: 'view_count',
+              width: 70
+            },
+            {
+              title: '点赞',
+              dataIndex: 'like_count',
+              width: 70
+            },
+            {
+              title: '评论',
+              dataIndex: 'comment_count',
+              width: 70
+            },
+            {
+              title: '发布时间',
+              dataIndex: 'created_at',
+              width: 150,
+              render: (date) => new Date(date).toLocaleString()
+            },
+            {
+              title: '操作',
+              width: 150,
+              render: (_, record: CommunityPost) => (
+                <Space>
+                  <Tooltip title={record.is_pinned ? '取消置顶' : '置顶'}>
+                    <Button 
+                      size="small"
+                      type={record.is_pinned ? 'primary' : 'default'}
+                      icon={<PushpinOutlined />}
+                      onClick={() => handleAdminPinPost(record.id)}
+                    />
+                  </Tooltip>
+                  <Tooltip title="删除">
+                    <Button 
+                      size="small" 
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => {
+                        Modal.confirm({
+                          title: '确认删除',
+                          content: `确定要删除帖子"${record.title}"吗？`,
+                          onOk: () => handleAdminDeletePost(record.id)
+                        })
+                      }}
+                    />
+                  </Tooltip>
+                </Space>
+              )
+            }
+          ]}
+        />
+      </Card>
+    </Spin>
+  )
+
+  // 用户管理标签页
+  const renderUsersTab = () => (
+    <Spin spinning={usersLoading}>
+      <Card title="用户管理" style={{ marginBottom: 24 }}>
+        <Space style={{ marginBottom: 16 }}>
+          <Input.Search
+            placeholder="搜索用户（ID/姓名/邮箱）"
+            allowClear
+            style={{ width: 300 }}
+            value={usersSearchTerm}
+            onChange={(e) => setUsersSearchTerm(e.target.value)}
+            onSearch={(value) => {
+              setUsersSearchTerm(value)
+              loadAdminUsers(1, value)
+            }}
+          />
+          <Button 
+            icon={<ReloadOutlined />} 
+            onClick={() => loadAdminUsers(usersPagination.page)}
+          >
+            刷新
+          </Button>
+        </Space>
+
+        <Table
+          dataSource={adminUsers}
+          rowKey="id"
+          pagination={{
+            current: usersPagination.page,
+            pageSize: usersPagination.pageSize,
+            total: usersPagination.total,
+            showTotal: (total) => `共 ${total} 个用户`,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            onChange: (page, pageSize) => {
+              setUsersPagination(prev => ({ ...prev, page, pageSize }))
+              loadAdminUsers(page, usersSearchTerm)
+            }
+          }}
+          columns={[
+            {
+              title: '用户',
+              dataIndex: 'name',
+              render: (name: string, record: AdminUser) => (
+                <Space>
+                  <Avatar 
+                    size="small" 
+                    src={record.avatar} 
+                    icon={<UserOutlined />}
+                  />
+                  <div>
+                    <div>{name}</div>
+                    <Text type="secondary" style={{ fontSize: 12 }}>{record.email}</Text>
+                  </div>
+                </Space>
+              )
+            },
+            {
+              title: 'ID',
+              dataIndex: 'id',
+              width: 120,
+              render: (id: string) => (
+                <Tooltip title={id}>
+                  <Text copyable style={{ fontSize: 11 }}>{id.substring(0, 8)}...</Text>
+                </Tooltip>
+              )
+            },
+            {
+              title: '电话',
+              dataIndex: 'phone',
+              width: 120,
+              render: (phone: string) => phone || '-'
+            },
+            {
+              title: '积分',
+              dataIndex: 'points',
+              width: 80,
+              sorter: (a: AdminUser, b: AdminUser) => (a.points || 0) - (b.points || 0),
+              render: (points: number) => (
+                <Tag color="gold">{points || 0}</Tag>
+              )
+            },
+            {
+              title: '分析次数',
+              dataIndex: 'analysis_count',
+              width: 90,
+              sorter: (a: AdminUser, b: AdminUser) => a.analysis_count - b.analysis_count,
+              render: (count: number) => count || 0
+            },
+            {
+              title: '测试次数',
+              dataIndex: 'test_count',
+              width: 90,
+              sorter: (a: AdminUser, b: AdminUser) => a.test_count - b.test_count,
+              render: (count: number) => count || 0
+            },
+            {
+              title: '发帖数',
+              dataIndex: 'post_count',
+              width: 80,
+              sorter: (a: AdminUser, b: AdminUser) => a.post_count - b.post_count,
+              render: (count: number) => count || 0
+            },
+            {
+              title: '注册时间',
+              dataIndex: 'created_at',
+              width: 160,
+              sorter: (a: AdminUser, b: AdminUser) => 
+                new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+              render: (date: string) => new Date(date).toLocaleString('zh-CN')
+            },
+            {
+              title: '操作',
+              width: 120,
+              render: (_, record: AdminUser) => (
+                <Space>
+                  <Tooltip title="查看积分记录">
+                    <Button
+                      size="small"
+                      icon={<DollarOutlined />}
+                      onClick={() => {
+                        setLedgerUserId(record.id)
+                        loadPointsLedger(record.id)
+                        setActiveTab('points')
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip title="删除用户">
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleDeleteUser(record.id, record.name)}
+                    />
+                  </Tooltip>
+                </Space>
+              )
+            }
+          ]}
+        />
+      </Card>
+    </Spin>
+  )
+
   const tabItems = [
     {
       key: 'overview',
@@ -2157,6 +2647,16 @@ const AdminDashboardPage = () => {
         </span>
       ),
       children: renderOverviewTab(),
+    },
+    {
+      key: 'users',
+      label: (
+        <span>
+          <TeamOutlined />
+          用户管理
+        </span>
+      ),
+      children: renderUsersTab(),
     },
     {
       key: 'inquiries',
@@ -2204,6 +2704,16 @@ const AdminDashboardPage = () => {
         </span>
       ),
       children: renderMallItemsTab(),
+    },
+    {
+      key: 'community',
+      label: (
+        <span>
+          <CommentOutlined />
+          社区管理
+        </span>
+      ),
+      children: renderCommunityTab(),
     },
   ]
 

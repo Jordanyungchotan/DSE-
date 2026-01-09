@@ -2667,8 +2667,8 @@ export default {
         }
 
         const user = await env.DB.prepare(
-          'SELECT id, name, email, password_hash, created_at FROM users WHERE email = ?'
-        ).bind(email.toLowerCase().trim()).first() as { id: string; name: string; email: string; password_hash: string; created_at: string } | null
+          'SELECT id, name, email, password_hash, avatar, created_at FROM users WHERE email = ?'
+        ).bind(email.toLowerCase().trim()).first() as { id: string; name: string; email: string; password_hash: string; avatar?: string; created_at: string } | null
 
         if (!user) {
           return errorResponse('该邮箱尚未注册，请先注册账号', 401, origin)
@@ -2683,7 +2683,7 @@ export default {
 
         return jsonResponse({
           message: '登录成功',
-          user: { id: user.id, name: user.name, email: user.email, createdAt: user.created_at },
+          user: { id: user.id, name: user.name, email: user.email, avatar: user.avatar, createdAt: user.created_at },
           token,
         }, 200, origin)
       }
@@ -3199,6 +3199,291 @@ export default {
           },
           recentUsers: recentUsers.results || [],
         }, 200, origin)
+      }
+
+      // =====================
+      // 公开 - 用户信息 API（用于好友系统）
+      // =====================
+
+      // 批量获取用户基本信息（用于显示好友头像等）
+      if (path === '/api/users/batch' && request.method === 'POST') {
+        try {
+          const body = await request.json() as { user_ids: string[] }
+          const userIds = body.user_ids || []
+          
+          if (userIds.length === 0) {
+            return jsonResponse({ success: true, data: [] }, 200, origin)
+          }
+
+          // 限制最多查询 50 个用户
+          const limitedIds = userIds.slice(0, 50)
+          const placeholders = limitedIds.map(() => '?').join(',')
+          
+          const users = await env.DB.prepare(`
+            SELECT id, name, avatar FROM users WHERE id IN (${placeholders})
+          `).bind(...limitedIds).all()
+
+          return jsonResponse({ 
+            success: true, 
+            data: users.results || []
+          }, 200, origin)
+        } catch (error) {
+          console.error('批量获取用户信息失败:', error)
+          return jsonResponse({ success: false, error: '获取用户信息失败' }, 500, origin)
+        }
+      }
+
+      // 搜索用户（按名称或邮箱）
+      if (path === '/api/users/search' && request.method === 'GET') {
+        try {
+          const url = new URL(request.url)
+          const query = url.searchParams.get('q') || ''
+          const limit = Math.min(parseInt(url.searchParams.get('limit') || '10'), 20)
+          const excludeUserId = url.searchParams.get('exclude') || ''
+
+          if (!query || query.length < 2) {
+            return jsonResponse({ 
+              success: true, 
+              data: [],
+              message: '请输入至少2个字符进行搜索'
+            }, 200, origin)
+          }
+
+          const searchPattern = `%${query}%`
+          
+          // 搜索用户（按名称或邮箱），排除当前用户
+          let users
+          if (excludeUserId) {
+            users = await env.DB.prepare(`
+              SELECT id, name, email, avatar, created_at
+              FROM users
+              WHERE (name LIKE ? OR email LIKE ?)
+                AND id != ?
+              ORDER BY name ASC
+              LIMIT ?
+            `).bind(searchPattern, searchPattern, excludeUserId, limit).all()
+          } else {
+            users = await env.DB.prepare(`
+              SELECT id, name, email, avatar, created_at
+              FROM users
+              WHERE name LIKE ? OR email LIKE ?
+              ORDER BY name ASC
+              LIMIT ?
+            `).bind(searchPattern, searchPattern, limit).all()
+          }
+
+          // 隐藏邮箱中间部分保护隐私
+          const maskedUsers = (users.results || []).map((user: Record<string, unknown>) => {
+            const email = user.email as string
+            const [localPart, domain] = email.split('@')
+            const maskedLocal = localPart.length > 2 
+              ? localPart[0] + '***' + localPart[localPart.length - 1]
+              : localPart[0] + '***'
+            return {
+              ...user,
+              email: `${maskedLocal}@${domain}`
+            }
+          })
+
+          return jsonResponse({ 
+            success: true, 
+            data: maskedUsers
+          }, 200, origin)
+        } catch (error) {
+          console.error('搜索用户失败:', error)
+          return jsonResponse({ success: false, error: '搜索用户失败' }, 500, origin)
+        }
+      }
+
+      // =====================
+      // 管理员 - 用户管理 API
+      // =====================
+
+      // 获取所有用户列表（管理员专用）
+      if (path === '/api/admin/users' && request.method === 'GET') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        try {
+          const url = new URL(request.url)
+          const page = parseInt(url.searchParams.get('page') || '1')
+          const pageSize = parseInt(url.searchParams.get('pageSize') || '20')
+          const search = url.searchParams.get('search') || ''
+          const offset = (page - 1) * pageSize
+
+          // 构建查询条件
+          let whereClause = ''
+          const params: string[] = []
+          
+          if (search) {
+            whereClause = 'WHERE name LIKE ? OR email LIKE ? OR id LIKE ?'
+            const searchPattern = `%${search}%`
+            params.push(searchPattern, searchPattern, searchPattern)
+          }
+
+          // 获取总数
+          const countQuery = `SELECT COUNT(*) as count FROM users ${whereClause}`
+          const countResult = search 
+            ? await env.DB.prepare(countQuery).bind(...params).first() as { count: number } | null
+            : await env.DB.prepare(countQuery).first() as { count: number } | null
+          
+          const total = countResult?.count || 0
+
+          // 获取用户列表 - 先获取基本用户信息
+          const listQuery = `
+            SELECT 
+              u.id, 
+              u.name, 
+              u.email, 
+              u.phone,
+              u.avatar,
+              u.created_at
+            FROM users u
+            ${whereClause}
+            ORDER BY u.created_at DESC
+            LIMIT ? OFFSET ?
+          `
+          
+          const usersResult = search
+            ? await env.DB.prepare(listQuery).bind(...params, pageSize, offset).all()
+            : await env.DB.prepare(listQuery).bind(pageSize, offset).all()
+
+          // 为每个用户补充统计信息（如果表存在的话）
+          const users = await Promise.all((usersResult.results || []).map(async (user: Record<string, unknown>) => {
+            let points = 0
+            let analysis_count = 0
+            let test_count = 0
+            let post_count = 0
+
+            try {
+              // 尝试获取积分
+              const pointsResult = await env.DB.prepare(
+                'SELECT COALESCE(balance, 0) as balance FROM user_points_account WHERE user_id = ?'
+              ).bind(user.id).first() as { balance: number } | null
+              points = pointsResult?.balance || 0
+            } catch { /* 表可能不存在 */ }
+
+            try {
+              // 尝试获取分析次数
+              const analysisResult = await env.DB.prepare(
+                'SELECT COUNT(*) as count FROM analysis_records WHERE user_id = ?'
+              ).bind(user.id).first() as { count: number } | null
+              analysis_count = analysisResult?.count || 0
+            } catch { /* 表可能不存在 */ }
+
+            try {
+              // 尝试获取测试次数
+              const testResult = await env.DB.prepare(
+                'SELECT COUNT(*) as count FROM level_tests WHERE user_id = ?'
+              ).bind(user.id).first() as { count: number } | null
+              test_count = testResult?.count || 0
+            } catch { /* 表可能不存在 */ }
+
+            try {
+              // 尝试获取发帖数
+              const postResult = await env.DB.prepare(
+                'SELECT COUNT(*) as count FROM posts WHERE user_id = ? AND is_deleted = 0'
+              ).bind(user.id).first() as { count: number } | null
+              post_count = postResult?.count || 0
+            } catch { /* 表可能不存在 */ }
+
+            return {
+              ...user,
+              points,
+              analysis_count,
+              test_count,
+              post_count
+            }
+          }))
+
+          return jsonResponse({
+            users: users,
+            pagination: {
+              page,
+              pageSize,
+              total,
+              totalPages: Math.ceil(total / pageSize)
+            }
+          }, 200, origin)
+        } catch (error) {
+          console.error('获取用户列表失败:', error)
+          return errorResponse('获取用户列表失败: ' + (error instanceof Error ? error.message : '未知错误'), 500, origin)
+        }
+      }
+
+      // 删除用户（管理员专用）
+      if (path.startsWith('/api/admin/users/') && request.method === 'DELETE') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== 'zhixin2024admin') {
+          return errorResponse('无权访问', 403, origin)
+        }
+
+        const userId = path.split('/').pop()
+        if (!userId) {
+          return errorResponse('用户ID不能为空', 400, origin)
+        }
+
+        try {
+          // 检查用户是否存在
+          const user = await env.DB.prepare(
+            'SELECT id, name, email FROM users WHERE id = ?'
+          ).bind(userId).first()
+
+          if (!user) {
+            return errorResponse('用户不存在', 404, origin)
+          }
+
+          // 删除用户相关数据（级联删除，忽略表不存在的错误）
+          const safeDelete = async (query: string, ...params: unknown[]) => {
+            try {
+              await env.DB.prepare(query).bind(...params).run()
+            } catch (e) {
+              // 忽略表不存在的错误
+              console.log(`Safe delete skipped: ${(e as Error).message}`)
+            }
+          }
+
+          // 1. 删除用户的帖子和评论
+          await safeDelete('UPDATE posts SET is_deleted = 1 WHERE user_id = ?', userId)
+          await safeDelete('UPDATE comments SET is_deleted = 1 WHERE user_id = ?', userId)
+          
+          // 2. 删除用户的好友关系
+          await safeDelete('DELETE FROM friends WHERE requester_id = ? OR receiver_id = ?', userId, userId)
+          
+          // 3. 删除用户的通知和消息
+          await safeDelete('DELETE FROM notifications WHERE user_id = ? OR sender_id = ?', userId, userId)
+          await safeDelete('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', userId, userId)
+          
+          // 4. 删除用户的积分账户和交易记录
+          await safeDelete('DELETE FROM points_ledger WHERE user_id = ?', userId)
+          await safeDelete('DELETE FROM user_points_account WHERE user_id = ?', userId)
+          
+          // 5. 删除用户的分析记录
+          await safeDelete('DELETE FROM analysis_records WHERE user_id = ?', userId)
+          
+          // 6. 删除用户的测试记录
+          await safeDelete('DELETE FROM level_tests WHERE user_id = ?', userId)
+          
+          // 7. 删除用户刷题历史
+          await safeDelete('DELETE FROM user_question_history WHERE user_id = ?', userId)
+          
+          // 8. 最后删除用户本身
+          await env.DB.prepare('DELETE FROM users WHERE id = ?').bind(userId).run()
+
+          return jsonResponse({ 
+            message: '用户删除成功',
+            deletedUser: {
+              id: (user as { id: string }).id,
+              name: (user as { name: string }).name,
+              email: (user as { email: string }).email
+            }
+          }, 200, origin)
+        } catch (error) {
+          console.error('删除用户失败:', error)
+          return errorResponse('删除用户失败: ' + (error instanceof Error ? error.message : '未知错误'), 500, origin)
+        }
       }
 
       // =====================
@@ -3907,15 +4192,37 @@ export default {
           explanation: string
         }
 
-        const id = crypto.randomUUID()
         const now = new Date().toISOString()
 
+        // 检查是否已存在该错题（基于 question_id 和 user_id）
+        const existing = await env.DB.prepare(
+          'SELECT id, wrong_count FROM wrong_questions WHERE question_id = ? AND user_id = ?'
+        ).bind(body.questionId, tokenData.userId).first() as { id: string; wrong_count: number } | null
+
+        if (existing) {
+          // 如果已存在，更新错误次数，重置状态为待复习，更新用户答案
+          await env.DB.prepare(
+            `UPDATE wrong_questions 
+             SET wrong_count = wrong_count + 1, 
+                 status = 'unreviewed', 
+                 user_answer = ?,
+                 last_attempt_date = ?,
+                 updated_at = ? 
+             WHERE id = ?`
+          ).bind(body.userAnswer, now, now, existing.id).run()
+          
+          return jsonResponse({ message: '错题已更新', id: existing.id, wrongCount: existing.wrong_count + 1 }, 200, origin)
+        }
+
+        // 如果不存在，创建新记录
+        const id = crypto.randomUUID()
         await env.DB.prepare(
-          `INSERT INTO wrong_questions (id, user_id, question_id, question_text, question_type, subject, topic, user_answer, correct_answer, explanation, status, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unreviewed', ?)`
+          `INSERT INTO wrong_questions (id, user_id, question_id, question_text, question_type, subject, topic, user_answer, correct_answer, explanation, wrong_count, status, first_attempt_date, last_attempt_date, created_at, updated_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'unreviewed', ?, ?, ?, ?)`
         ).bind(
           id, tokenData.userId, body.questionId, body.questionText, body.questionType,
-          body.subject, body.topic || '综合', body.userAnswer, body.correctAnswer, body.explanation, now
+          body.subject, body.topic || '综合', body.userAnswer, body.correctAnswer, body.explanation, 
+          now, now, now, now
         ).run()
 
         return jsonResponse({ message: '错题已添加', id }, 200, origin)

@@ -1,0 +1,639 @@
+/**
+ * JUPAS 课程信息 API 服务
+ * 
+ * 提供课程搜索、详情查询、匹配度分析等功能
+ */
+
+import { ragFetchJson } from '../config/api'
+
+// ============================================================
+// 类型定义
+// ============================================================
+
+/** 课程基本信息 */
+export interface JUPASProgramme {
+  id: number
+  programme_code: string
+  university_code: string
+  university_name_zh: string
+  university_name_en: string
+  title_zh: string
+  title_en: string
+  faculty?: string
+  department?: string
+  duration?: string
+  degree_awarded?: string
+  url?: string
+  description?: string
+  career_prospects?: string
+}
+
+/** 入学要求科目 */
+export interface RequirementSubject {
+  subject_code: string
+  subject_name_zh: string
+  subject_name_en: string
+  required_level: string
+  required_value: number
+  is_alternative: boolean
+  alternative_group?: string
+  notes?: string
+}
+
+/** 入学要求 */
+export interface AdmissionRequirements {
+  core_subjects: RequirementSubject[]
+  elective_subjects: RequirementSubject[]
+  preferred_subjects: RequirementSubject[]
+}
+
+/** 收生成绩（按年份） */
+export interface AdmissionScores {
+  [year: number]: {
+    mean?: number
+    median?: number
+    lower_quartile?: number
+    upper_quartile?: number
+    min?: number
+    max?: number
+  }
+}
+
+/** 课程详情（含入学要求和收生成绩） */
+export interface JUPASProgrammeDetail extends JUPASProgramme {
+  admission_requirements: AdmissionRequirements
+  admission_scores: AdmissionScores
+}
+
+/** 院校信息 */
+export interface JUPASUniversity {
+  id: number
+  code: string
+  name_zh: string
+  name_en: string
+  short_name: string
+  website: string
+  programme_count: number
+}
+
+/** 学生成绩 */
+export interface StudentScores {
+  chinese?: number
+  english?: number
+  mathematics?: number
+  citizenship?: number
+  // 选修科目
+  physics?: number
+  chemistry?: number
+  biology?: number
+  economics?: number
+  geography?: number
+  history?: number
+  chinese_history?: number
+  ict?: number
+  m1?: number
+  m2?: number
+  bafs?: number
+  [subject: string]: number | undefined
+}
+
+/** 匹配分析结果 */
+export interface MatchAnalysis {
+  programme: {
+    code: string
+    title: string
+    university: string
+  }
+  student_scores: {
+    best_5: number
+    best_6: number
+  }
+  analysis: {
+    meets_minimum: boolean
+    unmet_requirements: string[]
+    match_level: 'high' | 'medium' | 'low' | 'not_eligible' | 'unknown'
+    description: string
+  }
+  historical_scores: {
+    mean?: number
+    median?: number
+    lower_quartile?: number
+    upper_quartile?: number
+  }
+  disclaimer: string
+}
+
+/** 推荐课程 */
+export interface RecommendedProgramme {
+  programme_code: string
+  title: string
+  university: string
+  match_level: 'high' | 'medium' | 'low' | 'unknown'
+  median_score?: number
+  your_best5: number
+}
+
+// ============================================================
+// API 函数
+// ============================================================
+
+/**
+ * 获取课程列表
+ */
+export async function getProgrammes(options: {
+  university?: string
+  keyword?: string
+  page?: number
+  limit?: number
+} = {}): Promise<{
+  success: boolean
+  data?: {
+    programmes: JUPASProgramme[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+  }
+  error?: string
+}> {
+  const params = new URLSearchParams()
+  if (options.university) params.set('university', options.university)
+  if (options.keyword) params.set('keyword', options.keyword)
+  if (options.page) params.set('page', String(options.page))
+  if (options.limit) params.set('limit', String(options.limit))
+  
+  return ragFetchJson(`/api/jupas/programmes?${params.toString()}`)
+}
+
+/**
+ * 获取课程详情
+ */
+export async function getProgrammeDetail(code: string): Promise<{
+  success: boolean
+  data?: JUPASProgrammeDetail
+  error?: string
+}> {
+  return ragFetchJson(`/api/jupas/programmes/${code}`)
+}
+
+/**
+ * 搜索课程
+ */
+export async function searchProgrammes(keyword: string, limit: number = 20): Promise<{
+  success: boolean
+  data?: JUPASProgramme[]
+  error?: string
+}> {
+  if (!keyword || keyword.length < 2) {
+    return { success: false, error: '搜索关键词至少需要2个字符' }
+  }
+  return ragFetchJson(`/api/jupas/search?q=${encodeURIComponent(keyword)}&limit=${limit}`)
+}
+
+/**
+ * 获取院校列表
+ */
+export async function getUniversities(): Promise<{
+  success: boolean
+  data?: JUPASUniversity[]
+  error?: string
+}> {
+  return ragFetchJson('/api/jupas/universities')
+}
+
+/**
+ * 分析匹配度
+ */
+export async function analyzeMatch(
+  programmeCode: string,
+  studentScores: StudentScores
+): Promise<{
+  success: boolean
+  data?: MatchAnalysis
+  error?: string
+}> {
+  // 过滤掉 undefined 值
+  const scores: { [key: string]: number } = {}
+  for (const [key, value] of Object.entries(studentScores)) {
+    if (value !== undefined && value > 0) {
+      scores[key] = value
+    }
+  }
+  
+  return ragFetchJson('/api/jupas/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      programme_code: programmeCode,
+      student_scores: scores
+    })
+  })
+}
+
+/**
+ * 获取课程推荐
+ */
+export async function getRecommendations(
+  studentScores: StudentScores,
+  options: {
+    university?: string
+    limit?: number
+  } = {}
+): Promise<{
+  success: boolean
+  data?: {
+    student_best5: number
+    recommendations: RecommendedProgramme[]
+  }
+  error?: string
+}> {
+  // 过滤掉 undefined 值
+  const scores: { [key: string]: number } = {}
+  for (const [key, value] of Object.entries(studentScores)) {
+    if (value !== undefined && value > 0) {
+      scores[key] = value
+    }
+  }
+  
+  return ragFetchJson('/api/jupas/recommend', {
+    method: 'POST',
+    body: JSON.stringify({
+      student_scores: scores,
+      university: options.university,
+      limit: options.limit || 10
+    })
+  })
+}
+
+/**
+ * 获取 JUPAS 数据统计
+ */
+export async function getJUPASStats(): Promise<{
+  success: boolean
+  data?: {
+    total_programmes: number
+    total_universities: number
+    total_requirements: number
+    total_scores: number
+    by_university: Array<{
+      code: string
+      name_zh: string
+      count: number
+    }>
+  }
+  error?: string
+}> {
+  return ragFetchJson('/api/jupas/stats')
+}
+
+// ============================================================
+// 工具函数
+// ============================================================
+
+/**
+ * 计算 Best 5 分数
+ */
+export function calculateBest5(scores: StudentScores): number {
+  const values = Object.values(scores)
+    .filter((v): v is number => typeof v === 'number' && v > 0)
+    .sort((a, b) => b - a)
+  
+  return values.slice(0, 5).reduce((sum, v) => sum + v, 0)
+}
+
+/**
+ * 计算 Best 6 分数
+ */
+export function calculateBest6(scores: StudentScores): number {
+  const values = Object.values(scores)
+    .filter((v): v is number => typeof v === 'number' && v > 0)
+    .sort((a, b) => b - a)
+  
+  return values.slice(0, 6).reduce((sum, v) => sum + v, 0)
+}
+
+/**
+ * 获取匹配等级对应的颜色
+ */
+export function getMatchLevelColor(level: string): string {
+  switch (level) {
+    case 'high':
+      return '#52c41a'  // 绿色
+    case 'medium':
+      return '#faad14'  // 橙色
+    case 'low':
+      return '#ff4d4f'  // 红色
+    case 'not_eligible':
+      return '#8c8c8c'  // 灰色
+    default:
+      return '#1890ff'  // 蓝色
+  }
+}
+
+/**
+ * 获取匹配等级的中文描述
+ */
+export function getMatchLevelText(level: string, locale: string = 'zh-CN'): string {
+  const isEnglish = locale === 'en'
+  
+  switch (level) {
+    case 'high':
+      return isEnglish ? 'High Chance' : '机会较高'
+    case 'medium':
+      return isEnglish ? 'Fair Chance' : '有一定机会'
+    case 'low':
+      return isEnglish ? 'Low Chance' : '机会较低'
+    case 'not_eligible':
+      return isEnglish ? 'Not Eligible' : '不符合要求'
+    default:
+      return isEnglish ? 'Unknown' : '未知'
+  }
+}
+
+/**
+ * 格式化 DSE 等级显示
+ */
+export function formatDSELevel(level: string | number): string {
+  if (level === 'Attained' || level === 1) {
+    return 'Attained'
+  }
+  return String(level)
+}
+
+/** 院校中文名称映射 */
+export const UNIVERSITY_NAMES: { [code: string]: { zh: string; en: string } } = {
+  hku: { zh: '香港大學', en: 'HKU' },
+  cuhk: { zh: '香港中文大學', en: 'CUHK' },
+  ust: { zh: '香港科技大學', en: 'HKUST' },
+  polyu: { zh: '香港理工大學', en: 'PolyU' },
+  cityu: { zh: '香港城市大學', en: 'CityU' },
+  bu: { zh: '香港浸會大學', en: 'HKBU' },
+  ln: { zh: '嶺南大學', en: 'LU' },
+  eduhk: { zh: '香港教育大學', en: 'EdUHK' },
+  hkmu: { zh: '香港都會大學', en: 'HKMU' },
+  hsu: { zh: '香港恆生大學', en: 'HSU' },
+}
+
+// ============================================================
+// 专业领域相关类型和 API
+// ============================================================
+
+/** 专业领域信息 */
+export interface ProgrammeField {
+  id: string
+  name_zh: string
+  name_en: string
+  color: string
+  count: number
+  sample_programmes?: string[]
+}
+
+/** 综合分析输入 */
+export interface ComprehensiveAnalysisInput {
+  grades: { [subject: string]: string | number }
+  interests: string[]
+  strengths: string[]
+  target_universities: string[]
+  target_fields?: string[]
+  career_aspirations?: string
+  extracurriculars?: string
+  limit?: number
+}
+
+/** 匹配结果详情 */
+export interface MatchResult {
+  totalScore: number
+  academicScore: number
+  personalScore: number
+  academicLevel: string
+  recommendation: 'safe' | 'match' | 'reach' | 'risk'
+  details: {
+    academicDescription: string
+    matchedAspects: string[]
+  }
+}
+
+/** 分析结果中的课程推荐 */
+export interface AnalysedProgramme {
+  programme_code: string
+  title_zh: string
+  title_en: string
+  university_code: string
+  university_name: string
+  field_id: string
+  field_name: string
+  field_color: string
+  match: MatchResult
+  historical_scores: {
+    median?: number
+    lower_quartile?: number
+    upper_quartile?: number
+  }
+}
+
+/** 综合分析响应 */
+export interface ComprehensiveAnalysisResponse {
+  student_profile: {
+    best5: number
+    best6: number
+    interests: string[]
+    strengths: string[]
+    target_universities: string[]
+  }
+  summary: {
+    total_analysed: number
+    best_match_fields: string[]
+    score_position: string
+  }
+  recommendations: {
+    safe: AnalysedProgramme[]
+    match: AnalysedProgramme[]
+    reach: AnalysedProgramme[]
+  }
+  all_results: AnalysedProgramme[]
+  disclaimer: string
+}
+
+/** AI 分析响应 */
+export interface AIAnalysisResponse {
+  student_profile: {
+    best5: number
+    best6: number
+    interests: string[]
+    strengths: string[]
+  }
+  matched_programmes: Array<{
+    code: string
+    title: string
+    university: string
+    field: string
+    match_score: number
+    academic_score: number
+    personal_score: number
+    recommendation: string
+    historical: {
+      median?: number
+      lower_quartile?: number
+      upper_quartile?: number
+    }
+  }>
+  ai_report: string
+  generated_at: string
+  disclaimer: string
+}
+
+/**
+ * 获取院校的专业领域分布
+ */
+export async function getUniversityFields(university?: string): Promise<{
+  success: boolean
+  data?: {
+    university: string
+    fields: ProgrammeField[]
+    total_programmes: number
+  }
+  error?: string
+}> {
+  const params = new URLSearchParams()
+  if (university) params.set('university', university)
+  
+  return ragFetchJson(`/api/jupas/fields?${params.toString()}`)
+}
+
+/**
+ * 根据院校和专业领域获取课程列表
+ */
+export async function getProgrammesByField(options: {
+  university?: string
+  field?: string
+  page?: number
+  limit?: number
+}): Promise<{
+  success: boolean
+  data?: {
+    programmes: (JUPASProgramme & {
+      field_id: string
+      field_name_zh: string
+      field_name_en: string
+      field_color: string
+    })[]
+    pagination: {
+      page: number
+      limit: number
+      total: number
+      totalPages: number
+    }
+  }
+  error?: string
+}> {
+  const params = new URLSearchParams()
+  if (options.university) params.set('university', options.university)
+  if (options.field) params.set('field', options.field)
+  if (options.page) params.set('page', String(options.page))
+  if (options.limit) params.set('limit', String(options.limit))
+  
+  return ragFetchJson(`/api/jupas/programmes/by-field?${params.toString()}`)
+}
+
+/**
+ * 综合分析 - 基于成绩和特质匹配课程
+ */
+export async function analyzeComprehensive(
+  input: ComprehensiveAnalysisInput
+): Promise<{
+  success: boolean
+  data?: ComprehensiveAnalysisResponse
+  error?: string
+}> {
+  return ragFetchJson('/api/jupas/analyze/comprehensive', {
+    method: 'POST',
+    body: JSON.stringify(input)
+  })
+}
+
+/**
+ * AI 增强分析 - 生成详细升学规划报告
+ */
+export async function analyzeWithAI(
+  input: ComprehensiveAnalysisInput
+): Promise<{
+  success: boolean
+  data?: AIAnalysisResponse
+  error?: string
+}> {
+  return ragFetchJson('/api/jupas/analyze/ai', {
+    method: 'POST',
+    body: JSON.stringify(input)
+  })
+}
+
+/** 专业领域颜色映射 */
+export const FIELD_COLORS: { [id: string]: string } = {
+  medicine: '#ff4d4f',
+  law: '#722ed1',
+  business: '#fa8c16',
+  engineering: '#1890ff',
+  science: '#52c41a',
+  arts: '#eb2f96',
+  social_science: '#13c2c2',
+  education: '#faad14',
+  architecture: '#8c8c8c',
+  other: '#bfbfbf'
+}
+
+/** 专业领域名称 */
+export const FIELD_NAMES: { [id: string]: { zh: string; en: string } } = {
+  medicine: { zh: '医学与健康科学', en: 'Medicine & Health Sciences' },
+  law: { zh: '法律', en: 'Law' },
+  business: { zh: '商科与管理', en: 'Business & Management' },
+  engineering: { zh: '工程与技术', en: 'Engineering & Technology' },
+  science: { zh: '理科', en: 'Science' },
+  arts: { zh: '文科与人文', en: 'Arts & Humanities' },
+  social_science: { zh: '社会科学', en: 'Social Sciences' },
+  education: { zh: '教育', en: 'Education' },
+  architecture: { zh: '建筑与规划', en: 'Architecture & Planning' },
+  other: { zh: '其他', en: 'Other' }
+}
+
+/** 获取推荐类型的显示信息 */
+export function getRecommendationInfo(recommendation: string, locale: string = 'zh-CN'): {
+  text: string
+  color: string
+  icon: string
+} {
+  const isEnglish = locale === 'en'
+  
+  switch (recommendation) {
+    case 'safe':
+      return {
+        text: isEnglish ? 'Safe Choice' : '保底选择',
+        color: '#52c41a',
+        icon: '🟢'
+      }
+    case 'match':
+      return {
+        text: isEnglish ? 'Core Target' : '核心目标',
+        color: '#faad14',
+        icon: '🟡'
+      }
+    case 'reach':
+      return {
+        text: isEnglish ? 'Reach/Stretch' : '冲刺尝试',
+        color: '#ff4d4f',
+        icon: '🔴'
+      }
+    case 'risk':
+      return {
+        text: isEnglish ? 'High Risk' : '风险较高',
+        color: '#8c8c8c',
+        icon: '⚪'
+      }
+    default:
+      return {
+        text: isEnglish ? 'Unknown' : '未知',
+        color: '#bfbfbf',
+        icon: '❓'
+      }
+  }
+}

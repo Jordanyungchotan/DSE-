@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { generateQuestions, gradeAnswer, QuizConfig } from '../services/quizGenerator.js'
 import { authMiddleware } from '../middleware/auth.js'
 import { ApiError } from '../middleware/errorHandler.js'
+import { getDatabase } from '../database/init.js'
 
 export const quizRouter = Router()
 
@@ -322,36 +323,48 @@ quizRouter.get('/stats', authMiddleware, async (req: Request, res: Response, nex
 })
 
 /**
- * 错题本存储
- */
-const wrongQuestions = new Map<string, Array<{
-  id: string
-  questionId: string
-  questionText: string
-  questionType: string
-  subject: string
-  topic: string
-  userAnswer: string
-  correctAnswer: string
-  explanation: string
-  wrongCount: number
-  status: 'unreviewed' | 'reviewed' | 'mastered'
-  firstAttemptDate: string
-  lastAttemptDate: string
-}>>()
-
-/**
  * 获取错题列表
  * GET /api/quiz/wrong-questions
  */
 quizRouter.get('/wrong-questions', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as Request & { userId: string }).userId
-    const questions = wrongQuestions.get(userId) || []
+    const db = getDatabase()
+
+    const questions = db.prepare(`
+      SELECT id, question_id as questionId, question_text as questionText, 
+             question_type as questionType, subject, topic, 
+             user_answer as userAnswer, correct_answer as correctAnswer, 
+             explanation, wrong_count as wrongCount, status,
+             first_attempt_date as firstAttemptDate, last_attempt_date as lastAttemptDate
+      FROM wrong_questions 
+      WHERE user_id = ? 
+      ORDER BY last_attempt_date DESC, created_at DESC
+    `).all(userId) as Array<{
+      id: string
+      questionId: string
+      questionText: string
+      questionType: string
+      subject: string
+      topic: string | null
+      userAnswer: string | null
+      correctAnswer: string | null
+      explanation: string | null
+      wrongCount: number
+      status: string
+      firstAttemptDate: string
+      lastAttemptDate: string | null
+    }>
 
     res.json({
       success: true,
-      questions,
+      questions: questions.map(q => ({
+        ...q,
+        topic: q.topic || '综合',
+        userAnswer: q.userAnswer || '',
+        correctAnswer: q.correctAnswer || '',
+        explanation: q.explanation || '',
+      })),
     })
   } catch (error) {
     next(error)
@@ -366,38 +379,41 @@ quizRouter.post('/wrong-questions', authMiddleware, async (req: Request, res: Re
   try {
     const userId = (req as Request & { userId: string }).userId
     const { questionId, questionText, questionType, subject, topic, userAnswer, correctAnswer, explanation } = req.body
+    const db = getDatabase()
+    const now = new Date().toISOString()
+    const today = now.split('T')[0]
 
-    const userQuestions = wrongQuestions.get(userId) || []
-    
     // 检查是否已存在
-    const existingIndex = userQuestions.findIndex(q => q.questionId === questionId)
-    
-    if (existingIndex >= 0) {
-      // 更新错题次数
-      userQuestions[existingIndex].wrongCount++
-      userQuestions[existingIndex].lastAttemptDate = new Date().toISOString().split('T')[0]
-      userQuestions[existingIndex].status = 'unreviewed'
+    const existing = db.prepare(`
+      SELECT id, wrong_count FROM wrong_questions 
+      WHERE user_id = ? AND question_id = ?
+    `).get(userId, questionId) as { id: string; wrong_count: number } | undefined
+
+    if (existing) {
+      // 更新错题次数，重置为未复习状态
+      db.prepare(`
+        UPDATE wrong_questions 
+        SET wrong_count = wrong_count + 1, 
+            last_attempt_date = ?, 
+            status = 'unreviewed',
+            updated_at = ?
+        WHERE id = ?
+      `).run(today, now, existing.id)
     } else {
       // 添加新错题
-      const newQuestion = {
-        id: uuidv4(),
-        questionId,
-        questionText,
-        questionType,
-        subject,
-        topic: topic || '综合',
-        userAnswer: String(userAnswer),
-        correctAnswer: String(correctAnswer),
-        explanation,
-        wrongCount: 1,
-        status: 'unreviewed' as const,
-        firstAttemptDate: new Date().toISOString().split('T')[0],
-        lastAttemptDate: new Date().toISOString().split('T')[0],
-      }
-      userQuestions.unshift(newQuestion)
+      const id = uuidv4()
+      db.prepare(`
+        INSERT INTO wrong_questions (
+          id, user_id, question_id, question_text, question_type, 
+          subject, topic, user_answer, correct_answer, explanation,
+          wrong_count, status, first_attempt_date, last_attempt_date, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'unreviewed', ?, ?, ?, ?)
+      `).run(
+        id, userId, questionId, questionText, questionType || 'multiple_choice',
+        subject, topic || '综合', String(userAnswer), String(correctAnswer), explanation || '',
+        today, today, now, now
+      )
     }
-
-    wrongQuestions.set(userId, userQuestions)
 
     res.json({
       success: true,
@@ -417,20 +433,24 @@ quizRouter.patch('/wrong-questions/:id/status', authMiddleware, async (req: Requ
     const userId = (req as Request & { userId: string }).userId
     const { id } = req.params
     const { status } = req.body
+    const db = getDatabase()
 
     if (!['reviewed', 'mastered', 'unreviewed'].includes(status)) {
       throw new ApiError('无效的状态值', 400)
     }
 
-    const userQuestions = wrongQuestions.get(userId) || []
-    const questionIndex = userQuestions.findIndex(q => q.id === id)
+    // 确保只能更新自己的错题
+    const existing = db.prepare(`
+      SELECT id FROM wrong_questions WHERE id = ? AND user_id = ?
+    `).get(id, userId)
 
-    if (questionIndex === -1) {
+    if (!existing) {
       throw new ApiError('错题不存在', 404)
     }
 
-    userQuestions[questionIndex].status = status
-    wrongQuestions.set(userId, userQuestions)
+    db.prepare(`
+      UPDATE wrong_questions SET status = ?, updated_at = ? WHERE id = ?
+    `).run(status, new Date().toISOString(), id)
 
     res.json({
       success: true,
@@ -449,10 +469,16 @@ quizRouter.delete('/wrong-questions/:id', authMiddleware, async (req: Request, r
   try {
     const userId = (req as Request & { userId: string }).userId
     const { id } = req.params
+    const db = getDatabase()
 
-    const userQuestions = wrongQuestions.get(userId) || []
-    const filteredQuestions = userQuestions.filter(q => q.id !== id)
-    wrongQuestions.set(userId, filteredQuestions)
+    // 确保只能删除自己的错题
+    const result = db.prepare(`
+      DELETE FROM wrong_questions WHERE id = ? AND user_id = ?
+    `).run(id, userId)
+
+    if (result.changes === 0) {
+      throw new ApiError('错题不存在', 404)
+    }
 
     res.json({
       success: true,
@@ -470,10 +496,36 @@ quizRouter.delete('/wrong-questions/:id', authMiddleware, async (req: Request, r
 quizRouter.get('/learning-profile', authMiddleware, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (req as Request & { userId: string }).userId
+    const db = getDatabase()
 
     // 获取用户的刷题历史
     const userHistory = quizHistory.get(userId) || []
-    const userWrongQuestions = wrongQuestions.get(userId) || []
+    
+    // 从数据库获取错题
+    const userWrongQuestions = db.prepare(`
+      SELECT id, question_id as questionId, question_text as questionText, 
+             question_type as questionType, subject, topic, 
+             user_answer as userAnswer, correct_answer as correctAnswer, 
+             explanation, wrong_count as wrongCount, status,
+             first_attempt_date as firstAttemptDate, last_attempt_date as lastAttemptDate
+      FROM wrong_questions 
+      WHERE user_id = ? 
+      ORDER BY last_attempt_date DESC
+    `).all(userId) as Array<{
+      id: string
+      questionId: string
+      questionText: string
+      questionType: string
+      subject: string
+      topic: string | null
+      userAnswer: string | null
+      correctAnswer: string | null
+      explanation: string | null
+      wrongCount: number
+      status: string
+      firstAttemptDate: string
+      lastAttemptDate: string | null
+    }>
 
     // 计算总体统计
     const totalQuizzes = userHistory.length
@@ -646,10 +698,29 @@ quizRouter.post('/generate-report', authMiddleware, async (req: Request, res: Re
   try {
     const userId = (req as Request & { userId: string }).userId
     const { period = 'weekly' } = req.body
+    const db = getDatabase()
 
     // 获取用户数据
     const userHistory = quizHistory.get(userId) || []
-    const userWrongQuestions = wrongQuestions.get(userId) || []
+    
+    // 从数据库获取错题
+    const userWrongQuestions = db.prepare(`
+      SELECT id, question_id as questionId, subject, topic, 
+             wrong_count as wrongCount, status,
+             last_attempt_date as lastAttemptDate
+      FROM wrong_questions 
+      WHERE user_id = ? 
+      ORDER BY last_attempt_date DESC
+      LIMIT 20
+    `).all(userId) as Array<{
+      id: string
+      questionId: string
+      subject: string
+      topic: string | null
+      wrongCount: number
+      status: string
+      lastAttemptDate: string | null
+    }>
 
     // 计算统计数据
     const totalQuestions = userHistory.length * 10 || 50 // 模拟数据

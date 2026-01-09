@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Form, Input, Button, Card, Typography, message } from 'antd'
 import { LockOutlined, SafetyOutlined } from '@ant-design/icons'
+import { useLanguageStore } from '../stores/languageStore'
 import styles from './AdminLoginPage.module.css'
 
 const { Title, Text } = Typography
 
 const AdminLoginPage = () => {
   const navigate = useNavigate()
+  const { t } = useLanguageStore()
   const [loading, setLoading] = useState(false)
 
   const handleLogin = async (values: { adminKey: string }) => {
@@ -33,7 +35,7 @@ const AdminLoginPage = () => {
           <div className={styles.logoSection}>
             <SafetyOutlined className={styles.logoIcon} />
             <Title level={3} className={styles.title}>管理员后台</Title>
-            <Text type="secondary">质心DSE升学分析系统</Text>
+            <Text type="secondary">{t('system.name')}</Text>
           </div>
           
           <Form

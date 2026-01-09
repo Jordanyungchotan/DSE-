@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Suspense, lazy } from 'react'
 import { Spin } from 'antd'
 import MainLayout from './components/Layout/MainLayout'
+import UpdatePrompt from './components/UpdatePrompt'
 
 // 懒加载页面组件
 const HomePage = lazy(() => import('./pages/HomePage'))
@@ -40,6 +41,15 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
 const PointsPage = lazy(() => import('./pages/PointsPage'))
 const PointsMallPage = lazy(() => import('./pages/PointsMallPage'))
 
+// 学习社区页面
+const CommunityPage = lazy(() => import('./pages/CommunityPage'))
+const PostDetailPage = lazy(() => import('./pages/PostDetailPage'))
+const NewPostPage = lazy(() => import('./pages/NewPostPage'))
+const FriendsPage = lazy(() => import('./pages/FriendsPage'))
+
+// 消息通知页面
+const MessagesPage = lazy(() => import('./pages/MessagesPage'))
+
 // 加载中组件
 const LoadingFallback = () => (
   <div style={{ 
@@ -72,8 +82,12 @@ const LoadingFallback = () => (
  */
 function App() {
   return (
-    <Suspense fallback={<LoadingFallback />}>
-      <Routes>
+    <>
+      {/* 版本更新提示 */}
+      <UpdatePrompt />
+      
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
         {/* 登录页面 - 独立布局 */}
         <Route path="/login" element={<LoginPage />} />
         
@@ -111,12 +125,22 @@ function App() {
           {/* 积分系统 */}
           <Route path="points" element={<PointsPage />} />
           <Route path="points/mall" element={<PointsMallPage />} />
+          
+          {/* 学习社区"量子纠缠" */}
+          <Route path="community" element={<CommunityPage />} />
+          <Route path="community/new" element={<NewPostPage />} />
+          <Route path="community/post/:postId" element={<PostDetailPage />} />
+          <Route path="friends" element={<FriendsPage />} />
+          
+          {/* 消息通知 */}
+          <Route path="messages" element={<MessagesPage />} />
         </Route>
         
         {/* 404重定向到首页 */}
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+        </Routes>
+      </Suspense>
+    </>
   )
 }
 

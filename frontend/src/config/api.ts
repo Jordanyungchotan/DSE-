@@ -104,3 +104,12 @@ export async function ragFetch(path: string, options?: RequestInit): Promise<Res
     headers,
   })
 }
+
+/**
+ * RAG 服务专用 fetch 函数 (自动解析 JSON)
+ * 用于 JUPAS 等返回 JSON 的 API 调用
+ */
+export async function ragFetchJson<T = unknown>(path: string, options?: RequestInit): Promise<T> {
+  const response = await ragFetch(path, options)
+  return response.json()
+}

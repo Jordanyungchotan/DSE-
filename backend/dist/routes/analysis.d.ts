@@ -1,0 +1,6 @@
+/**
+ * 分析路由
+ * 处理DSE插班分析相关请求
+ */
+export declare const analysisRouter: any;
+//# sourceMappingURL=analysis.d.ts.map

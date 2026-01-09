@@ -50,14 +50,20 @@ export const en = {
     analysisHistory: 'Analysis History',
     accountSettings: 'Account Settings',
     myRanking: 'My Ranking',
+    // Social
+    social: 'Social',
+    community: 'Quantum Entanglement',
+    friends: 'Friends',
+    messages: 'Messages',
+    notifications: 'Notifications',
   },
 
   // System
   system: {
-    name: 'Center of Mass Education DSE Analysis',
+    name: 'CENTER OF MASS EDUCATION',
     shortName: 'CoM Education',
     slogan: 'Professional Hong Kong DSE Education Platform',
-    copyright: '© 2024 Center of Mass Education',
+    copyright: '© 2024 CENTER OF MASS EDUCATION',
   },
 
   // Home Page

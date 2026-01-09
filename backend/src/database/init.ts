@@ -68,11 +68,37 @@ export const initDatabase = async (): Promise<void> => {
     )
   `)
 
+  // 创建错题本表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wrong_questions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      question_id TEXT NOT NULL,
+      question_text TEXT NOT NULL,
+      question_type TEXT DEFAULT 'multiple_choice',
+      subject TEXT NOT NULL,
+      topic TEXT,
+      user_answer TEXT,
+      correct_answer TEXT,
+      explanation TEXT,
+      wrong_count INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'unreviewed',
+      first_attempt_date TEXT DEFAULT CURRENT_TIMESTAMP,
+      last_attempt_date TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `)
+
   // 创建索引
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_analysis_user_id ON analysis_records(user_id);
     CREATE INDEX IF NOT EXISTS idx_analysis_created_at ON analysis_records(created_at);
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_wrong_questions_user ON wrong_questions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_wrong_questions_status ON wrong_questions(status);
+    CREATE INDEX IF NOT EXISTS idx_wrong_questions_subject ON wrong_questions(subject);
   `)
 
   console.log(`📁 数据库路径: ${DB_PATH}`)

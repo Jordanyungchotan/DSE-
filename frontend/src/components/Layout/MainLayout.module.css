@@ -104,6 +104,16 @@
   border-radius: 20px;
 }
 
+.messageBtn {
+  margin-right: 12px;
+  color: var(--text-primary);
+  transition: color 0.2s;
+}
+
+.messageBtn:hover {
+  color: var(--color-primary);
+}
+
 /* 移动端菜单按钮 */
 .mobileMenuBtn {
   display: none;
