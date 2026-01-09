@@ -10,6 +10,7 @@ const AnalysisFormPage = lazy(() => import('./pages/AnalysisFormPage'))
 const UniversityAnalysisPage = lazy(() => import('./pages/UniversityAnalysisPage'))
 const ResultPage = lazy(() => import('./pages/ResultPage'))
 const UniversityResultPage = lazy(() => import('./pages/UniversityResultPage'))
+const FeasibilityResultPage = lazy(() => import('./pages/FeasibilityResultPage'))
 const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 
@@ -102,6 +103,7 @@ function App() {
           <Route path="analysis/university" element={<UniversityAnalysisPage />} />
           <Route path="result/:id" element={<ResultPage />} />
           <Route path="result/university/:id" element={<UniversityResultPage />} />
+          <Route path="result/feasibility/:id" element={<FeasibilityResultPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="quiz" element={<QuizSetupPage />} />
           <Route path="quiz/practice" element={<QuizPage />} />

@@ -1,0 +1,205 @@
+/* 插班可行性评估结果页面样式 */
+
+.resultPage {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.loadingContainer,
+.errorContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.disclaimer {
+  margin-bottom: 24px;
+  border-radius: 8px;
+}
+
+/* 评估概览卡片 */
+.overviewCard {
+  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.levelBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border-radius: 16px;
+  border: 2px solid;
+  text-align: center;
+}
+
+.levelEmoji {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.levelGrade {
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.levelTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.overviewInfo {
+  padding-left: 16px;
+}
+
+.studentInfo {
+  margin-bottom: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.arrow {
+  font-size: 18px;
+  color: #999;
+  margin: 0 8px;
+}
+
+.levelDescription {
+  font-size: 16px;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 0;
+}
+
+/* 各区块卡片 */
+.sectionCard {
+  margin-bottom: 20px;
+  border-radius: 12px;
+}
+
+.sectionCard :global(.ant-card-head-title) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assessment {
+  font-size: 15px;
+  line-height: 1.8;
+  color: #333;
+  margin-bottom: 0;
+}
+
+/* 科目分析网格 */
+.subjectGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.subjectCard {
+  border-radius: 8px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.subjectCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.subjectHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.subjectScore {
+  margin-bottom: 8px;
+}
+
+.subjectDesc {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.subjectRecommendation {
+  background: #f5f5f5;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+.subjectRecommendation :global(.anticon) {
+  color: #faad14;
+  margin-right: 6px;
+}
+
+/* 准备计划折叠面板 */
+.planCollapse {
+  margin-bottom: 24px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.planCollapse :global(.ant-collapse-header) {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+/* 底部操作区 */
+.footer {
+  text-align: center;
+  padding: 24px 0;
+  margin-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .resultPage {
+    padding: 16px;
+  }
+
+  .levelBadge {
+    padding: 16px;
+  }
+
+  .levelEmoji {
+    font-size: 36px;
+  }
+
+  .levelGrade {
+    font-size: 48px;
+  }
+
+  .overviewInfo {
+    padding-left: 0;
+    padding-top: 16px;
+  }
+
+  .studentInfo {
+    justify-content: center;
+  }
+
+  .subjectGrid {
+    grid-template-columns: 1fr;
+  }
+}

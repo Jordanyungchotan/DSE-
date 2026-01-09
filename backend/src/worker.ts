@@ -2955,7 +2955,7 @@ export default {
         })
 
         // 按匹配分数排序
-        recommendations.sort((a, b) => b.matchScore - a.matchScore)
+        recommendations.sort((a: any, b: any) => b.matchScore - a.matchScore)
 
         return jsonResponse({ recommendations: recommendations.slice(0, 10) }, 200, origin)
       }
@@ -3942,7 +3942,7 @@ export default {
         }
         
         try {
-          body = await request.json()
+          body = await request.json() as typeof body
         } catch (parseError) {
           return errorResponse('请求数据格式错误', 400, origin)
         }
@@ -4406,7 +4406,6 @@ export default {
           for (const row of (allSessions.results || [])) {
             let subjectId = 'math'
             let questionsCount = 0
-            let lastPracticed = today
             
             try {
               const config = JSON.parse(row.config as string || '{}')
@@ -4542,7 +4541,7 @@ export default {
           })
 
           // 6. 计算学习目标（从已获取的数据计算）
-          const todayStart = new Date(today).toISOString()
+          void new Date(today).toISOString() // todayStart - reserved for future use
           const weekStart = new Date()
           weekStart.setDate(weekStart.getDate() - 7)
           const monthStart = new Date()
@@ -4854,7 +4853,7 @@ export default {
           let userRank = null
           let userPosition = null
           if (currentUserId) {
-            const userEntry = rankings.find(r => r.isCurrentUser)
+            const userEntry = rankings.find((r: any) => r.isCurrentUser)
             if (userEntry) {
               userRank = userEntry
               userPosition = userEntry.rank
@@ -4862,8 +4861,8 @@ export default {
           }
 
           // 计算统计信息
-          const scores = rankings.map(r => r.totalScore)
-          const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0
+          const scores = rankings.map((r: any) => r.totalScore)
+          const avgScore = scores.length > 0 ? scores.reduce((a: number, b: number) => a + b, 0) / scores.length : 0
 
           const leaderboard = {
             id: `lb_${type}_${criteria}_${Date.now()}`,
@@ -4878,7 +4877,7 @@ export default {
             statistics: {
               averageScore: Math.round(avgScore * 10) / 10,
               medianScore: scores.length > 0 ? scores[Math.floor(scores.length / 2)] : 0,
-              top10Average: scores.slice(0, 10).length > 0 ? scores.slice(0, 10).reduce((a, b) => a + b, 0) / scores.slice(0, 10).length : 0,
+              top10Average: scores.slice(0, 10).length > 0 ? scores.slice(0, 10).reduce((a: number, b: number) => a + b, 0) / scores.slice(0, 10).length : 0,
               scoreDistribution: []
             },
             lastUpdated: new Date().toISOString(),

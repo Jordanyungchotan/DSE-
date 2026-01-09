@@ -3245,10 +3245,24 @@ export default {
                     return errorResponse('登录已过期', 401, origin);
                 }
                 const body = await request.json();
-                const id = crypto.randomUUID();
                 const now = new Date().toISOString();
-                await env.DB.prepare(`INSERT INTO wrong_questions (id, user_id, question_id, question_text, question_type, subject, topic, user_answer, correct_answer, explanation, status, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unreviewed', ?)`).bind(id, tokenData.userId, body.questionId, body.questionText, body.questionType, body.subject, body.topic || '综合', body.userAnswer, body.correctAnswer, body.explanation, now).run();
+                // 检查是否已存在该错题（基于 question_id 和 user_id）
+                const existing = await env.DB.prepare('SELECT id, wrong_count FROM wrong_questions WHERE question_id = ? AND user_id = ?').bind(body.questionId, tokenData.userId).first();
+                if (existing) {
+                    // 如果已存在，更新错误次数，重置状态为待复习，更新用户答案
+                    await env.DB.prepare(`UPDATE wrong_questions 
+             SET wrong_count = wrong_count + 1, 
+                 status = 'unreviewed', 
+                 user_answer = ?,
+                 last_attempt_date = ?,
+                 updated_at = ? 
+             WHERE id = ?`).bind(body.userAnswer, now, now, existing.id).run();
+                    return jsonResponse({ message: '错题已更新', id: existing.id, wrongCount: existing.wrong_count + 1 }, 200, origin);
+                }
+                // 如果不存在，创建新记录
+                const id = crypto.randomUUID();
+                await env.DB.prepare(`INSERT INTO wrong_questions (id, user_id, question_id, question_text, question_type, subject, topic, user_answer, correct_answer, explanation, wrong_count, status, first_attempt_date, last_attempt_date, created_at, updated_at) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'unreviewed', ?, ?, ?, ?)`).bind(id, tokenData.userId, body.questionId, body.questionText, body.questionType, body.subject, body.topic || '综合', body.userAnswer, body.correctAnswer, body.explanation, now, now, now, now).run();
                 return jsonResponse({ message: '错题已添加', id }, 200, origin);
             }
             // 更新错题状态
@@ -3399,7 +3413,6 @@ export default {
                     for (const row of (allSessions.results || [])) {
                         let subjectId = 'math';
                         let questionsCount = 0;
-                        let lastPracticed = today;
                         try {
                             const config = JSON.parse(row.config || '{}');
                             subjectId = config.subject || 'math';
@@ -3514,7 +3527,7 @@ export default {
                         progress: Math.min(100, Math.round((overallStats.totalQuestions / 1000) * 100)),
                     });
                     // 6. 计算学习目标（从已获取的数据计算）
-                    const todayStart = new Date(today).toISOString();
+                    void new Date(today).toISOString(); // todayStart - reserved for future use
                     const weekStart = new Date();
                     weekStart.setDate(weekStart.getDate() - 7);
                     const monthStart = new Date();
@@ -3793,14 +3806,14 @@ export default {
                     let userRank = null;
                     let userPosition = null;
                     if (currentUserId) {
-                        const userEntry = rankings.find(r => r.isCurrentUser);
+                        const userEntry = rankings.find((r) => r.isCurrentUser);
                         if (userEntry) {
                             userRank = userEntry;
                             userPosition = userEntry.rank;
                         }
                     }
                     // 计算统计信息
-                    const scores = rankings.map(r => r.totalScore);
+                    const scores = rankings.map((r) => r.totalScore);
                     const avgScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
                     const leaderboard = {
                         id: `lb_${type}_${criteria}_${Date.now()}`,

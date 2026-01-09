@@ -1,6 +1,6 @@
 /**
  * 分析路由
- * 处理DSE插班分析相关请求
+ * 处理DSE插班可行性评估相关请求
  */
 import { Router } from 'express';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import { getDatabase } from '../database/init.js';
 import { optionalAuth, requireAuth } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { analyzeWithDeepSeek } from '../services/deepseek.js';
+import { evaluateFeasibility, enhanceWithAI } from '../services/feasibilityEngine.js';
 export const analysisRouter = Router();
 // ===== 请求验证Schema =====
 const subjectSchema = z.object({
@@ -242,5 +243,145 @@ analysisRouter.get('/schools', (_req, res) => {
         ],
     };
     res.json({ schools });
+});
+// ============================================================
+// 新版可行性评估API
+// ============================================================
+/**
+ * 可行性评估请求验证Schema
+ */
+const feasibilityRequestSchema = z.object({
+    student: z.object({
+        age: z.number().min(10).max(20),
+        gender: z.enum(['male', 'female']),
+        currentGrade: z.string(), // S1-S6
+        scores: z.record(z.string(), z.number().min(0).max(100)),
+        currentSchool: z.string().optional(),
+        currentBand: z.number().min(1).max(3).optional(),
+        strengths: z.array(z.string()).optional(),
+        extracurriculars: z.array(z.string()).optional(),
+    }),
+    targetSchool: z.object({
+        schoolId: z.string().optional(),
+        schoolName: z.string().min(1),
+        bandLevel: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+        district: z.string().min(1),
+        gender: z.enum(['boys', 'girls', 'coed']).optional(),
+        type: z.enum(['government', 'aided', 'dss', 'private']).optional(),
+        englishRequirement: z.enum(['high', 'medium', 'low']).optional(),
+    }),
+});
+/**
+ * 插班可行性评估
+ * POST /api/analysis/feasibility
+ *
+ * 基于规则引擎 + AI推理的可行性等级评估
+ * 输出A/B/C/D等级，不输出具体百分比
+ */
+analysisRouter.post('/feasibility', optionalAuth, async (req, res, next) => {
+    try {
+        // 验证请求数据
+        const request = feasibilityRequestSchema.parse(req.body);
+        console.log('📊 收到可行性评估请求:', {
+            grade: request.student.currentGrade,
+            targetSchool: request.targetSchool.schoolName,
+            band: request.targetSchool.bandLevel,
+        });
+        // 1. 规则引擎评估
+        console.log('🔧 执行规则引擎评估...');
+        let result = evaluateFeasibility(request);
+        // 2. AI增强（如有API密钥）
+        const aiApiKey = process.env.DEEPSEEK_API_KEY;
+        if (aiApiKey) {
+            console.log('🤖 AI增强评估中...');
+            result = await enhanceWithAI(request, result, aiApiKey);
+        }
+        console.log('✅ 评估完成，可行性等级:', result.feasibilityLevel);
+        // 3. 保存记录
+        const recordId = uuidv4();
+        const now = new Date().toISOString();
+        const db = getDatabase();
+        db.prepare(`
+      INSERT INTO analysis_records (id, user_id, student_info, result, created_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(recordId, req.userId || null, JSON.stringify(request), JSON.stringify(result), now);
+        // 4. 返回结果
+        res.json({
+            success: true,
+            result: {
+                id: recordId,
+                createdAt: now,
+                ...result,
+            },
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * 获取可行性评估结果
+ * GET /api/analysis/feasibility/:id
+ */
+analysisRouter.get('/feasibility/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const db = getDatabase();
+        const record = db.prepare(`
+      SELECT id, user_id, student_info, result, created_at
+      FROM analysis_records WHERE id = ?
+    `).get(id);
+        if (!record) {
+            throw new ApiError('评估记录不存在', 404);
+        }
+        const studentInfo = JSON.parse(record.student_info);
+        const result = JSON.parse(record.result);
+        res.json({
+            success: true,
+            result: {
+                id: record.id,
+                createdAt: record.created_at,
+                request: studentInfo,
+                ...result,
+            },
+        });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+/**
+ * 获取学校排名数据（供前端选择目标学校）
+ * GET /api/analysis/school-rankings
+ */
+analysisRouter.get('/school-rankings', async (req, res, next) => {
+    try {
+        const district = req.query.district;
+        const band = req.query.band ? parseInt(req.query.band) : undefined;
+        // 这里可以从数据库获取学校排名数据
+        // 暂时返回静态数据
+        const schools = [
+            { name: '聖保羅男女中學', band: 1, district: '中西區', type: 'dss' },
+            { name: '拔萃女書院', band: 1, district: '油尖旺區', type: 'dss' },
+            { name: '拔萃男書院', band: 1, district: '九龍城區', type: 'dss' },
+            { name: '喇沙書院', band: 1, district: '九龍城區', type: 'aided' },
+            { name: '聖公會曾肇添中學', band: 1, district: '沙田區', type: 'aided' },
+            { name: '英皇書院', band: 1, district: '中西區', type: 'government' },
+            { name: '皇仁書院', band: 1, district: '灣仔區', type: 'government' },
+            { name: '浸信會呂明才中學', band: 1, district: '沙田區', type: 'aided' },
+            // ... 更多学校
+        ];
+        let filtered = schools;
+        if (district) {
+            filtered = filtered.filter(s => s.district === district);
+        }
+        if (band) {
+            filtered = filtered.filter(s => s.band === band);
+        }
+        res.json({ success: true, schools: filtered });
+    }
+    catch (error) {
+        next(error);
+    }
 });
 //# sourceMappingURL=analysis.js.map
