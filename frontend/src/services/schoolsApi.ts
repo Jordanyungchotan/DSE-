@@ -2,7 +2,13 @@
  * 香港中学 API 服务
  */
 
-import { ragFetchJson } from '../config/api'
+import { apiFetch } from '../config/api'
+
+// 封装 JSON 解析
+async function apiFetchJson<T = unknown>(path: string, options?: RequestInit): Promise<T> {
+  const response = await apiFetch(path, options)
+  return response.json()
+}
 
 // 区域信息
 export interface Region {
@@ -59,7 +65,7 @@ export async function getRegions(): Promise<{
   error?: string
 }> {
   try {
-    const result = await ragFetchJson('/api/districts') as any
+    const result = await apiFetchJson('/api/districts') as any
     
     if (result.districts) {
       // 转换新的API格式
@@ -93,7 +99,7 @@ export async function getSchoolsByDistrict(district: string): Promise<{
   error?: string
 }> {
   try {
-    const result = await ragFetchJson(`/api/schools/by-district?district=${encodeURIComponent(district)}`) as any
+    const result = await apiFetchJson(`/api/schools/by-district?district=${encodeURIComponent(district)}`) as any
     
     if (result.success && result.schools) {
       // 转换学校数据格式
@@ -132,7 +138,7 @@ export async function searchSchools(query: string): Promise<{
   
   try {
     // 获取所有学校数据进行本地搜索
-    const result = await ragFetchJson('/api/schools/by-district') as any
+    const result = await apiFetchJson('/api/schools/by-district') as any
     
     if (result.success && result.districts) {
       const allSchools: School[] = []
@@ -184,7 +190,7 @@ export async function getAllSchools(page = 1, limit = 50): Promise<{
   error?: string
 }> {
   try {
-    const result = await ragFetchJson('/api/schools/by-district') as any
+    const result = await apiFetchJson('/api/schools/by-district') as any
     
     if (result.success && result.districts) {
       const allSchools: School[] = []
