@@ -3282,7 +3282,7 @@ export default {
         const url = new URL(request.url)
         const district = url.searchParams.get('district')
         
-        // 使用从 chsc.hk 爬取的完整学校数据（978所学校）
+        // 使用从 schoolsData.ts 导入的学校数据（441所学校）
         if (district && SCHOOLS_BY_DISTRICT[district]) {
           return jsonResponse({ 
             success: true, 
