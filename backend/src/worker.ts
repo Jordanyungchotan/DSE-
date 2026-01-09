@@ -4,6 +4,8 @@
  * 适配 Cloudflare Workers 运行环境
  */
 
+import { SCHOOLS_BY_DISTRICT } from './data/schoolsData'
+
 export interface Env {
   // D1 数据库绑定
   DB: D1Database
@@ -3280,144 +3282,7 @@ export default {
         const url = new URL(request.url)
         const district = url.searchParams.get('district')
         
-        // 完整的学校数据（从chsc.hk爬取）
-        const SCHOOLS_BY_DISTRICT: Record<string, Array<{name: string; name_en: string; type: string; gender: string}>> = {
-          '中西區': [
-            { name: '英皇書院', name_en: 'King\'s College', type: '官立', gender: '男' },
-            { name: '聖保羅男女中學', name_en: 'St. Paul\'s Co-educational College', type: '直資', gender: '男女' },
-            { name: '聖保羅書院', name_en: 'St. Paul\'s College', type: '直資', gender: '男' },
-            { name: '聖若瑟書院', name_en: 'St. Joseph\'s College', type: '資助', gender: '男' },
-            { name: '聖士提反女子中學', name_en: 'St. Stephen\'s Girls\' College', type: '資助', gender: '女' },
-            { name: '英華女學校', name_en: 'Ying Wa Girls\' School', type: '資助', gender: '女' },
-            { name: '聖類斯中學', name_en: 'St. Louis School', type: '資助', gender: '男' },
-            { name: '高主教書院', name_en: 'Raimondi College', type: '資助', gender: '男女' },
-          ],
-          '灣仔區': [
-            { name: '皇仁書院', name_en: 'Queen\'s College', type: '官立', gender: '男' },
-            { name: '香港華仁書院', name_en: 'Wah Yan College Hong Kong', type: '資助', gender: '男' },
-            { name: '聖公會鄧肇堅中學', name_en: 'S.K.H. Tang Shiu Kin Secondary School', type: '資助', gender: '男女' },
-            { name: '玫瑰崗中學', name_en: 'Rosaryhill Secondary School', type: '資助', gender: '男女' },
-            { name: '佛教黃鳳翎中學', name_en: 'Buddhist Wong Fung Ling College', type: '資助', gender: '男女' },
-          ],
-          '東區': [
-            { name: '庇理羅士女子中學', name_en: 'Belilios Public School', type: '官立', gender: '女' },
-            { name: '筲箕灣官立中學', name_en: 'Shau Kei Wan Government Secondary School', type: '官立', gender: '男女' },
-            { name: '張祝珊英文中學', name_en: 'Cheung Chuk Shan College', type: '資助', gender: '男女' },
-            { name: '港島民生書院', name_en: 'Munsang College (Hong Kong Island)', type: '資助', gender: '男女' },
-            { name: '嘉諾撒書院', name_en: 'Canossa College', type: '資助', gender: '女' },
-          ],
-          '南區': [
-            { name: '香港仔浸信會呂明才書院', name_en: 'Aberdeen Baptist Lui Ming Choi College', type: '資助', gender: '男女' },
-            { name: '嘉諾撒培德書院', name_en: 'Pui Tak Canossian College', type: '資助', gender: '女' },
-            { name: '聖伯多祿中學', name_en: 'St. Peter\'s Secondary School', type: '資助', gender: '男女' },
-            { name: '新會商會陳白沙紀念中學', name_en: 'San Wui Commercial Society Chan Pak Sha School', type: '資助', gender: '男女' },
-          ],
-          '油尖旺區': [
-            // 17所本区学校 (来源: chsc.hk 中學概覽2025/2026)
-            { name: '中華基督教會銘基書院', name_en: 'CCC Ming Kei College', type: '資助', gender: '男女' },
-            { name: '拔萃女書院', name_en: 'Diocesan Girls\' School', type: '直資', gender: '女' },
-            { name: '基督教香港信義會信義中學', name_en: 'ELCHK Lutheran Secondary School', type: '資助', gender: '男女' },
-            { name: '港九潮州公會中學', name_en: 'HK & KLN Chiu Chow Public Assn. Sec. School', type: '資助', gender: '男女' },
-            { name: '香港管理專業協會李國寶中學', name_en: 'HKMA David Li Kwok Po College', type: '直資', gender: '男女' },
-            { name: '九龍三育中學', name_en: 'Kowloon Sam Yuk Secondary School', type: '直資', gender: '男女' },
-            { name: '麗澤中學', name_en: 'Lai Chack Middle School', type: '資助', gender: '男女' },
-            { name: '世界龍岡學校劉皇發中學', name_en: 'Lung Kong WFSL Lau Wong Fat Secondary School', type: '資助', gender: '男女' },
-            { name: '循道中學', name_en: 'Methodist College', type: '資助', gender: '男女' },
-            { name: '天主教新民書院', name_en: 'Newman Catholic College', type: '資助', gender: '男女' },
-            { name: '伊利沙伯中學', name_en: 'Queen Elizabeth School', type: '官立', gender: '男女' },
-            { name: '官立嘉道理爵士中學（西九龍）', name_en: 'Sir Ellis Kadoorie Secondary School (West Kowloon)', type: '官立', gender: '男女' },
-            { name: '真光女書院', name_en: 'True Light Girls\' College', type: '資助', gender: '女' },
-            { name: '油麻地天主教小學（海泓道）', name_en: 'Yau Ma Tei Catholic Primary School (Hoi Wang Road)', type: '資助', gender: '男女' },
-            { name: '油蔴地天主教中學（油蔴地）', name_en: 'Yaumati Catholic Secondary School', type: '資助', gender: '男' },
-            { name: '余振強紀念第二中學', name_en: 'Yu Chun Keung Memorial College No. 2', type: '資助', gender: '男女' },
-            { name: '文理書院（九龍）', name_en: 'Cognitio College (Kowloon)', type: '資助', gender: '男女' },
-          ],
-          '深水埗區': [
-            { name: '聖瑪加利男女英文中小學', name_en: 'St. Margaret\'s Co-educational English Secondary & Primary School', type: '直資', gender: '男女' },
-            { name: '長沙灣天主教英文中學', name_en: 'Cheung Sha Wan Catholic Secondary School', type: '資助', gender: '男' },
-            { name: '德雅中學', name_en: 'Tak Nga Secondary School', type: '資助', gender: '女' },
-            { name: '英華書院', name_en: 'Ying Wa College', type: '直資', gender: '男' },
-            { name: '聖公會聖馬利亞堂莫慶堯中學', name_en: 'S.K.H. St. Mary\'s Church Mok Hing Yiu College', type: '資助', gender: '男女' },
-          ],
-          '九龍城區': [
-            { name: '拔萃男書院', name_en: 'Diocesan Boys\' School', type: '直資', gender: '男' },
-            { name: '喇沙書院', name_en: 'La Salle College', type: '資助', gender: '男' },
-            { name: '瑪利諾修院學校', name_en: 'Maryknoll Convent School', type: '資助', gender: '女' },
-            { name: '協恩中學', name_en: 'Heep Yunn School', type: '直資', gender: '女' },
-            { name: '民生書院', name_en: 'Munsang College', type: '資助', gender: '男女' },
-            { name: '九龍華仁書院', name_en: 'Wah Yan College Kowloon', type: '資助', gender: '男' },
-            { name: '培正中學', name_en: 'Pui Ching Middle School', type: '資助', gender: '男女' },
-            { name: '何明華會督銀禧中學', name_en: 'Bishop Hall Jubilee School', type: '資助', gender: '男女' },
-          ],
-          '黃大仙區': [
-            { name: '聖母書院', name_en: 'Our Lady\'s College', type: '資助', gender: '女' },
-            { name: '德望學校', name_en: 'Good Hope School', type: '直資', gender: '女' },
-            { name: '保良局第一張永慶中學', name_en: 'Po Leung Kuk No.1 W.H. Cheung College', type: '資助', gender: '男女' },
-            { name: '中華基督教會協和書院', name_en: 'CCC Heep Woh College', type: '資助', gender: '男女' },
-          ],
-          '觀塘區': [
-            { name: '觀塘官立中學', name_en: 'Kwun Tong Government Secondary School', type: '官立', gender: '男女' },
-            { name: '聖言中學', name_en: 'Sing Yin Secondary School', type: '資助', gender: '男' },
-            { name: '觀塘瑪利諾書院', name_en: 'Kwun Tong Maryknoll College', type: '資助', gender: '男' },
-            { name: '聖傑靈女子中學', name_en: 'St. Catharine\'s School for Girls', type: '資助', gender: '女' },
-            { name: '藍田聖保祿中學', name_en: 'St. Paul\'s School (Lam Tin)', type: '資助', gender: '女' },
-          ],
-          '葵青區': [
-            { name: '聖公會林護紀念中學', name_en: 'S.K.H. Lam Woo Memorial Secondary School', type: '資助', gender: '男女' },
-            { name: '天主教母佑會蕭明中學', name_en: 'Daughters of Mary Help of Christians Siu Ming Catholic Secondary School', type: '資助', gender: '女' },
-            { name: '佛教善德英文中學', name_en: 'Buddhist Sin Tak College', type: '資助', gender: '男女' },
-            { name: '順德聯誼總會李兆基中學', name_en: 'Shun Tak Fraternal Association Lee Shau Kee College', type: '資助', gender: '男女' },
-          ],
-          '荃灣區': [
-            { name: '荃灣官立中學', name_en: 'Tsuen Wan Government Secondary School', type: '官立', gender: '男女' },
-            { name: '可風中學（嗇色園主辦）', name_en: 'Ho Fung College (Sponsored by Sik Sik Yuen)', type: '資助', gender: '男女' },
-            { name: '保良局李城璧中學', name_en: 'Po Leung Kuk Lee Shing Pik College', type: '資助', gender: '男女' },
-          ],
-          '屯門區': [
-            { name: '順德聯誼總會梁銶琚中學', name_en: 'Shun Tak Fraternal Association Leung Kau Kui College', type: '資助', gender: '男女' },
-            { name: '保良局百周年李兆忠紀念中學', name_en: 'Po Leung Kuk Centenary Li Shiu Chung Memorial College', type: '資助', gender: '男女' },
-            { name: '屯門官立中學', name_en: 'Tuen Mun Government Secondary School', type: '官立', gender: '男女' },
-            { name: '妙法寺劉金龍中學', name_en: 'Madam Lau Kam Lung Secondary School of MFBM', type: '資助', gender: '男女' },
-          ],
-          '元朗區': [
-            { name: '聖公會白約翰會督中學', name_en: 'SKH Bishop Baker Secondary School', type: '資助', gender: '男女' },
-            { name: '新界鄉議局元朗區中學', name_en: 'NT Heung Yee Kuk Yuen Long District Secondary School', type: '資助', gender: '男女' },
-            { name: '趙聿修紀念中學', name_en: 'Chiu Lut Sau Memorial Secondary School', type: '官立', gender: '男女' },
-            { name: '元朗商會中學', name_en: 'Yuen Long Merchants Association Secondary School', type: '資助', gender: '男女' },
-          ],
-          '北區': [
-            { name: '風采中學（教育評議會主辦）', name_en: 'Elegantia College (Sponsored by Education Convergence)', type: '資助', gender: '男女' },
-            { name: '東華三院李嘉誠中學', name_en: 'TWGHs Li Ka Shing College', type: '資助', gender: '男女' },
-            { name: '粉嶺救恩書院', name_en: 'Fanling Kau Yan College', type: '資助', gender: '男女' },
-          ],
-          '大埔區': [
-            { name: '迦密柏雨中學', name_en: 'Carmel Pak U Secondary School', type: '資助', gender: '男女' },
-            { name: '聖公會莫壽增會督中學', name_en: 'S.K.H. Bishop Mok Sau Tseng Secondary School', type: '資助', gender: '男女' },
-            { name: '恩主教書院', name_en: 'Valtorta College', type: '資助', gender: '男女' },
-            { name: '王肇枝中學', name_en: 'Wong Shiu Chi Secondary School', type: '資助', gender: '男女' },
-          ],
-          '沙田區': [
-            { name: '聖公會曾肇添中學', name_en: 'S.K.H. Tsang Shiu Tim Secondary School', type: '資助', gender: '男女' },
-            { name: '浸信會呂明才中學', name_en: 'Baptist Lui Ming Choi Secondary School', type: '資助', gender: '男女' },
-            { name: '沙田官立中學', name_en: 'Sha Tin Government Secondary School', type: '官立', gender: '男女' },
-            { name: '沙田培英中學', name_en: 'Pui Ying College', type: '資助', gender: '男女' },
-            { name: '聖母無玷聖心書院', name_en: 'Immaculate Heart of Mary College', type: '資助', gender: '男女' },
-            { name: '天主教郭得勝中學', name_en: 'Kwok Tak Seng Catholic Secondary School', type: '資助', gender: '男女' },
-          ],
-          '西貢區': [
-            { name: '迦密主恩中學', name_en: 'Carmel Divine Grace Foundation Secondary School', type: '資助', gender: '男女' },
-            { name: '將軍澳官立中學', name_en: 'Tseung Kwan O Government Secondary School', type: '官立', gender: '男女' },
-            { name: '播道書院', name_en: 'Evangel College', type: '直資', gender: '男女' },
-            { name: '景嶺書院', name_en: 'King Ling College', type: '資助', gender: '男女' },
-          ],
-          '離島區': [
-            { name: '佛教筏可紀念中學', name_en: 'Buddhist Fat Ho Memorial College', type: '直資', gender: '男女' },
-            { name: '長洲官立中學', name_en: 'Cheung Chau Government Secondary School', type: '官立', gender: '男女' },
-            { name: '東涌天主教學校', name_en: 'Tung Chung Catholic School', type: '資助', gender: '男女' },
-            { name: '靈糧堂怡文中學', name_en: 'Ling Liang Church E Wun Secondary School', type: '資助', gender: '男女' },
-          ],
-        }
-        
+        // 使用从 chsc.hk 爬取的完整学校数据（978所学校）
         if (district && SCHOOLS_BY_DISTRICT[district]) {
           return jsonResponse({ 
             success: true, 
