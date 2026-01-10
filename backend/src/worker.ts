@@ -6110,14 +6110,90 @@ export default {
         return jsonResponse({ message: '排名已更新' }, 200, origin)
       }
 
+      // =====================
+      // API 文档端点
+      // =====================
+
+      // 获取 OpenAPI/Swagger 规范
+      if (path === '/api/docs' || path === '/api/openapi.json') {
+        const openApiSpec = {
+          openapi: '3.0.3',
+          info: {
+            title: 'DSE 插班智能评估 API',
+            description: '基于规则评分引擎 + DeepSeek AI 的香港 DSE 插班可行性分析系统。所有结果为参考建议，不构成录取保证。',
+            version: '2.1.0',
+          },
+          servers: [
+            { url: 'https://dse-analysis-api.jordanyungchotan.workers.dev', description: '生产环境' },
+            { url: 'http://localhost:5000', description: '本地开发' },
+          ],
+          paths: {
+            '/api/auth/register': { post: { summary: '用户注册', tags: ['认证'] } },
+            '/api/auth/login': { post: { summary: '用户登录', tags: ['认证'] } },
+            '/api/auth/me': { get: { summary: '获取当前用户信息', tags: ['认证'], security: [{ bearerAuth: [] }] } },
+            '/api/analysis/submit': { post: { summary: '提交插班分析', tags: ['插班分析'], security: [{ bearerAuth: [] }] } },
+            '/api/analysis/result/{id}': { get: { summary: '获取分析结果', tags: ['插班分析'] } },
+            '/api/analysis/history': { get: { summary: '获取分析历史', tags: ['插班分析'], security: [{ bearerAuth: [] }] } },
+            '/api/analysis/history/{id}': { delete: { summary: '删除分析记录', tags: ['插班分析'], security: [{ bearerAuth: [] }] } },
+            '/api/analysis/subjects': { get: { summary: '获取科目列表', tags: ['配置数据'] } },
+            '/api/analysis/grades': { get: { summary: '获取年级列表', tags: ['配置数据'] } },
+            '/api/analysis/schools': { get: { summary: '获取学校列表', tags: ['配置数据'] } },
+            '/api/placement/score': { post: { summary: '规则评分（不调用AI）', tags: ['规则评分'], security: [{ bearerAuth: [] }] } },
+            '/api/analysis/feedback': { post: { summary: '提交分析反馈', tags: ['用户反馈'], security: [{ bearerAuth: [] }] } },
+            '/api/analysis/feedback/{analysisId}': { get: { summary: '获取反馈状态', tags: ['用户反馈'] } },
+            '/api/consultation/book': { post: { summary: '预约升学咨询', tags: ['咨询预约'], security: [{ bearerAuth: [] }] } },
+            '/api/consultation/actions': { get: { summary: '获取推荐行动', tags: ['咨询预约'] } },
+          },
+          components: {
+            securitySchemes: {
+              bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+            },
+          },
+        }
+        return jsonResponse(openApiSpec, 200, origin)
+      }
+
+      // Swagger UI HTML 页面
+      if (path === '/api-docs' || path === '/swagger') {
+        const swaggerHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <title>DSE API 文档</title>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/api/docs',
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: 'StandaloneLayout'
+    });
+  </script>
+</body>
+</html>`
+        return new Response(swaggerHtml, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8',
+            ...corsHeaders(origin),
+          },
+        })
+      }
+
       // 根路径 - 显示 API 状态
       if (path === '/' || path === '') {
         return jsonResponse({
           name: 'DSE Analysis API',
           version: '2.1.0',
+          documentation: '/api-docs',
           status: 'running',
           endpoints: [
             'GET /api/health',
+            'GET /api-docs (Swagger UI)',
+            'GET /api/docs (OpenAPI JSON)',
             // 认证 API
             'POST /api/auth/login',
             'POST /api/auth/register',
