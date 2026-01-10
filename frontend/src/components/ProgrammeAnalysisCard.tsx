@@ -134,7 +134,10 @@ export const ProgrammeAnalysisCard: React.FC<ProgrammeAnalysisCardProps> = ({
   const matchConfig = getMatchLevelConfig(result.match.level, isEnglish)
   const recConfig = getRecommendationLevelConfig(result.recommendation.level, isEnglish)
   const positionConfig = getRelativePositionLabel(result.relative_position.position, isEnglish)
-  const mappingInfo = getMappingConfidenceInfo(result.score.grade_mapping_used, isEnglish)
+  const mappingInfo = getMappingConfidenceInfo(result.score.mapping_confidence || result.score.grade_mapping_used, isEnglish)
+  
+  // 强制要求: 当 mappingConfidence !== "official" 时显示警告
+  const isNonOfficial = result.score.mapping_confidence && result.score.mapping_confidence !== 'official'
   
   // 5年中位数平均
   const validMedians = result.historical.filter(h => h.median !== null).map(h => h.median!)
@@ -283,23 +286,37 @@ export const ProgrammeAnalysisCard: React.FC<ProgrammeAnalysisCardProps> = ({
       
       {/* 可信度提示 */}
       <div style={{ 
-        background: '#fafafa', 
+        background: isNonOfficial ? '#fffbe6' : '#fafafa', 
         padding: '8px 12px', 
         borderRadius: 4,
         marginBottom: 16,
         display: 'flex',
         alignItems: 'center',
-        gap: 8
+        gap: 8,
+        border: isNonOfficial ? '1px solid #ffe58f' : 'none'
       }}>
         <Tooltip title={mappingInfo.description}>
           <Tag color={mappingInfo.color} style={{ cursor: 'help' }}>
-            <InfoCircleOutlined /> {mappingInfo.label}
+            {isNonOfficial ? <WarningOutlined /> : <InfoCircleOutlined />} {mappingInfo.label}
           </Tag>
         </Tooltip>
         <Text type="secondary" style={{ fontSize: 12 }}>
           {result.score.formula_description}
         </Text>
       </div>
+      
+      {/* 强制要求: 非官方数据警告 */}
+      {isNonOfficial && (
+        <Alert
+          message={isEnglish 
+            ? 'This programme scoring method is not fully public, results are based on model estimation' 
+            : '该专业计分方式非完全公开，结果基于模型推算'}
+          type="warning"
+          showIcon
+          icon={<WarningOutlined />}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       
       {/* 警告信息 */}
       {result.score.warnings.length > 0 && (

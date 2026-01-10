@@ -764,6 +764,7 @@ export interface ProgrammeAnalysisResultV2 {
     raw_best5: number
     raw_best6: number
     grade_mapping_used: string
+    mapping_confidence: 'official' | 'estimated' | 'low' | 'standard'
     formula_description: string
     breakdown: ScoreBreakdownItem[]
     warnings: string[]
