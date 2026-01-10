@@ -483,10 +483,15 @@ const ResultPage = () => {
               <div className={styles.chartContainer}>
                 <Title level={5} style={{ textAlign: 'center' }}>录取概率对比</Title>
                 <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={schoolChartData} layout="vertical">
+                  <BarChart data={schoolChartData} layout="vertical" margin={{ left: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis type="number" domain={[0, 100]} />
-                    <YAxis type="category" dataKey="name" width={100} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="name" 
+                      width={140}
+                      tick={{ fontSize: 12 }}
+                    />
                     <RechartsTooltip />
                     <Bar
                       dataKey="probability"
