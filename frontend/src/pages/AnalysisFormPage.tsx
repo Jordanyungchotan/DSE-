@@ -100,14 +100,56 @@ const GRADE_OPTIONS = [
 ]
 
 /**
- * 学期选项
+ * 根据日期计算对应的学期
+ * 香港学年：9月-1月为上学期，2月-8月为下学期
  */
-const SEMESTER_OPTIONS = [
-  { value: '2024-2025-1', label: '2024-2025年度 上学期' },
-  { value: '2024-2025-2', label: '2024-2025年度 下学期' },
-  { value: '2025-2026-1', label: '2025-2026年度 上学期' },
-  { value: '2025-2026-2', label: '2025-2026年度 下学期' },
-]
+function getSemesterFromDate(date: dayjs.Dayjs): { value: string; label: string } {
+  const month = date.month() + 1 // dayjs month is 0-indexed
+  const year = date.year()
+  
+  if (month >= 9) {
+    // 9-12月属于该学年上学期
+    return {
+      value: `${year}-${year + 1}-1`,
+      label: `${year}-${year + 1}年度 上学期`
+    }
+  } else if (month >= 2) {
+    // 2-8月属于上一学年下学期
+    return {
+      value: `${year - 1}-${year}-2`,
+      label: `${year - 1}-${year}年度 下学期`
+    }
+  } else {
+    // 1月属于上一学年上学期
+    return {
+      value: `${year - 1}-${year}-1`,
+      label: `${year - 1}-${year}年度 上学期`
+    }
+  }
+}
+
+/**
+ * 动态生成学期选项（从当前年度到未来3年）
+ */
+function generateSemesterOptions(): { value: string; label: string }[] {
+  const currentYear = new Date().getFullYear()
+  const options: { value: string; label: string }[] = []
+  
+  for (let year = currentYear - 1; year <= currentYear + 3; year++) {
+    options.push({
+      value: `${year}-${year + 1}-1`,
+      label: `${year}-${year + 1}年度 上学期`
+    })
+    options.push({
+      value: `${year}-${year + 1}-2`,
+      label: `${year}-${year + 1}年度 下学期`
+    })
+  }
+  
+  return options
+}
+
+const SEMESTER_OPTIONS = generateSemesterOptions()
 
 
 /**
@@ -453,13 +495,26 @@ const AnalysisFormPage = () => {
   }
 
   /**
+   * 处理日期选择，自动设置对应学期
+   */
+  const handleDateChange = (date: dayjs.Dayjs | null) => {
+    if (date) {
+      const semester = getSemesterFromDate(date)
+      form.setFieldsValue({ 
+        enrollmentDate: date,
+        semester: semester.value 
+      })
+    }
+  }
+
+  /**
    * 渲染步骤1 - 插班时间
    */
   const renderStep1 = () => (
     <div className={styles.stepContent}>
       <Title level={4}>选择插班时间</Title>
       <Paragraph type="secondary">
-        请选择您期望的插班日期和目标学期
+        请选择您期望的插班日期，系统将自动匹配对应学期
       </Paragraph>
       
       <Row gutter={24}>
@@ -474,18 +529,20 @@ const AnalysisFormPage = () => {
               style={{ width: '100%' }}
               placeholder="选择日期"
               disabledDate={(current) => current && current < dayjs().startOf('day')}
+              onChange={handleDateChange}
             />
           </Form.Item>
         </Col>
         <Col xs={24} md={12}>
           <Form.Item
             name="semester"
-            label="目标学期"
+            label="目标学期（自动匹配）"
             rules={[{ required: true, message: '请选择学期' }]}
+            tooltip="根据选择的日期自动推荐，也可手动调整"
           >
             <Select
               size="large"
-              placeholder="选择学期"
+              placeholder="选择日期后自动匹配"
               options={SEMESTER_OPTIONS}
             />
           </Form.Item>
