@@ -42,6 +42,7 @@ import {
   FIELD_COLORS,
   ComprehensiveAnalysisInput,
   AIAnalysisResponse,
+  formatScoringFormula,
 } from '../services/jupasApi'
 import styles from './UniversityAnalysisPage.module.css'
 

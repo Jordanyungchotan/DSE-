@@ -59,10 +59,29 @@ export interface AdmissionScores {
   }
 }
 
+/** 计分公式 */
+export interface ScoringFormula {
+  year: number
+  scoring_base: string
+  include_english: boolean
+  include_math: boolean
+  include_specific: string[]
+  subject_weights: { [subject: string]: number }
+  sixth_subject_bonus: number
+  highest_attainable: number | null
+  median: number | null
+  lower_quartile: number | null
+  upper_quartile: number | null
+  formula_description: string
+  is_simulated: boolean
+}
+
 /** 课程详情（含入学要求和收生成绩） */
 export interface JUPASProgrammeDetail extends JUPASProgramme {
   admission_requirements: AdmissionRequirements
   admission_scores: AdmissionScores
+  scoring_formulas?: ScoringFormula[]
+  latest_formula?: ScoringFormula | null
 }
 
 /** 院校信息 */
@@ -105,9 +124,19 @@ export interface MatchAnalysis {
     university: string
   }
   student_scores: {
+    weighted_score: number
     best_5: number
     best_6: number
   }
+  scoring_formula?: {
+    formula_used: string
+    breakdown: string[]
+    year: number
+    highest_attainable: number | null
+    median: number | null
+    lower_quartile: number | null
+    is_simulated: boolean
+  } | null
   analysis: {
     meets_minimum: boolean
     unmet_requirements: string[]
@@ -176,6 +205,58 @@ export async function getProgrammeDetail(code: string): Promise<{
   error?: string
 }> {
   return ragFetchJson(`/api/jupas/programmes/${code}`)
+}
+
+/**
+ * 获取课程计分公式
+ */
+export async function getScoringFormula(code: string, year?: number): Promise<{
+  success: boolean
+  data?: ScoringFormula | null
+  message?: string
+  error?: string
+}> {
+  const params = year ? `?year=${year}` : ''
+  return ragFetchJson(`/api/jupas/scoring-formula/${code}${params}`)
+}
+
+/**
+ * 格式化计分公式为可读文本
+ */
+export function formatScoringFormula(formula: ScoringFormula | null | undefined): string {
+  if (!formula) return 'Best 5 subjects'
+  
+  const parts: string[] = []
+  const weights = formula.subject_weights || {}
+  
+  // 检查是否有加权
+  if (Object.keys(weights).length > 0) {
+    for (const [subject, weight] of Object.entries(weights)) {
+      if (weight !== 1) {
+        parts.push(`${subject} x${weight}`)
+      }
+    }
+  }
+  
+  // 基础计分方式
+  if (formula.scoring_base.includes('3core_2elec')) {
+    parts.push('3 Core + 2 Elective')
+  } else if (formula.scoring_base.includes('best_6')) {
+    parts.push('Best 6 subjects')
+  } else if (formula.scoring_base.includes('eng_x2_math_x2')) {
+    if (!parts.some(p => p.includes('English'))) {
+      parts.push('English x2 + Math x2 + 3 subjects')
+    }
+  } else {
+    parts.push('Best 5 subjects')
+  }
+  
+  // 加分
+  if (formula.sixth_subject_bonus > 0) {
+    parts.push(`6th subject +${formula.sixth_subject_bonus * 100}%`)
+  }
+  
+  return parts.join(' + ') || formula.scoring_base
 }
 
 /**
