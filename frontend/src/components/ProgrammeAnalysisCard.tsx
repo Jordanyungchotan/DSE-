@@ -19,14 +19,12 @@ import {
   Col,
   Typography,
   Table,
-  Progress,
   Alert,
   Divider,
   Space,
   Badge,
 } from 'antd'
 import {
-  TrophyOutlined,
   InfoCircleOutlined,
   LineChartOutlined,
   BookOutlined,
@@ -129,7 +127,7 @@ export const ProgrammeAnalysisCard: React.FC<ProgrammeAnalysisCardProps> = ({
   isEnglish = false,
   showDetails = true,
 }) => {
-  const [expanded, setExpanded] = useState(false)
+  const [, setExpanded] = useState(false)
   
   const matchConfig = getMatchLevelConfig(result.match.level, isEnglish)
   const recConfig = getRecommendationLevelConfig(result.recommendation.level, isEnglish)
@@ -246,7 +244,7 @@ export const ProgrammeAnalysisCard: React.FC<ProgrammeAnalysisCardProps> = ({
               color: result.comparison?.difference_from_median && result.comparison.difference_from_median >= 0 
                 ? '#52c41a' : '#ff4d4f'
             }}>
-              {result.comparison?.difference_from_median !== null 
+              {result.comparison?.difference_from_median !== null && result.comparison?.difference_from_median !== undefined
                 ? `${result.comparison.difference_from_median >= 0 ? '+' : ''}${result.comparison.difference_from_median.toFixed(1)}`
                 : 'N/A'
               }
