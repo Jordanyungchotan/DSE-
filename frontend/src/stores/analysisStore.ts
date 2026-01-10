@@ -46,14 +46,64 @@ export interface SubjectAnalysis {
 }
 
 /**
+ * 可行性等级类型
+ */
+export type FeasibilityLevel = 'A' | 'B' | 'C' | 'D' | 'E'
+
+/**
+ * 可行性等级配置
+ */
+export const FEASIBILITY_LEVEL_CONFIG: Record<FeasibilityLevel, {
+  label: string
+  color: 'success' | 'processing' | 'warning' | 'error' | 'default'
+  description: string
+  actionText: string
+}> = {
+  'A': { 
+    label: '可行性高', 
+    color: 'success', 
+    description: '条件匹配度良好，通过适当准备有较大机会',
+    actionText: '建议立即准备申请材料'
+  },
+  'B': { 
+    label: '可行性较高', 
+    color: 'processing', 
+    description: '基本符合要求，部分方面需加强',
+    actionText: '建议针对性提升后申请'
+  },
+  'C': { 
+    label: '可行性中等', 
+    color: 'warning', 
+    description: '存在一定差距，需要较长时间准备',
+    actionText: '建议制定3-6个月提升计划'
+  },
+  'D': { 
+    label: '可行性较低', 
+    color: 'error', 
+    description: '差距较大，需要显著提升或调整目标',
+    actionText: '建议调整目标学校或长期准备'
+  },
+  'E': { 
+    label: '可行性低', 
+    color: 'default', 
+    description: '当前条件与目标差距显著',
+    actionText: '建议重新评估升学规划'
+  },
+}
+
+/**
  * 分析结果 - 学校评估
  */
 export interface SchoolAssessment {
   schoolName: string
-  admissionProbability: number
+  feasibilityLevel: FeasibilityLevel
+  levelLabel: string
+  levelColor: string
   requirements: string[]
   gaps: string[]
   recommendations: string[]
+  // 兼容旧数据
+  admissionProbability?: number
 }
 
 /**
@@ -65,6 +115,8 @@ export interface AnalysisResult {
   studentInfo: StudentInfo
   overallAssessment: {
     feasibilityScore: number
+    feasibilityLevel?: FeasibilityLevel
+    levelDescription?: string
     summary: string
     keyStrengths: string[]
     keyWeaknesses: string[]

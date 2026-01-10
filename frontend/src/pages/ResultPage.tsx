@@ -235,14 +235,18 @@ const ResultPage = () => {
     schoolAssessments: [
       {
         schoolName: '喇沙书院',
-        admissionProbability: 70,
+        feasibilityLevel: 'B' as const,
+        levelLabel: '可行性较高',
+        levelColor: 'processing',
         requirements: ['DSE成绩优异', '良好品行记录', '面试表现'],
         gaps: ['中文成绩需提升', '需准备面试'],
         recommendations: ['重点提升中文成绩', '准备自我介绍', '了解学校文化'],
       },
       {
         schoolName: '拔萃男书院',
-        admissionProbability: 60,
+        feasibilityLevel: 'C' as const,
+        levelLabel: '可行性中等',
+        levelColor: 'warning',
         requirements: ['顶尖学术成绩', '课外活动表现', '领导力展示'],
         gaps: ['整体成绩需进一步提升', '需展示课外活动参与'],
         recommendations: ['全面提升各科成绩', '参与更多课外活动', '培养领导能力'],
@@ -286,10 +290,19 @@ const ResultPage = () => {
     target: parseInt(subject.targetLevel) || 5,
   }))
 
-  // 学校录取概率柱状图数据
+  // 学校可行性等级转换为分数用于图表显示
+  const levelToScore = (level: string): number => {
+    const scores: Record<string, number> = { 'A': 90, 'B': 75, 'C': 55, 'D': 40, 'E': 20 }
+    return scores[level] || 50
+  }
+  
+  // 学校可行性对比柱状图数据
   const schoolChartData = result.schoolAssessments.map((school) => ({
     name: school.schoolName,
-    probability: school.admissionProbability,
+    probability: school.feasibilityLevel 
+      ? levelToScore(school.feasibilityLevel)
+      : (school.admissionProbability || 50),
+    level: school.feasibilityLevel || 'C',
   }))
 
   return (
@@ -481,7 +494,7 @@ const ResultPage = () => {
           <Row gutter={24}>
             <Col xs={24} lg={10}>
               <div className={styles.chartContainer}>
-                <Title level={5} style={{ textAlign: 'center' }}>录取概率对比</Title>
+                <Title level={5} style={{ textAlign: 'center' }}>可行性评估对比</Title>
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart data={schoolChartData} layout="vertical" margin={{ left: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" />
@@ -511,8 +524,11 @@ const ResultPage = () => {
                   title={
                     <Space>
                       <Text strong>{school.schoolName}</Text>
-                      <Tag color={school.admissionProbability >= 70 ? 'success' : school.admissionProbability >= 50 ? 'warning' : 'error'}>
-                        录取概率 {school.admissionProbability}%
+                      <Tag color={school.levelColor as 'success' | 'processing' | 'warning' | 'error' | 'default' || 
+                        (school.feasibilityLevel === 'A' ? 'success' : 
+                         school.feasibilityLevel === 'B' ? 'processing' : 
+                         school.feasibilityLevel === 'C' ? 'warning' : 'error')}>
+                        {school.levelLabel || `${school.feasibilityLevel}级`}
                       </Tag>
                     </Space>
                   }

@@ -2176,7 +2176,7 @@ async function analyzeWithDeepSeek(studentInfo: StudentInfo, apiKey: string): Pr
       body: JSON.stringify({
         model: 'deepseek-chat',
         messages: [
-          { role: 'system', content: '你是一位专业的香港DSE教育顾问，擅长分析学生情况并提供升学建议。请用JSON格式回复。' },
+          { role: 'system', content: '你是一位专业的香港DSE教育顾问，擅长分析学生情况并提供升学建议。请用JSON格式回复。绝对禁止输出任何百分比或成功率数字。' },
           { role: 'user', content: prompt },
         ],
         max_tokens: 4000,
@@ -2201,10 +2201,74 @@ async function analyzeWithDeepSeek(studentInfo: StudentInfo, apiKey: string): Pr
       return generateMockResult(studentInfo)
     }
 
-    return JSON.parse(jsonMatch[0]) as AnalysisResult
+    // 解析 AI 返回的结果
+    const rawResult = JSON.parse(jsonMatch[0])
+    
+    // 标准化处理结果，确保格式正确
+    return normalizeAnalysisResult(rawResult)
   } catch (error) {
     console.error('DeepSeek error:', error)
     return generateMockResult(studentInfo)
+  }
+}
+
+// 标准化 AI 返回的分析结果
+function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult {
+  const overallScore = (raw.overallAssessment as Record<string, unknown>)?.feasibilityScore as number || 70
+  const overallLevel = calculateFeasibilityLevel(overallScore)
+  
+  // 处理学校评估，将百分比转换为等级
+  const rawSchoolAssessments = (raw.schoolAssessments as Record<string, unknown>[]) || []
+  const schoolAssessments = rawSchoolAssessments.map((school) => {
+    // 如果 AI 仍然返回了 admissionProbability，转换为等级
+    let level: FeasibilityLevelType = 'C'
+    if (school.admissionProbability !== undefined) {
+      level = calculateFeasibilityLevel(school.admissionProbability as number)
+    } else if (school.feasibilityLevel) {
+      // 验证并使用 AI 返回的等级
+      const rawLevel = (school.feasibilityLevel as string).toUpperCase()
+      if (['A', 'B', 'C', 'D', 'E'].includes(rawLevel)) {
+        level = rawLevel as FeasibilityLevelType
+      }
+    }
+    
+    return {
+      schoolName: school.schoolName as string,
+      feasibilityLevel: level,
+      levelLabel: FEASIBILITY_LEVEL_CONFIG[level].label,
+      levelColor: FEASIBILITY_LEVEL_CONFIG[level].color,
+      requirements: (school.requirements as string[]) || [],
+      gaps: (school.gaps as string[]) || [],
+      recommendations: (school.recommendations as string[]) || [],
+    }
+  })
+  
+  return {
+    overallAssessment: {
+      feasibilityScore: overallScore,
+      feasibilityLevel: overallLevel,
+      levelDescription: FEASIBILITY_LEVEL_CONFIG[overallLevel].description,
+      summary: ((raw.overallAssessment as Record<string, unknown>)?.summary as string) || '',
+      keyStrengths: ((raw.overallAssessment as Record<string, unknown>)?.keyStrengths as string[]) || [],
+      keyWeaknesses: ((raw.overallAssessment as Record<string, unknown>)?.keyWeaknesses as string[]) || [],
+    },
+    subjectAnalyses: ((raw.subjectAnalyses as Record<string, unknown>[]) || []).map((s) => ({
+      subject: s.subject as string,
+      currentLevel: s.currentLevel as string,
+      targetLevel: s.targetLevel as string,
+      gap: s.gap as string,
+      strengths: (s.strengths as string[]) || [],
+      weaknesses: (s.weaknesses as string[]) || [],
+      recommendations: (s.recommendations as string[]) || [],
+      estimatedTimeToImprove: s.estimatedTimeToImprove as string,
+    })),
+    schoolAssessments,
+    studyPlan: {
+      weeklySchedule: ((raw.studyPlan as Record<string, unknown>)?.weeklySchedule as string[]) || [],
+      monthlyGoals: ((raw.studyPlan as Record<string, unknown>)?.monthlyGoals as string[]) || [],
+      resources: ((raw.studyPlan as Record<string, unknown>)?.resources as string[]) || [],
+    },
+    additionalAdvice: (raw.additionalAdvice as string[]) || [],
   }
 }
 
@@ -2225,9 +2289,61 @@ interface StudentInfo {
   achievements?: string        // 获奖经历
 }
 
+// 可行性等级定义
+type FeasibilityLevelType = 'A' | 'B' | 'C' | 'D' | 'E'
+
+const FEASIBILITY_LEVEL_CONFIG: Record<FeasibilityLevelType, { 
+  label: string
+  color: string
+  description: string
+  actionText: string
+}> = {
+  'A': { 
+    label: '可行性高', 
+    color: 'success', 
+    description: '条件匹配度良好，通过适当准备有较大机会',
+    actionText: '建议立即准备申请材料'
+  },
+  'B': { 
+    label: '可行性较高', 
+    color: 'processing', 
+    description: '基本符合要求，部分方面需加强',
+    actionText: '建议针对性提升后申请'
+  },
+  'C': { 
+    label: '可行性中等', 
+    color: 'warning', 
+    description: '存在一定差距，需要较长时间准备',
+    actionText: '建议制定3-6个月提升计划'
+  },
+  'D': { 
+    label: '可行性较低', 
+    color: 'error', 
+    description: '差距较大，需要显著提升或调整目标',
+    actionText: '建议调整目标学校或长期准备'
+  },
+  'E': { 
+    label: '可行性低', 
+    color: 'default', 
+    description: '当前条件与目标差距显著',
+    actionText: '建议重新评估升学规划'
+  },
+}
+
+// 根据分数计算可行性等级
+function calculateFeasibilityLevel(score: number): FeasibilityLevelType {
+  if (score >= 80) return 'A'
+  if (score >= 65) return 'B'
+  if (score >= 50) return 'C'
+  if (score >= 35) return 'D'
+  return 'E'
+}
+
 interface AnalysisResult {
   overallAssessment: {
     feasibilityScore: number
+    feasibilityLevel: FeasibilityLevelType
+    levelDescription: string
     summary: string
     keyStrengths: string[]
     keyWeaknesses: string[]
@@ -2244,7 +2360,9 @@ interface AnalysisResult {
   }[]
   schoolAssessments: {
     schoolName: string
-    admissionProbability: number
+    feasibilityLevel: FeasibilityLevelType
+    levelLabel: string
+    levelColor: string
     requirements: string[]
     gaps: string[]
     recommendations: string[]
@@ -2351,10 +2469,10 @@ ${subjectsText}
   "schoolAssessments": [
     {
       "schoolName": "<学校名称>",
-      "admissionProbability": <0-100的整数，录取概率>,
+      "feasibilityLevel": "<A/B/C/D/E，可行性等级>",
       "requirements": ["录取要求1", "录取要求2"],
-      "gaps": ["差距1", "差距2"],
-      "recommendations": ["建议1", "建议2"]
+      "gaps": ["与学校要求的差距1", "差距2"],
+      "recommendations": ["针对该校的建议1", "建议2"]
     }
   ],
   "studyPlan": {
@@ -2364,6 +2482,17 @@ ${subjectsText}
   },
   "additionalAdvice": ["建议1", "建议2", "建议3", "建议4"]
 }
+
+【★★★ 可行性等级说明（必须严格遵守）★★★】
+- A级：学生条件与学校要求高度匹配，通过适当准备有较大机会
+- B级：基本符合学校要求，部分方面需针对性加强
+- C级：与学校要求存在一定差距，需要较长时间准备
+- D级：差距较大，需要显著提升或考虑调整目标学校
+- E级：当前条件与目标学校要求差距显著，建议重新评估
+
+【★★★ 绝对禁止输出百分比或成功率 ★★★】
+- ❌ 禁止："录取概率70%"、"成功率65%"、"admissionProbability"
+- ✅ 正确：使用 A/B/C/D/E 等级表示可行性
 
 重要注意事项：
 1. subjectAnalyses 必须包含以下科目的分析：${subjectNames.join('、')}
@@ -2415,10 +2544,13 @@ function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
   const isLowGrade = ['form4', 'S4', 'S1', 'S2', 'S3', 'form1', 'form2', 'form3', '中一', '中二', '中三', '中四'].includes(grade)
   const baseScore = isHighGrade ? 60 : isLowGrade ? 75 : 70
   const gradeName = GRADE_NAME_MAP[grade] || grade || '中四'
+  const overallLevel = calculateFeasibilityLevel(baseScore)
 
   return {
     overallAssessment: {
       feasibilityScore: baseScore,
+      feasibilityLevel: overallLevel,
+      levelDescription: FEASIBILITY_LEVEL_CONFIG[overallLevel].description,
       summary: `该学生目前就读${gradeName}，计划于${studentInfo.enrollmentDate || '近期'}插班。根据提供的成绩信息，整体学术表现中等偏上。建议重点加强薄弱科目的学习，为目标学校的录取做好准备。`,
       keyStrengths: ['学习态度积极', '部分科目基础扎实', '有明确的目标规划'],
       keyWeaknesses: ['部分科目需要提升', '时间管理能力待加强', '需要更多实战练习'],
@@ -2433,13 +2565,20 @@ function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
       recommendations: ['每天复习30分钟', '完成每周练习题', '定期进行模拟测试'],
       estimatedTimeToImprove: '2-3个月',
     })),
-    schoolAssessments: studentInfo.targetSchools.map((school, i) => ({
-      schoolName: school,
-      admissionProbability: Math.max(40, baseScore - i * 10),
-      requirements: ['优异的DSE成绩', '良好的品行记录', '面试表现优秀'],
-      gaps: ['部分科目成绩需提升', '需准备面试'],
-      recommendations: ['重点提升薄弱科目', '准备自我介绍', '了解学校文化'],
-    })),
+    schoolAssessments: studentInfo.targetSchools.map((school, i) => {
+      // 根据学校排序计算可行性等级
+      const schoolScore = Math.max(35, baseScore - i * 15)
+      const level = calculateFeasibilityLevel(schoolScore)
+      return {
+        schoolName: school,
+        feasibilityLevel: level,
+        levelLabel: FEASIBILITY_LEVEL_CONFIG[level].label,
+        levelColor: FEASIBILITY_LEVEL_CONFIG[level].color,
+        requirements: ['优异的DSE成绩', '良好的品行记录', '面试表现优秀'],
+        gaps: ['部分科目成绩需提升', '需准备面试'],
+        recommendations: ['重点提升薄弱科目', '准备自我介绍', '了解学校文化'],
+      }
+    }),
     studyPlan: {
       weeklySchedule: ['周一至周五：每天2小时自习', '周六：难题训练', '周日：综合复习'],
       monthlyGoals: ['第1个月：夯实基础', '第2个月：针对性提升', '第3个月：模拟训练'],
