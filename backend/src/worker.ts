@@ -4149,7 +4149,16 @@ export default {
           careerInterests?: string[]
         }
 
-        // 计算最佳5科/6科分数
+        /**
+         * 计算最佳5科/6科分数
+         * 
+         * @deprecated 此处使用固定换算 (5**=7)，不支持课程特定加权。
+         * 
+         * TODO: 禁止在大学分析 (JUPAS) 中依赖此值进行匹配度判断。
+         * 应改用 RAG Worker 返回的 weighted_score（基于课程计分规则）。
+         * 此处计算的 bestFive/bestSix 仅作为参考值传递。
+         */
+        // @deprecated - 固定换算，不同课程有不同规则（如城大2025: 5**=8.5）
         const gradeToScore: Record<string, number> = {
           '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
         }

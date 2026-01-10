@@ -250,8 +250,17 @@ const UniversityAnalysisPage = () => {
     }
   }
 
-  // 计算最佳5科分数
+  /**
+   * 计算最佳5科分数（仅用于前端显示参考）
+   * 
+   * @deprecated 此函数使用固定换算 (5**=7)，仅作为用户界面参考显示。
+   * 实际大学分析应使用后端返回的加权分数 (weighted_score)。
+   * 
+   * TODO: 禁止在大学分析结果展示中使用此值作为匹配依据。
+   * 应显示后端计算的 weighted_score 而非此 Best 5。
+   */
   const calculateBestFive = () => {
+    // @deprecated - 固定换算，不同课程有不同规则
     const gradeToScore: Record<string, number> = {
       '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
     }

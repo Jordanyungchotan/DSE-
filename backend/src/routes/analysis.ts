@@ -239,8 +239,16 @@ analysisRouter.get('/subjects', (_req, res) => {
 /**
  * 获取成绩等级列表
  * GET /api/analysis/grades
+ * 
+ * @deprecated points 字段使用固定的 7 分制换算，仅供参考。
+ * 不同大学/课程有不同的换算规则（如城大2025: 5**=8.5）。
+ * 
+ * TODO: 禁止在大学分析 (JUPAS) 中依赖此 points 值。
+ * 前端应仅使用 value/label 用于下拉选择，
+ * 实际分数计算由后端根据课程规则完成。
  */
 analysisRouter.get('/grades', (_req, res) => {
+  // @deprecated - points 仅供参考，不同课程换算不同
   const grades = [
     { value: '5**', label: '5**', points: 7 },
     { value: '5*', label: '5*', points: 6 },

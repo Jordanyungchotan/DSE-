@@ -129,8 +129,18 @@ const GRADE_NAME_MAP: Record<string, string> = {
   form4: '中四', form5: '中五', form6: '中六',
 }
 
-/** DSE 等级转分数 */
+/**
+ * DSE 等级转分数（用于插班分析的百分制换算）
+ * 
+ * 注意：此函数用于中学插班分析，将等级转换为百分制分数 (0-100)。
+ * 这与 JUPAS 大学分析使用的 7 分制不同，是有意为之。
+ * 
+ * 插班分析使用百分制是因为需要与学校的百分制成绩进行比较。
+ * 
+ * TODO: 确认此函数仅用于插班分析，不用于大学 (JUPAS) 分析。
+ */
 function dseGradeToScore(grade: string): number {
+  // 百分制换算（用于插班分析，非 JUPAS）
   const mapping: Record<string, number> = {
     '5**': 95, '5*': 85, '5': 75, '4': 65, '3': 55, '2': 45, '1': 35, 'U': 20,
   }
