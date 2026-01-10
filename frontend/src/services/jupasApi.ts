@@ -718,3 +718,262 @@ export function getRecommendationInfo(recommendation: string, locale: string = '
       }
   }
 }
+
+// ============================================================
+// V2 API 类型定义 - 使用课程特定计分规则
+// ============================================================
+
+/** 分数明细项 */
+export interface ScoreBreakdownItem {
+  subject: string
+  rawGrade: string
+  mappedScore: number
+  weight: number
+  weightedScore: number
+  type: 'required' | 'best' | 'bonus'
+}
+
+/** 匹配等级 */
+export type MatchLevel = 'excellent' | 'good' | 'moderate' | 'challenging' | 'difficult' | 'unknown'
+
+/** 推荐等级 */
+export type RecommendationLevel = 'high' | 'medium' | 'low'
+
+/** 相对位置 */
+export type RelativePosition = 
+  | 'far_above_median'
+  | 'above_median'
+  | 'around_median'
+  | 'below_median'
+  | 'around_lower_quartile'
+  | 'below_lower_quartile'
+  | 'far_below_lower_quartile'
+  | 'unknown'
+
+/** V2 分析结果 - 单个专业 */
+export interface ProgrammeAnalysisResultV2 {
+  programme_code: string
+  programme_name_zh: string
+  programme_name_en: string
+  university_code: string
+  university_name_zh: string
+  
+  // 分数计算结果
+  score: {
+    weighted_score: number
+    raw_best5: number
+    raw_best6: number
+    grade_mapping_used: string
+    formula_description: string
+    breakdown: ScoreBreakdownItem[]
+    warnings: string[]
+  }
+  
+  // 匹配等级
+  match: {
+    level: MatchLevel
+    level_label_zh: string
+    level_label_en: string
+    level_color: string
+    description: string
+  }
+  
+  // 相对位置评估
+  relative_position: {
+    position: RelativePosition
+    simple_position: 'above_median' | 'around_median' | 'below_lower_quartile' | 'unknown'
+    explanation: string
+    details: {
+      userScore: number
+      latestMedian: number | null
+      latestLowerQuartile: number | null
+      latestUpperQuartile: number | null
+      differenceFromMedian: number | null
+      differenceFromLowerQuartile: number | null
+      trend: 'rising' | 'falling' | 'stable' | 'unknown'
+      medianRange: { min: number; max: number } | null
+    }
+    historical_summary: string
+  }
+  
+  // 5年历史数据
+  historical: Array<{
+    year: number
+    median: number | null
+    lower_quartile: number | null
+    upper_quartile: number | null
+  }>
+  
+  // 对比参考
+  comparison: {
+    your_score: number
+    median: number
+    lower_quartile: number | null
+    upper_quartile: number | null
+    difference_from_median: number | null
+    difference_from_lower_quartile: number | null
+    trend: 'rising' | 'falling' | 'stable' | 'unknown'
+    median_range: { min: number; max: number } | null
+  } | null
+  
+  // 推荐信息
+  recommendation: {
+    level: RecommendationLevel
+    rank: number
+    total: number
+    reason: string
+  }
+}
+
+/** V2 分析响应 */
+export interface AnalysisResponseV2 {
+  success: boolean
+  data?: {
+    analysis_results: ProgrammeAnalysisResultV2[]
+    by_recommendation: {
+      high: ProgrammeAnalysisResultV2[]
+      medium: ProgrammeAnalysisResultV2[]
+      low: ProgrammeAnalysisResultV2[]
+    }
+    summary: {
+      total_analysed: number
+      recommendation_high: number
+      recommendation_medium: number
+      recommendation_low: number
+      excellent_match: number
+      good_match: number
+      moderate_match: number
+      challenging: number
+      difficult: number
+    }
+    disclaimer: string
+  }
+  error?: string
+}
+
+/**
+ * V2 大学分析 - 使用课程特定计分规则
+ */
+export async function analyzeUniversityV2(
+  grades: { [subject: string]: string | number },
+  programmeCodes: string[],
+  includeHistorical: boolean = true
+): Promise<AnalysisResponseV2> {
+  return ragFetchJson('/api/jupas/analyze/v2', {
+    method: 'POST',
+    body: JSON.stringify({
+      grades,
+      programme_codes: programmeCodes,
+      include_historical: includeHistorical
+    })
+  })
+}
+
+/** 获取匹配等级配置 */
+export function getMatchLevelConfig(level: MatchLevel, isEnglish: boolean = false): {
+  label: string
+  color: string
+  description: string
+} {
+  const configs: Record<MatchLevel, { label_zh: string; label_en: string; color: string; desc_zh: string; desc_en: string }> = {
+    excellent: { label_zh: '极具竞争力', label_en: 'Excellent Match', color: '#52c41a', desc_zh: '成绩显著高于历年录取中位数', desc_en: 'Score significantly above median' },
+    good: { label_zh: '竞争力较强', label_en: 'Good Match', color: '#73d13d', desc_zh: '成绩高于历年录取中位数', desc_en: 'Score above median' },
+    moderate: { label_zh: '有一定机会', label_en: 'Moderate Match', color: '#faad14', desc_zh: '成绩在录取范围内', desc_en: 'Score within admission range' },
+    challenging: { label_zh: '需要努力', label_en: 'Challenging', color: '#ff7a45', desc_zh: '成绩略低于历年录取下四分位', desc_en: 'Score below lower quartile' },
+    difficult: { label_zh: '难度较大', label_en: 'Difficult', color: '#ff4d4f', desc_zh: '成绩与录取要求有明显差距', desc_en: 'Significant gap from requirements' },
+    unknown: { label_zh: '暂无数据', label_en: 'Unknown', color: '#bfbfbf', desc_zh: '该课程暂无历年收生数据', desc_en: 'No historical data available' }
+  }
+  const config = configs[level] || configs.unknown
+  return {
+    label: isEnglish ? config.label_en : config.label_zh,
+    color: config.color,
+    description: isEnglish ? config.desc_en : config.desc_zh
+  }
+}
+
+/** 获取推荐等级配置 */
+export function getRecommendationLevelConfig(level: RecommendationLevel, isEnglish: boolean = false): {
+  label: string
+  color: string
+  icon: string
+} {
+  const configs: Record<RecommendationLevel, { label_zh: string; label_en: string; color: string; icon: string }> = {
+    high: { label_zh: '强烈推荐', label_en: 'Highly Recommended', color: '#52c41a', icon: '🌟' },
+    medium: { label_zh: '值得考虑', label_en: 'Worth Considering', color: '#faad14', icon: '✨' },
+    low: { label_zh: '需要冲刺', label_en: 'Reach Choice', color: '#ff7a45', icon: '🎯' }
+  }
+  const config = configs[level] || configs.medium
+  return {
+    label: isEnglish ? config.label_en : config.label_zh,
+    color: config.color,
+    icon: config.icon
+  }
+}
+
+/** 获取相对位置标签 */
+export function getRelativePositionLabel(position: RelativePosition, isEnglish: boolean = false): {
+  label: string
+  color: string
+  icon: string
+} {
+  const configs: Record<RelativePosition, { label_zh: string; label_en: string; color: string; icon: string }> = {
+    far_above_median: { label_zh: '远高于中位数', label_en: 'Far Above Median', color: '#52c41a', icon: '📈' },
+    above_median: { label_zh: '高于中位数', label_en: 'Above Median', color: '#73d13d', icon: '↗️' },
+    around_median: { label_zh: '接近中位数', label_en: 'Around Median', color: '#faad14', icon: '➡️' },
+    below_median: { label_zh: '低于中位数', label_en: 'Below Median', color: '#ff7a45', icon: '↘️' },
+    around_lower_quartile: { label_zh: '接近下四分位', label_en: 'Around Lower Quartile', color: '#ff4d4f', icon: '⬇️' },
+    below_lower_quartile: { label_zh: '低于下四分位', label_en: 'Below Lower Quartile', color: '#f5222d', icon: '📉' },
+    far_below_lower_quartile: { label_zh: '远低于下四分位', label_en: 'Far Below Lower Quartile', color: '#a8071a', icon: '⚠️' },
+    unknown: { label_zh: '暂无数据', label_en: 'Unknown', color: '#bfbfbf', icon: '❓' }
+  }
+  const config = configs[position] || configs.unknown
+  return {
+    label: isEnglish ? config.label_en : config.label_zh,
+    color: config.color,
+    icon: config.icon
+  }
+}
+
+/** 获取等级换算可信度说明 */
+export function getMappingConfidenceInfo(confidence: string, isEnglish: boolean = false): {
+  label: string
+  color: string
+  description: string
+} {
+  const configs: Record<string, { label_zh: string; label_en: string; color: string; desc_zh: string; desc_en: string }> = {
+    official: { 
+      label_zh: '官方数据', 
+      label_en: 'Official', 
+      color: '#52c41a', 
+      desc_zh: '计分规则来源于官方公布的招生简章',
+      desc_en: 'Scoring rules from official admission documents'
+    },
+    estimated: { 
+      label_zh: '推算数据', 
+      label_en: 'Estimated', 
+      color: '#faad14', 
+      desc_zh: '基于历年数据和相似课程推算，仅供参考',
+      desc_en: 'Estimated based on historical data, for reference only'
+    },
+    low: { 
+      label_zh: '参考数据', 
+      label_en: 'Reference', 
+      color: '#ff7a45', 
+      desc_zh: '数据可信度较低，建议联系院校确认',
+      desc_en: 'Low confidence, please verify with the institution'
+    },
+    standard: { 
+      label_zh: '标准换算', 
+      label_en: 'Standard', 
+      color: '#1890ff', 
+      desc_zh: '使用传统的7分制换算 (5**=7)',
+      desc_en: 'Using standard 7-point scale (5**=7)'
+    }
+  }
+  const config = configs[confidence] || configs.standard
+  return {
+    label: isEnglish ? config.label_en : config.label_zh,
+    color: config.color,
+    description: isEnglish ? config.desc_en : config.desc_zh
+  }
+}

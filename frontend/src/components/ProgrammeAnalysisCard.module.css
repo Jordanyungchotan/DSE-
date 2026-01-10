@@ -1,0 +1,207 @@
+/* 专业分析卡片样式 */
+
+.programmeCard {
+  margin-bottom: 16px;
+  transition: all 0.3s ease;
+}
+
+.programmeCard:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.programmeInfo {
+  flex: 1;
+}
+
+.tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.programmeName {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #1a1a1a;
+}
+
+.programmeCode {
+  color: #666;
+  font-size: 14px;
+}
+
+.positionTag {
+  font-size: 14px;
+  padding: 4px 12px;
+  cursor: help;
+}
+
+.statsGrid {
+  margin-bottom: 16px;
+}
+
+.statBox {
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.statBoxScore {
+  background: #f0f5ff;
+}
+
+.statBoxMedian {
+  background: #fffbe6;
+}
+
+.statBoxDiff {
+  background: #f6ffed;
+}
+
+.statBoxDiffNegative {
+  background: #fff2f0;
+}
+
+.statBoxRef {
+  background: #f5f5f5;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.statValuePositive {
+  color: #52c41a;
+}
+
+.statValueNegative {
+  color: #ff4d4f;
+}
+
+.statValueBlue {
+  color: #1890ff;
+}
+
+.statValueYellow {
+  color: #faad14;
+}
+
+.statValueGray {
+  color: #666;
+}
+
+.statNote {
+  font-size: 11px;
+  color: #999;
+}
+
+.confidenceBar {
+  background: #fafafa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confidenceTag {
+  cursor: help;
+}
+
+.formulaText {
+  font-size: 12px;
+}
+
+.detailsPanel {
+  background: transparent;
+}
+
+.summaryTable {
+  margin-top: 8px;
+}
+
+.totalRow {
+  font-weight: 600;
+}
+
+.totalScore {
+  color: #1890ff;
+  font-size: 16px;
+}
+
+.historicalSection {
+  margin-bottom: 12px;
+}
+
+.historicalTitle {
+  margin-bottom: 8px;
+}
+
+.yearBox {
+  text-align: center;
+  padding: 8px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+.yearBoxCurrent {
+  border: 1px solid #1890ff;
+}
+
+.yearLabel {
+  font-size: 12px;
+  color: #666;
+}
+
+.yearValue {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.yearLQ {
+  font-size: 10px;
+  color: #999;
+}
+
+.explanationText {
+  font-size: 13px;
+  margin: 0;
+}
+
+.summaryText {
+  font-size: 12px;
+}
+
+/* 响应式 */
+@media (max-width: 576px) {
+  .cardHeader {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .programmeName {
+    font-size: 16px;
+  }
+  
+  .statValue {
+    font-size: 20px;
+  }
+}
