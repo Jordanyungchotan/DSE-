@@ -5,14 +5,23 @@
 const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || 'https://dse-rag-questions.jordanyungchotan.workers.dev'
 
 async function ragFetch(endpoint: string, options?: RequestInit) {
-  const response = await fetch(`${RAG_API_BASE}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  })
-  return response.json()
+  try {
+    const response = await fetch(`${RAG_API_BASE}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+    })
+    if (!response.ok) {
+      console.warn(`RAG API 请求失败: ${endpoint} - ${response.status}`)
+      return { success: false, error: `HTTP ${response.status}` }
+    }
+    return response.json()
+  } catch (error) {
+    console.warn(`RAG API 请求异常: ${endpoint}`, error)
+    return { success: false, error: 'Network error' }
+  }
 }
 
 // ==================== 通知 ====================
@@ -108,6 +117,7 @@ export async function sendMessage(senderId: string, receiverId: string, content:
 
 /**
  * 获取未读消息总数
+ * 注意：如果 API 不可用，返回默认值以避免界面错误
  */
 export async function getUnreadCount(userId: string): Promise<{
   success: boolean
@@ -117,5 +127,22 @@ export async function getUnreadCount(userId: string): Promise<{
     total: number
   }
 }> {
-  return ragFetch(`/api/messages/unread/count?user_id=${userId}`)
+  try {
+    const result = await ragFetch(`/api/messages/unread/count?user_id=${userId}`)
+    // 确保返回正确的结构
+    if (result && result.success !== undefined) {
+      return result
+    }
+    // 如果返回结构不正确，返回默认值
+    return {
+      success: true,
+      data: { notifications: 0, messages: 0, total: 0 }
+    }
+  } catch {
+    // API 调用失败时返回默认值，不抛出错误
+    return {
+      success: false,
+      data: { notifications: 0, messages: 0, total: 0 }
+    }
+  }
 }
