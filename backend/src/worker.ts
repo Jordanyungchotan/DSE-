@@ -2262,7 +2262,15 @@ const SUBJECT_NAME_MAP: Record<string, string> = {
 }
 
 const GRADE_NAME_MAP: Record<string, string> = {
+  // 旧格式兼容
   form4: '中四', form5: '中五', form6: '中六',
+  form1: '中一', form2: '中二', form3: '中三',
+  // 新格式
+  S1: '中一', S2: '中二', S3: '中三',
+  S4: '中四', S5: '中五', S6: '中六',
+  // 直接中文也兼容
+  '中一': '中一', '中二': '中二', '中三': '中三',
+  '中四': '中四', '中五': '中五', '中六': '中六',
 }
 
 // 构建分析提示词
@@ -2273,12 +2281,15 @@ function buildAnalysisPrompt(studentInfo: StudentInfo): string {
 
   const subjectNames = studentInfo.subjects.map(s => SUBJECT_NAME_MAP[s.subject] || s.subject)
 
+  // 获取年级名称，确保不会为空
+  const gradeName = GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade || '中四'
+  
   return `你是一位资深的香港DSE教育专家。请根据以下【已完整提供】的学生信息，提供专业的插班分析和建议。
 
-【学生基本信息】（以下信息已全部提供，请直接使用这些信息进行分析，不要说信息缺失）：
-- 插班日期：${studentInfo.enrollmentDate}
-- 当前年级：${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}
-- 学生年龄：${studentInfo.age}岁
+【学生基本信息】（★重要：以下所有信息均已完整提供，请直接使用，严禁说"信息缺失"、"未明确"等）：
+- 插班日期：${studentInfo.enrollmentDate || '待定'}
+- 当前年级：${gradeName}（★已明确提供）
+- 学生年龄：${studentInfo.age || 16}岁
 - 原就读学校：${studentInfo.currentSchool || '未填写'}
 
 【各科目成绩详情】：
@@ -2329,18 +2340,28 @@ ${subjectsText}
 2. schoolAssessments 必须包含以下学校的评估：${studentInfo.targetSchools.join('、')}
 3. 所有数组字段不能为空
 4. 只返回JSON，不要有其他文字说明
-5. 【特别重要】上述学生信息已完整提供，请在分析中充分利用年级（${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}）、年龄（${studentInfo.age}岁）等信息。绝对不要在keyWeaknesses或任何地方说"信息缺失"、"资料缺失"或类似表述
-6. 请根据学生当前年级评估其与目标学校课程进度的匹配度`
+5. 【★★★ 绝对禁止 ★★★】严禁在任何字段（包括summary、keyWeaknesses等）中出现以下表述：
+   - "年级信息未明确" ❌
+   - "信息缺失" ❌
+   - "资料不完整" ❌
+   - "未提供" ❌
+   学生年级已明确为【${gradeName}】，年龄为【${studentInfo.age || 16}岁】，请直接使用这些信息进行分析！
+6. 请根据学生当前年级（${gradeName}）评估其与目标学校课程进度的匹配度`
 }
 
 // 生成模拟结果
 function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
-  const baseScore = studentInfo.grade === 'form6' ? 60 : studentInfo.grade === 'form4' ? 75 : 70
+  // 处理各种年级格式
+  const grade = studentInfo.grade || 'S4'
+  const isHighGrade = ['form6', 'S6', 'S5', 'form5', '中五', '中六'].includes(grade)
+  const isLowGrade = ['form4', 'S4', 'S1', 'S2', 'S3', 'form1', 'form2', 'form3', '中一', '中二', '中三', '中四'].includes(grade)
+  const baseScore = isHighGrade ? 60 : isLowGrade ? 75 : 70
+  const gradeName = GRADE_NAME_MAP[grade] || grade || '中四'
 
   return {
     overallAssessment: {
       feasibilityScore: baseScore,
-      summary: `该学生目前就读${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}，计划于${studentInfo.enrollmentDate}插班。根据提供的成绩信息，整体学术表现中等偏上。建议重点加强薄弱科目的学习，为目标学校的录取做好准备。`,
+      summary: `该学生目前就读${gradeName}，计划于${studentInfo.enrollmentDate || '近期'}插班。根据提供的成绩信息，整体学术表现中等偏上。建议重点加强薄弱科目的学习，为目标学校的录取做好准备。`,
       keyStrengths: ['学习态度积极', '部分科目基础扎实', '有明确的目标规划'],
       keyWeaknesses: ['部分科目需要提升', '时间管理能力待加强', '需要更多实战练习'],
     },

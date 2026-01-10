@@ -88,12 +88,15 @@ const DSE_GRADES = [
 ]
 
 /**
- * 年级选项
+ * 年级选项（包含初中和高中）
  */
 const GRADE_OPTIONS = [
-  { value: 'form4', label: '中四' },
-  { value: 'form5', label: '中五' },
-  { value: 'form6', label: '中六' },
+  { value: 'S1', label: '中一' },
+  { value: 'S2', label: '中二' },
+  { value: 'S3', label: '中三' },
+  { value: 'S4', label: '中四' },
+  { value: 'S5', label: '中五' },
+  { value: 'S6', label: '中六' },
 ]
 
 /**
