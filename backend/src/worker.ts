@@ -2284,18 +2284,37 @@ function buildAnalysisPrompt(studentInfo: StudentInfo): string {
   // 获取年级名称，确保不会为空
   const gradeName = GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade || '中四'
   
+  // 计算距离插班的时间
+  let timeToEnrollment = ''
+  if (studentInfo.enrollmentDate) {
+    const enrollDate = new Date(studentInfo.enrollmentDate)
+    const now = new Date()
+    const diffDays = Math.ceil((enrollDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays > 0) {
+      const months = Math.floor(diffDays / 30)
+      const days = diffDays % 30
+      timeToEnrollment = months > 0 ? `约${months}个月${days > 0 ? days + '天' : ''}` : `${diffDays}天`
+    } else {
+      timeToEnrollment = '即将进行'
+    }
+  }
+  
   return `你是一位资深的香港DSE教育专家。请根据以下【已完整提供】的学生信息，提供专业的插班分析和建议。
 
-【学生基本信息】（★重要：以下所有信息均已完整提供，请直接使用，严禁说"信息缺失"、"未明确"等）：
-- 插班日期：${studentInfo.enrollmentDate || '待定'}
-- 当前年级：${gradeName}（★已明确提供）
+【学生基本信息】（★重要：以下所有信息均已完整提供，请直接使用进行分析）：
+- 插班目标日期：${studentInfo.enrollmentDate || '近期'}
+- 目标学期：${studentInfo.semester || '下学期'}
+- 距离插班时间：${timeToEnrollment || '待确定'}
+- 当前年级：${gradeName}
 - 学生年龄：${studentInfo.age || 16}岁
-- 原就读学校：${studentInfo.currentSchool || '未填写'}
+- 原就读学校：${studentInfo.currentSchool || '（学生未填写，请忽略此项）'}
 
-【各科目成绩详情】：
+【各科目成绩详情】（共${studentInfo.subjects.length}个科目）：
 ${subjectsText}
 
-【目标学校】：${studentInfo.targetSchools.join('、')}
+【目标学校】（共${studentInfo.targetSchools.length}所）：${studentInfo.targetSchools.join('、')}
+
+【学生备注】：${studentInfo.notes || '无'}
 
 请严格按照以下JSON格式返回分析结果，不要添加任何其他内容：
 
@@ -2356,17 +2375,17 @@ ${subjectsText}
    - "规划紧迫性不明"
    
    ✅ keyWeaknesses 应该只包含【学术能力相关】的待改进项，例如：
-   - "英文成绩需要提升"
+   - "英文成绩需要提升至X级"
    - "数学基础需要加强"
-   - "目标学校竞争激烈"
-   
-   已提供的完整信息：
-   - 插班日期：${studentInfo.enrollmentDate || '近期'}
-   - 年级：${gradeName}
-   - 年龄：${studentInfo.age || 16}岁
-   - 目标学校：${studentInfo.targetSchools.join('、')}
+   - "目标学校竞争激烈，需提前准备"
+   - "准备时间${timeToEnrollment || '有限'}，需抓紧复习"
 
-6. 请根据学生当前年级（${gradeName}）评估其与目标学校课程进度的匹配度`
+6. 请充分利用以上所有信息进行分析：
+   - 根据【插班日期】和【距离时间】评估准备时间是否充足
+   - 根据【年级】评估与目标学校课程的衔接
+   - 根据【各科成绩】评估学术竞争力
+   - 根据【目标学校】评估录取难度
+   - 如有【备注】信息，请纳入分析考量`
 }
 
 // 生成模拟结果
