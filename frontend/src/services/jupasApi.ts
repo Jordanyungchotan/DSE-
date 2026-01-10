@@ -824,6 +824,9 @@ export interface ProgrammeAnalysisResultV2 {
     total: number
     reason: string
   }
+  
+  // AI 解释 (预留字段，默认为空，不在大学分析阶段调用 DeepSeek)
+  ai_explanation: string | null
 }
 
 /** V2 分析响应 */
