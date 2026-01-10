@@ -1,0 +1,778 @@
+openapi: 3.0.3
+info:
+  title: DSE 插班智能评估 API
+  description: |
+    基于规则评分引擎 + DeepSeek AI 的香港 DSE 插班可行性分析系统。
+    所有结果为参考建议，不构成录取保证。
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:5000
+    description: 本地开发
+  - url: https://dse-analysis-api.jordanyungchotan.workers.dev
+    description: 生产环境
+
+paths:
+
+  ## -----------------------------------------------
+  ## 1. 用户认证模块
+  ## -----------------------------------------------
+
+  /api/auth/register:
+    post:
+      summary: 用户注册
+      tags: [认证]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                name:
+                  type: string
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  userId:
+                    type: string
+        '400':
+          description: 参数错误
+
+  /api/auth/login:
+    post:
+      summary: 用户登录
+      tags: [认证]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: 登录成功，返回 Token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /api/auth/me:
+    get:
+      summary: 获取当前用户信息
+      tags: [认证]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 当前用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: 未授权
+
+  ## -----------------------------------------------
+  ## 2. 插班分析（规则 + AI）
+  ## -----------------------------------------------
+
+  /api/analysis/submit:
+    post:
+      summary: 提交插班分析请求
+      tags: [插班分析]
+      description: |
+        提交学生信息与目标学校，用规则引擎打分并调用 DeepSeek AI 生成可行性分析。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisRequest'
+      responses:
+        '200':
+          description: 分析完成
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  result:
+                    $ref: '#/components/schemas/AnalysisResult'
+
+  /api/analysis/result/{id}:
+    get:
+      summary: 获取分析结果
+      tags: [插班分析]
+      description: 根据分析 ID 获取规则评分 + AI 分析结果。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 分析返回
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    $ref: '#/components/schemas/AnalysisResult'
+        '404':
+          description: 记录不存在
+
+  /api/analysis/history:
+    get:
+      summary: 获取当前用户分析历史
+      tags: [插班分析]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 历史分析列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  history:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/HistoryItem'
+
+  /api/analysis/history/{id}:
+    delete:
+      summary: 删除指定分析
+      tags: [插班分析]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /api/analysis/subjects:
+    get:
+      summary: 获取支持分析的科目列表
+      tags: [配置数据]
+      responses:
+        '200':
+          description: 学科列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subjects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Subject'
+
+  /api/analysis/grades:
+    get:
+      summary: 获取成绩等级列表
+      tags: [配置数据]
+      responses:
+        '200':
+          description: 等级信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  grades:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GradeLevel'
+
+  /api/analysis/schools:
+    get:
+      summary: 获取支持的学校列表
+      tags: [配置数据]
+      parameters:
+        - in: query
+          name: district
+          schema:
+            type: string
+          description: 按地区筛选
+        - in: query
+          name: band
+          schema:
+            type: integer
+            enum: [1, 2, 3]
+          description: 按 Band 等级筛选
+      responses:
+        '200':
+          description: 学校信息
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schools:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/School'
+
+  ## -----------------------------------------------
+  ## 3. 规则评分（单独接口）
+  ## -----------------------------------------------
+
+  /api/placement/score:
+    post:
+      summary: 规则评分（不调用 AI）
+      tags: [规则评分]
+      description: |
+        仅用规则引擎计算可行性评分和扣分原因，不调用 AI。
+        适用于快速预评估场景。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student, targetSchool]
+              properties:
+                student:
+                  $ref: '#/components/schemas/StudentProfile'
+                targetSchool:
+                  $ref: '#/components/schemas/TargetSchool'
+      responses:
+        '200':
+          description: 评分结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlacementScore'
+
+  ## -----------------------------------------------
+  ## 4. 用户反馈（反向训练）
+  ## -----------------------------------------------
+
+  /api/analysis/feedback:
+    post:
+      summary: 提交分析反馈
+      tags: [用户反馈]
+      description: 用户可选择性反馈最终插班结果，用于后续优化评分逻辑。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FeedbackRequest'
+      responses:
+        '200':
+          description: 反馈记录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  feedbackId:
+                    type: string
+
+  /api/analysis/feedback/{analysisId}:
+    get:
+      summary: 获取分析反馈状态
+      tags: [用户反馈]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: analysisId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 反馈状态
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasFeedback:
+                    type: boolean
+                  feedback:
+                    $ref: '#/components/schemas/Feedback'
+
+  ## -----------------------------------------------
+  ## 5. 咨询预约（闭环）
+  ## -----------------------------------------------
+
+  /api/consultation/book:
+    post:
+      summary: 预约升学咨询
+      tags: [咨询预约]
+      description: 把分析流转为咨询需求，可用于销售线索追踪。
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsultationBooking'
+      responses:
+        '200':
+          description: 预约成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  bookingId:
+                    type: string
+
+  /api/consultation/actions:
+    get:
+      summary: 获取推荐行动配置
+      tags: [咨询预约]
+      parameters:
+        - in: query
+          name: level
+          schema:
+            type: string
+            enum: [A, B, C, D, E]
+          description: 按可行性等级筛选
+      responses:
+        '200':
+          description: 推荐行动列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  actions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RecommendedAction'
+
+  /api/consultation/my-bookings:
+    get:
+      summary: 获取我的预约列表
+      tags: [咨询预约]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 预约列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bookings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BookingItem'
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    StudentProfile:
+      type: object
+      required: [currentGrade, scores]
+      properties:
+        age:
+          type: integer
+          minimum: 10
+          maximum: 20
+        gender:
+          type: string
+          enum: [male, female]
+        currentGrade:
+          type: string
+          enum: [S1, S2, S3, S4, S5, S6]
+        scores:
+          type: object
+          additionalProperties:
+            type: number
+            minimum: 0
+            maximum: 100
+        currentSchool:
+          type: string
+        strengths:
+          type: array
+          items:
+            type: string
+        extracurriculars:
+          type: array
+          items:
+            type: string
+        hobbies:
+          type: string
+        achievements:
+          type: string
+
+    TargetSchool:
+      type: object
+      required: [schoolName, bandLevel, district]
+      properties:
+        schoolId:
+          type: string
+        schoolName:
+          type: string
+        bandLevel:
+          type: integer
+          enum: [1, 2, 3]
+        district:
+          type: string
+        gender:
+          type: string
+          enum: [boys, girls, coed]
+        type:
+          type: string
+          enum: [government, aided, dss, private]
+
+    AnalysisRequest:
+      type: object
+      required: [student, targetSchool]
+      properties:
+        student:
+          $ref: '#/components/schemas/StudentProfile'
+        targetSchool:
+          $ref: '#/components/schemas/TargetSchool'
+        enrollmentDate:
+          type: string
+          format: date
+        semester:
+          type: string
+        notes:
+          type: string
+
+    AnalysisResult:
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        studentInfo:
+          $ref: '#/components/schemas/StudentProfile'
+        feasibilityLevel:
+          type: string
+          enum: [A, B, C, D, E]
+        levelDescription:
+          type: string
+        overallAssessment:
+          type: string
+        mainRisks:
+          type: array
+          items:
+            type: string
+        keyStrengths:
+          type: array
+          items:
+            type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+        subjectAnalysis:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubjectAnalysis'
+        preparationPlan:
+          $ref: '#/components/schemas/PreparationPlan'
+        disclaimer:
+          type: string
+          example: 本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。
+
+    SubjectAnalysis:
+      type: object
+      properties:
+        subject:
+          type: string
+        currentScore:
+          type: number
+        targetScore:
+          type: number
+        gap:
+          type: number
+        priority:
+          type: string
+          enum: [high, medium, low]
+        suggestions:
+          type: array
+          items:
+            type: string
+
+    PreparationPlan:
+      type: object
+      properties:
+        immediateActions:
+          type: array
+          items:
+            type: string
+        shortTermGoals:
+          type: array
+          items:
+            type: string
+        mediumTermGoals:
+          type: array
+          items:
+            type: string
+        resources:
+          type: array
+          items:
+            type: string
+
+    PlacementScore:
+      type: object
+      properties:
+        score:
+          type: number
+          minimum: 0
+          maximum: 100
+        level:
+          type: string
+          enum: [A, B, C, D, E]
+        levelDescription:
+          type: string
+        reasons:
+          type: array
+          items:
+            type: string
+        positiveReasons:
+          type: array
+          items:
+            type: string
+        breakdown:
+          type: object
+          properties:
+            baseScore:
+              type: number
+            gradeAdjustment:
+              type: number
+            districtAdjustment:
+              type: number
+            bonusPoints:
+              type: number
+        disclaimer:
+          type: string
+
+    HistoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        targetSchool:
+          type: string
+        feasibilityLevel:
+          type: string
+        summary:
+          type: string
+
+    Subject:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        nameEn:
+          type: string
+        category:
+          type: string
+          enum: [core, elective]
+
+    GradeLevel:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+
+    School:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        nameEn:
+          type: string
+        district:
+          type: string
+        bandLevel:
+          type: integer
+        gender:
+          type: string
+        type:
+          type: string
+
+    FeedbackRequest:
+      type: object
+      required: [analysisId, userOutcome]
+      properties:
+        analysisId:
+          type: string
+        userOutcome:
+          type: string
+          enum: [success, failure, not_tried, pending]
+        targetSchool:
+          type: string
+        updatedScores:
+          type: object
+          additionalProperties:
+            type: number
+        isEnrolled:
+          type: boolean
+        enrolledCourse:
+          type: string
+        feedbackText:
+          type: string
+        accuracyRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        usefulnessRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+
+    Feedback:
+      type: object
+      properties:
+        id:
+          type: string
+        userOutcome:
+          type: string
+        targetSchool:
+          type: string
+        isEnrolled:
+          type: boolean
+        accuracyRating:
+          type: integer
+        usefulnessRating:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ConsultationBooking:
+      type: object
+      required: [analysisId, contactName]
+      properties:
+        analysisId:
+          type: string
+        contactName:
+          type: string
+        contactPhone:
+          type: string
+        contactEmail:
+          type: string
+          format: email
+        preferredTime:
+          type: string
+          example: "2026-02-20 19:00"
+        notes:
+          type: string
+
+    RecommendedAction:
+      type: object
+      properties:
+        id:
+          type: string
+        level:
+          type: string
+        actionType:
+          type: string
+          enum: [consultation, course, assessment]
+        title:
+          type: string
+        description:
+          type: string
+        priority:
+          type: integer
+
+    BookingItem:
+      type: object
+      properties:
+        id:
+          type: string
+        analysisId:
+          type: string
+        contactName:
+          type: string
+        preferredTime:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, completed, cancelled]
+        createdAt:
+          type: string
+          format: date-time
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

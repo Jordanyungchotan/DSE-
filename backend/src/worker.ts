@@ -2769,6 +2769,276 @@ export default {
         }, 200, origin)
       }
 
+      // 获取当前用户信息
+      if (path === '/api/auth/me' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const user = await env.DB.prepare(
+          'SELECT id, name, email, avatar, created_at FROM users WHERE id = ?'
+        ).bind(tokenData.userId).first() as { id: string; name: string; email: string; avatar: string | null; created_at: string } | null
+
+        if (!user) {
+          return errorResponse('用户不存在', 404, origin)
+        }
+
+        return jsonResponse({
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            avatar: user.avatar,
+            createdAt: user.created_at,
+          },
+        }, 200, origin)
+      }
+
+      // =====================
+      // 配置数据 API
+      // =====================
+
+      // 获取支持的科目列表
+      if (path === '/api/analysis/subjects' && request.method === 'GET') {
+        const subjects = [
+          { id: 'chinese', name: '中国语文', nameEn: 'Chinese', category: 'core' },
+          { id: 'english', name: '英国语文', nameEn: 'English', category: 'core' },
+          { id: 'math', name: '数学', nameEn: 'Mathematics', category: 'core' },
+          { id: 'liberal', name: '公民与社会发展', nameEn: 'Citizenship', category: 'core' },
+          { id: 'physics', name: '物理', nameEn: 'Physics', category: 'elective' },
+          { id: 'chemistry', name: '化学', nameEn: 'Chemistry', category: 'elective' },
+          { id: 'biology', name: '生物', nameEn: 'Biology', category: 'elective' },
+          { id: 'economics', name: '经济', nameEn: 'Economics', category: 'elective' },
+          { id: 'bafs', name: '企业会计与财务概论', nameEn: 'BAFS', category: 'elective' },
+          { id: 'geography', name: '地理', nameEn: 'Geography', category: 'elective' },
+          { id: 'history', name: '历史', nameEn: 'History', category: 'elective' },
+          { id: 'ict', name: '资讯及通讯科技', nameEn: 'ICT', category: 'elective' },
+          { id: 'science', name: '科学/常识', nameEn: 'Science', category: 'elective' },
+          { id: 'm1', name: '数学延伸部分(M1)', nameEn: 'M1', category: 'elective' },
+          { id: 'm2', name: '数学延伸部分(M2)', nameEn: 'M2', category: 'elective' },
+        ]
+        return jsonResponse({ subjects }, 200, origin)
+      }
+
+      // 获取成绩等级列表
+      if (path === '/api/analysis/grades' && request.method === 'GET') {
+        const grades = [
+          { id: 'S1', name: '中一', description: '中一相对容易插班' },
+          { id: 'S2', name: '中二', description: '中二为基准难度' },
+          { id: 'S3', name: '中三', description: '中三难度略增' },
+          { id: 'S4', name: '中四', description: 'DSE选科后难度增加' },
+          { id: 'S5', name: '中五', description: '名额稀缺，竞争激烈' },
+          { id: 'S6', name: '中六', description: '几乎不接受插班' },
+        ]
+        return jsonResponse({ grades }, 200, origin)
+      }
+
+      // 获取学校列表
+      if (path === '/api/analysis/schools' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const district = url.searchParams.get('district')
+        const band = url.searchParams.get('band')
+
+        let schools = Object.entries(SCHOOLS_BY_DISTRICT).flatMap(([dist, schoolList]) =>
+          schoolList.map(school => ({
+            ...school,
+            district: dist,
+          }))
+        )
+
+        // 按地区筛选
+        if (district) {
+          schools = schools.filter(s => s.district === district)
+        }
+
+        // 按 Band 筛选
+        if (band) {
+          const bandLevel = parseInt(band, 10)
+          schools = schools.filter(s => s.band === bandLevel)
+        }
+
+        return jsonResponse({ 
+          schools: schools.map(s => ({
+            id: s.name, // 使用学校名作为 ID
+            name: s.name,
+            nameEn: s.nameEn || s.name,
+            district: s.district,
+            bandLevel: s.band,
+            gender: s.gender || 'coed',
+            type: s.type || 'aided',
+          })),
+          total: schools.length,
+        }, 200, origin)
+      }
+
+      // =====================
+      // 规则评分 API（不调用 AI）
+      // =====================
+
+      // 纯规则评分
+      if (path === '/api/placement/score' && request.method === 'POST') {
+        const body = await request.json() as {
+          student: {
+            age?: number
+            gender?: 'male' | 'female'
+            currentGrade: string
+            scores: Record<string, number>
+            currentSchool?: string
+            strengths?: string[]
+            extracurriculars?: string[]
+          }
+          targetSchool: {
+            schoolId?: string
+            schoolName: string
+            bandLevel: 1 | 2 | 3
+            district: string
+            gender?: 'boys' | 'girls' | 'coed'
+            type?: 'government' | 'aided' | 'dss' | 'private'
+          }
+        }
+
+        const { student, targetSchool } = body
+
+        // Band等级对应的基准分数要求
+        const BAND_THRESHOLDS: Record<number, { chinese: number; english: number; math: number; minAverage: number }> = {
+          1: { chinese: 70, english: 75, math: 70, minAverage: 72 },
+          2: { chinese: 55, english: 60, math: 55, minAverage: 58 },
+          3: { chinese: 40, english: 45, math: 40, minAverage: 42 },
+        }
+
+        // 区域竞争强度系数
+        const DISTRICT_FACTORS: Record<string, number> = {
+          '中西區': 1.15, '灣仔區': 1.12, '東區': 1.05, '南區': 1.02,
+          '九龍城區': 1.18, '油尖旺區': 1.10, '深水埗區': 1.05, '黃大仙區': 1.00, '觀塘區': 1.02,
+          '沙田區': 1.12, '大埔區': 1.05, '北區': 0.98, '西貢區': 1.08,
+          '葵青區': 1.00, '荃灣區': 1.02, '屯門區': 1.00, '元朗區': 0.98, '離島區': 0.95,
+        }
+
+        // 年级难度系数
+        const GRADE_FACTORS: Record<string, number> = {
+          'S1': 0.90, 'S2': 0.95, 'S3': 1.00, 'S4': 1.15, 'S5': 1.25, 'S6': 1.40,
+        }
+
+        const thresholds = BAND_THRESHOLDS[targetSchool.bandLevel]
+        const districtFactor = DISTRICT_FACTORS[targetSchool.district] || 1.0
+        const gradeFactor = GRADE_FACTORS[student.currentGrade] || 1.0
+
+        // 计算平均分
+        const scores = student.scores
+        const allScores = Object.values(scores)
+        const averageScore = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0
+
+        // 计算调整后的要求
+        const adjustedMinAverage = thresholds.minAverage * districtFactor * gradeFactor
+        const scoreDiff = averageScore - adjustedMinAverage
+
+        // 评估风险因素
+        const reasons: string[] = []
+        const positiveReasons: string[] = []
+        let baseScore = 70 // 基础分
+
+        // 成绩评估
+        if (scoreDiff >= 10) {
+          baseScore += 15
+          positiveReasons.push('整体成绩优于该校常见要求')
+        } else if (scoreDiff >= 0) {
+          baseScore += 5
+          positiveReasons.push('整体成绩达到基本要求')
+        } else if (scoreDiff >= -10) {
+          baseScore -= 10
+          reasons.push('整体成绩略低于该校一般要求')
+        } else {
+          baseScore -= 25
+          reasons.push('整体成绩与该校常见插班要求有较大差距')
+        }
+
+        // 核心科目评估
+        const coreSubjects = ['chinese', 'english', 'math']
+        for (const subject of coreSubjects) {
+          const score = scores[subject]
+          if (score !== undefined) {
+            const threshold = thresholds[subject as keyof typeof thresholds] as number
+            if (score < threshold - 15) {
+              baseScore -= 10
+              reasons.push(`${subject === 'chinese' ? '中文' : subject === 'english' ? '英文' : '数学'}成绩偏低`)
+            } else if (score >= threshold + 10) {
+              baseScore += 5
+              positiveReasons.push(`${subject === 'chinese' ? '中文' : subject === 'english' ? '英文' : '数学'}成绩优秀`)
+            }
+          }
+        }
+
+        // 年级难度调整
+        if (['S4', 'S5', 'S6'].includes(student.currentGrade)) {
+          baseScore -= 10
+          reasons.push('高年级插班名额稀缺，竞争激烈')
+        }
+
+        // Band 跨级评估
+        if (targetSchool.bandLevel === 1 && averageScore < 65) {
+          baseScore -= 15
+          reasons.push('目标为 Band 1 学校，需要更高的学术表现')
+        }
+
+        // 加分项
+        if (student.strengths && student.strengths.length > 0) {
+          baseScore += Math.min(student.strengths.length * 2, 10)
+          positiveReasons.push('具备个人特长优势')
+        }
+        if (student.extracurriculars && student.extracurriculars.length > 0) {
+          baseScore += Math.min(student.extracurriculars.length * 2, 10)
+          positiveReasons.push('课外活动丰富')
+        }
+
+        // 限制分数范围
+        const finalScore = Math.max(0, Math.min(100, baseScore))
+
+        // 等级映射
+        let level: string
+        let levelDescription: string
+        if (finalScore >= 80) {
+          level = 'A'
+          levelDescription = '可行性高 - 具备较强竞争力'
+        } else if (finalScore >= 60) {
+          level = 'B'
+          levelDescription = '可行性中等 - 有一定机会，建议针对性提升'
+        } else if (finalScore >= 45) {
+          level = 'C'
+          levelDescription = '可行性偏低 - 需要系统性提升后再尝试'
+        } else if (finalScore >= 30) {
+          level = 'D'
+          levelDescription = '可行性较低 - 不建议现阶段尝试'
+        } else {
+          level = 'E'
+          levelDescription = '可行性极低 - 建议先巩固基础，调整目标后再考虑插班'
+        }
+
+        // 免责声明
+        const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。'
+
+        return jsonResponse({
+          score: finalScore,
+          level,
+          levelDescription,
+          reasons,
+          positiveReasons,
+          breakdown: {
+            baseScore: 70,
+            scoreAdjustment: baseScore - 70,
+            districtFactor,
+            gradeFactor,
+            finalScore,
+          },
+          disclaimer,
+        }, 200, origin)
+      }
+
       // 提交分析
       if (path === '/api/analysis/submit' && request.method === 'POST') {
         const body = await request.json() as StudentInfo
@@ -5844,18 +6114,29 @@ export default {
       if (path === '/' || path === '') {
         return jsonResponse({
           name: 'DSE Analysis API',
-          version: '2.0.0',
+          version: '2.1.0',
           status: 'running',
           endpoints: [
             'GET /api/health',
+            // 认证 API
             'POST /api/auth/login',
             'POST /api/auth/register',
+            'GET /api/auth/me',
+            // 插班分析 API
             'POST /api/analysis/submit',
             'POST /api/analysis/university',
             'POST /api/analysis/feedback',
             'GET /api/analysis/feedback/:analysisId',
             'GET /api/analysis/result/:id',
             'GET /api/analysis/history',
+            'DELETE /api/analysis/history/:id',
+            // 配置数据 API
+            'GET /api/analysis/subjects',
+            'GET /api/analysis/grades',
+            'GET /api/analysis/schools',
+            // 规则评分 API
+            'POST /api/placement/score',
+            // 咨询预约 API
             'POST /api/consultation/book',
             'GET /api/consultation/actions',
             'GET /api/consultation/my-bookings',
