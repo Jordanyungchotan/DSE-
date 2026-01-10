@@ -1,0 +1,42 @@
+{
+  "lowEnglish": {
+    "threshold": 65,
+    "weight": 2.0,
+    "message": "英文成绩偏弱，会显著影响插班竞争力"
+  },
+  "lowMath": {
+    "threshold": 60,
+    "weight": 1.5,
+    "message": "数学成绩偏弱，影响整体学术表现"
+  },
+  "lowChinese": {
+    "threshold": 55,
+    "weight": 1.2,
+    "message": "中文成绩偏弱，需要加强"
+  },
+  "coreSubjectGap": {
+    "difference": 10,
+    "weight": 1.5,
+    "message": "核心科目存在明显短板"
+  },
+  "highGradeSensitivity": {
+    "grades": ["S4", "S5", "S6"],
+    "weight": 1.8,
+    "message": "高年级插班名额稀缺，竞争激烈"
+  },
+  "bandJump": {
+    "singleJump": {
+      "weight": 1.5,
+      "message": "跨一个Band插班需要充分准备"
+    },
+    "doubleJump": {
+      "weight": 2.5,
+      "message": "跨两个Band插班难度极大"
+    }
+  },
+  "imbalancedSubjects": {
+    "gapThreshold": 20,
+    "weight": 1.3,
+    "message": "科目成绩差距较大，存在偏科现象"
+  }
+}

@@ -2792,6 +2792,9 @@ export default {
           'INSERT INTO analysis_records (id, user_id, student_info, result, created_at) VALUES (?, ?, ?, ?, ?)'
         ).bind(recordId, userId, JSON.stringify(body), JSON.stringify(analysisResult), now).run()
 
+        // 免责声明
+        const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。'
+
         return jsonResponse({
           message: '分析完成',
           result: {
@@ -2799,6 +2802,7 @@ export default {
             createdAt: now,
             studentInfo: body,
             ...analysisResult,
+            disclaimer,
           },
         }, 200, origin)
       }
@@ -2815,12 +2819,16 @@ export default {
           return errorResponse('记录不存在', 404, origin)
         }
 
+        // 免责声明
+        const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。'
+
         return jsonResponse({
           result: {
             id: record.id,
             createdAt: record.created_at,
             studentInfo: JSON.parse(record.student_info),
             ...JSON.parse(record.result),
+            disclaimer,
           },
         }, 200, origin)
       }
@@ -2885,6 +2893,346 @@ export default {
         await env.DB.prepare('DELETE FROM analysis_records WHERE id = ?').bind(recordId).run()
 
         return jsonResponse({ message: '删除成功' }, 200, origin)
+      }
+
+      // =====================
+      // 用户反馈 API
+      // =====================
+
+      // 提交分析反馈
+      if (path === '/api/analysis/feedback' && request.method === 'POST') {
+        const body = await request.json() as {
+          analysisId: string
+          userOutcome: 'success' | 'failure' | 'not_tried' | 'pending'
+          targetSchool?: string
+          updatedScores?: Record<string, string>
+          isEnrolled?: boolean
+          enrolledCourse?: string
+          feedbackText?: string
+          difficultyRating?: number
+          accuracyRating?: number
+          usefulnessRating?: number
+        }
+
+        // 验证必填字段
+        if (!body.analysisId) {
+          return errorResponse('缺少分析ID', 400, origin)
+        }
+        if (!body.userOutcome || !['success', 'failure', 'not_tried', 'pending'].includes(body.userOutcome)) {
+          return errorResponse('无效的结果类型', 400, origin)
+        }
+
+        // 验证分析记录是否存在
+        const analysisRecord = await env.DB.prepare(
+          'SELECT id FROM analysis_records WHERE id = ?'
+        ).bind(body.analysisId).first()
+
+        if (!analysisRecord) {
+          return errorResponse('分析记录不存在', 404, origin)
+        }
+
+        // 获取用户ID（如果已登录）
+        let userId: string | null = null
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const token = authHeader.substring(7)
+          const tokenData = await verifyToken(token, env)
+          if (tokenData) {
+            userId = tokenData.userId
+          }
+        }
+
+        // 检查是否已有反馈
+        const existingFeedback = await env.DB.prepare(
+          'SELECT id FROM analysis_feedback WHERE analysis_id = ?'
+        ).bind(body.analysisId).first()
+
+        const now = new Date().toISOString()
+
+        if (existingFeedback) {
+          // 更新现有反馈
+          await env.DB.prepare(`
+            UPDATE analysis_feedback SET
+              user_outcome = ?,
+              target_school = ?,
+              updated_scores = ?,
+              is_enrolled = ?,
+              enrolled_course = ?,
+              feedback_text = ?,
+              difficulty_rating = ?,
+              accuracy_rating = ?,
+              usefulness_rating = ?,
+              updated_at = ?
+            WHERE analysis_id = ?
+          `).bind(
+            body.userOutcome,
+            body.targetSchool || null,
+            body.updatedScores ? JSON.stringify(body.updatedScores) : null,
+            body.isEnrolled ? 1 : 0,
+            body.enrolledCourse || null,
+            body.feedbackText || null,
+            body.difficultyRating || null,
+            body.accuracyRating || null,
+            body.usefulnessRating || null,
+            now,
+            body.analysisId
+          ).run()
+
+          return jsonResponse({
+            message: '反馈已更新',
+            feedbackId: (existingFeedback as { id: string }).id,
+          }, 200, origin)
+        } else {
+          // 创建新反馈
+          const feedbackId = crypto.randomUUID()
+
+          await env.DB.prepare(`
+            INSERT INTO analysis_feedback (
+              id, analysis_id, user_id, user_outcome, target_school,
+              updated_scores, is_enrolled, enrolled_course, feedback_text,
+              difficulty_rating, accuracy_rating, usefulness_rating,
+              feedback_source, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            feedbackId,
+            body.analysisId,
+            userId,
+            body.userOutcome,
+            body.targetSchool || null,
+            body.updatedScores ? JSON.stringify(body.updatedScores) : null,
+            body.isEnrolled ? 1 : 0,
+            body.enrolledCourse || null,
+            body.feedbackText || null,
+            body.difficultyRating || null,
+            body.accuracyRating || null,
+            body.usefulnessRating || null,
+            'web',
+            now,
+            now
+          ).run()
+
+          return jsonResponse({
+            message: '感谢您的反馈',
+            feedbackId,
+          }, 201, origin)
+        }
+      }
+
+      // 获取分析的反馈状态
+      if (path.startsWith('/api/analysis/feedback/') && request.method === 'GET') {
+        const analysisId = path.split('/').pop()
+
+        const feedback = await env.DB.prepare(
+          'SELECT * FROM analysis_feedback WHERE analysis_id = ?'
+        ).bind(analysisId).first()
+
+        if (!feedback) {
+          return jsonResponse({ hasFeedback: false }, 200, origin)
+        }
+
+        return jsonResponse({
+          hasFeedback: true,
+          feedback: {
+            id: (feedback as Record<string, unknown>).id,
+            userOutcome: (feedback as Record<string, unknown>).user_outcome,
+            targetSchool: (feedback as Record<string, unknown>).target_school,
+            isEnrolled: (feedback as Record<string, unknown>).is_enrolled === 1,
+            accuracyRating: (feedback as Record<string, unknown>).accuracy_rating,
+            usefulnessRating: (feedback as Record<string, unknown>).usefulness_rating,
+            createdAt: (feedback as Record<string, unknown>).created_at,
+          },
+        }, 200, origin)
+      }
+
+      // =====================
+      // 咨询预约 API
+      // =====================
+
+      // 预约咨询
+      if (path === '/api/consultation/book' && request.method === 'POST') {
+        const body = await request.json() as {
+          analysisId?: string
+          contactName: string
+          contactPhone: string
+          contactEmail?: string
+          contactWechat?: string
+          preferredTime?: string
+          preferredTimeSlot?: 'morning' | 'afternoon' | 'evening' | 'weekend'
+          consultationType: string
+          studentGrade?: string
+          targetSchools?: string[]
+          notes?: string
+          sourceLevel?: string
+          sourceAction?: string
+        }
+
+        // 验证必填字段
+        if (!body.contactName?.trim()) {
+          return errorResponse('请填写联系人姓名', 400, origin)
+        }
+        if (!body.contactPhone?.trim()) {
+          return errorResponse('请填写联系电话', 400, origin)
+        }
+        if (!body.consultationType?.trim()) {
+          return errorResponse('请选择咨询类型', 400, origin)
+        }
+
+        // 验证电话格式（香港手机号）
+        const phoneRegex = /^[0-9]{8}$/
+        if (!phoneRegex.test(body.contactPhone.replace(/\s/g, ''))) {
+          return errorResponse('请输入有效的香港手机号码（8位数字）', 400, origin)
+        }
+
+        // 获取用户ID（如果已登录）
+        let userId: string | null = null
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const token = authHeader.substring(7)
+          const tokenData = await verifyToken(token, env)
+          if (tokenData) {
+            userId = tokenData.userId
+          }
+        }
+
+        const bookingId = crypto.randomUUID()
+        const now = new Date().toISOString()
+
+        // 验证 analysisId 是否存在（如果提供）
+        if (body.analysisId) {
+          const analysisRecord = await env.DB.prepare(
+            'SELECT id FROM analysis_records WHERE id = ?'
+          ).bind(body.analysisId).first()
+          
+          if (!analysisRecord) {
+            // 分析记录不存在，清空关联
+            body.analysisId = undefined
+          }
+        }
+
+        // 创建预约记录
+        await env.DB.prepare(`
+          INSERT INTO consultation_bookings (
+            id, analysis_id, user_id,
+            contact_name, contact_phone, contact_email, contact_wechat,
+            preferred_time, preferred_time_slot, consultation_type,
+            source_level, source_action, student_grade, target_schools,
+            notes, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          bookingId,
+          body.analysisId || null,
+          userId,
+          body.contactName.trim(),
+          body.contactPhone.trim(),
+          body.contactEmail?.trim() || null,
+          body.contactWechat?.trim() || null,
+          body.preferredTime || null,
+          body.preferredTimeSlot || null,
+          body.consultationType,
+          body.sourceLevel || null,
+          body.sourceAction || null,
+          body.studentGrade || null,
+          body.targetSchools ? JSON.stringify(body.targetSchools) : null,
+          body.notes?.trim() || null,
+          'pending',
+          now,
+          now
+        ).run()
+
+        return jsonResponse({
+          message: '预约成功，我们会尽快与您联系',
+          bookingId,
+          estimatedContactTime: '24小时内',
+        }, 201, origin)
+      }
+
+      // 获取推荐行动
+      if (path === '/api/consultation/actions' && request.method === 'GET') {
+        const level = new URL(request.url).searchParams.get('level') as 'A' | 'B' | 'C' | 'D' | 'E' | null
+        
+        // 推荐行动配置
+        const RECOMMENDED_ACTIONS: Record<string, { title: string; actions: { type: string; title: string; description: string; ctaText: string }[] }> = {
+          'A': {
+            title: '可行性较高 - 建议把握机会',
+            actions: [
+              { type: 'consultation', title: '插班冲刺咨询', description: '您的孩子具备较好条件，建议预约专业顾问制定冲刺计划', ctaText: '预约免费咨询' },
+              { type: 'course', title: '插班强化课程', description: '针对目标学校的强化训练，提升面试和笔试竞争力', ctaText: '了解课程详情' },
+            ]
+          },
+          'B': {
+            title: '可行性中等 - 建议重点提升',
+            actions: [
+              { type: 'consultation', title: '插班规划咨询', description: '具备插班机会，建议咨询顾问制定提升策略', ctaText: '预约免费咨询' },
+              { type: 'course', title: '核心科目提升班', description: '重点提升英文/数学，增强竞争优势', ctaText: '了解提升方案' },
+            ]
+          },
+          'C': {
+            title: '可行性一般 - 建议先提升再尝试',
+            actions: [
+              { type: 'consultation', title: '能力提升咨询', description: '建议先进行系统评估，制定3-6个月提升计划', ctaText: '预约免费咨询' },
+              { type: 'course', title: '基础强化课程', description: '夯实基础，逐步提升各科成绩', ctaText: '了解课程详情' },
+            ]
+          },
+          'D': {
+            title: '可行性较低 - 建议调整目标',
+            actions: [
+              { type: 'consultation', title: '升学策略咨询', description: '建议重新评估目标，制定切实可行的升学方案', ctaText: '预约策略咨询' },
+              { type: 'course', title: '基础重建方案', description: '从基础开始，系统性提升学习能力', ctaText: '了解重建方案' },
+            ]
+          },
+          'E': {
+            title: '可行性极低 - 建议从基础开始',
+            actions: [
+              { type: 'consultation', title: '学习规划咨询', description: '建议进行全面评估，制定长期学习计划', ctaText: '预约规划咨询' },
+              { type: 'course', title: '基础能力培养班', description: '重建学习基础，培养良好学习习惯', ctaText: '了解培养方案' },
+            ]
+          }
+        }
+
+        if (level && RECOMMENDED_ACTIONS[level]) {
+          return jsonResponse({
+            level,
+            recommendation: RECOMMENDED_ACTIONS[level],
+          }, 200, origin)
+        }
+
+        // 返回所有推荐行动
+        return jsonResponse({
+          recommendations: RECOMMENDED_ACTIONS,
+        }, 200, origin)
+      }
+
+      // 查询预约状态（用户查看自己的预约）
+      if (path === '/api/consultation/my-bookings' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const token = authHeader.substring(7)
+        const tokenData = await verifyToken(token, env)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const bookings = await env.DB.prepare(`
+          SELECT id, analysis_id, consultation_type, preferred_time, status, created_at
+          FROM consultation_bookings
+          WHERE user_id = ?
+          ORDER BY created_at DESC
+          LIMIT 20
+        `).bind(tokenData.userId).all()
+
+        return jsonResponse({
+          bookings: (bookings.results || []).map((b: Record<string, unknown>) => ({
+            id: b.id,
+            analysisId: b.analysis_id,
+            consultationType: b.consultation_type,
+            preferredTime: b.preferred_time,
+            status: b.status,
+            createdAt: b.created_at,
+          })),
+        }, 200, origin)
       }
 
       // =====================
@@ -3085,7 +3433,8 @@ export default {
           resources: ['历年插班试题（如有）', '各科精编练习册', '在线学习平台', '专业补习班或私人导师', '学校开放日和咨询活动'],
         }
 
-        const DISCLAIMER = '⚠️ 免责声明：本系统基于公开教育资料与经验模型进行分析，仅作为升学参考，不构成任何录取保证。实际录取结果受多种因素影响，包括但不限于学校当年招生名额、面试表现、其他申请者情况等。建议结合学校官方信息和专业教育顾问意见做出决策。'
+        // 免责声明（统一使用简短版本）
+        const DISCLAIMER = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。'
 
         // 获取用户ID
         let userId: string | null = null
@@ -3419,6 +3768,9 @@ export default {
            VALUES (?, ?, 'university', ?, ?, ?)`
         ).bind(recordId, userId, JSON.stringify({ ...body, bestFive, bestSix }), JSON.stringify(universityAnalysisResult), now).run()
 
+        // 免责声明
+        const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。'
+
         return jsonResponse({
           message: '大学申请分析完成',
           result: {
@@ -3427,6 +3779,7 @@ export default {
             bestFive,
             bestSix,
             ...universityAnalysisResult,
+            disclaimer,
           },
         }, 200, origin)
       }
@@ -5499,8 +5852,13 @@ export default {
             'POST /api/auth/register',
             'POST /api/analysis/submit',
             'POST /api/analysis/university',
+            'POST /api/analysis/feedback',
+            'GET /api/analysis/feedback/:analysisId',
             'GET /api/analysis/result/:id',
             'GET /api/analysis/history',
+            'POST /api/consultation/book',
+            'GET /api/consultation/actions',
+            'GET /api/consultation/my-bookings',
             'POST /api/student/residence',
             'GET /api/student/residence',
             'POST /api/student/preferences',

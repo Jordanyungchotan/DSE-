@@ -77,6 +77,8 @@ export interface AnalysisResult {
     resources: string[]
   }
   additionalAdvice: string[]
+  /** 免责声明 */
+  disclaimer?: string
 }
 
 /**

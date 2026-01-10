@@ -598,6 +598,18 @@ const ResultPage = () => {
             )}
           />
         </Card>
+
+        {/* 免责声明 */}
+        <Alert
+          type="warning"
+          showIcon
+          message="免责声明"
+          description={
+            (result as { disclaimer?: string }).disclaimer || 
+            '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。'
+          }
+          className={styles.disclaimer}
+        />
       </div>
     </div>
   )

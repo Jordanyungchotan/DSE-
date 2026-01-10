@@ -1,0 +1,26 @@
+{
+  "S1": {
+    "factor": 0.8,
+    "description": "中一相对容易插班，名额较多"
+  },
+  "S2": {
+    "factor": 1.0,
+    "description": "中二为基准难度"
+  },
+  "S3": {
+    "factor": 1.2,
+    "description": "中三难度略增，需应对分科选择"
+  },
+  "S4": {
+    "factor": 1.5,
+    "description": "中四 DSE 选科后难度显著增加"
+  },
+  "S5": {
+    "factor": 1.7,
+    "description": "中五名额稀缺，竞争最激烈"
+  },
+  "S6": {
+    "factor": 2.0,
+    "description": "中六几乎不接受插班"
+  }
+}

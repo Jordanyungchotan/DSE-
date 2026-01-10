@@ -1,0 +1,20 @@
+{
+  "中西區": { "level": "极高", "factor": 1.15 },
+  "灣仔區": { "level": "极高", "factor": 1.12 },
+  "九龍城區": { "level": "极高", "factor": 1.18 },
+  "沙田區": { "level": "高", "factor": 1.12 },
+  "油尖旺區": { "level": "高", "factor": 1.10 },
+  "西貢區": { "level": "高", "factor": 1.08 },
+  "東區": { "level": "中高", "factor": 1.05 },
+  "南區": { "level": "中", "factor": 1.02 },
+  "大埔區": { "level": "中", "factor": 1.05 },
+  "深水埗區": { "level": "中", "factor": 1.05 },
+  "觀塘區": { "level": "中", "factor": 1.02 },
+  "荃灣區": { "level": "中", "factor": 1.02 },
+  "黃大仙區": { "level": "中", "factor": 1.00 },
+  "葵青區": { "level": "中", "factor": 1.00 },
+  "屯門區": { "level": "中", "factor": 1.00 },
+  "元朗區": { "level": "中低", "factor": 0.98 },
+  "北區": { "level": "中低", "factor": 0.98 },
+  "離島區": { "level": "低", "factor": 0.95 }
+}
