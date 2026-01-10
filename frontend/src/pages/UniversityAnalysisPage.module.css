@@ -190,9 +190,7 @@
   font-size: 14px;
   font-weight: 500;
   color: #1890ff;
-}
-
-/* 课程网格 - 3列显示更多 */
+}/* 课程网格 - 3列显示更多 */
 .programmesGrid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

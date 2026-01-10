@@ -1,4 +1,4 @@
-/* 插班可行性评估结果页面样式 */
+/* 插班可行性评估结果页面样式 v2.0 */
 
 .resultPage {
   max-width: 1000px;
@@ -20,16 +20,12 @@
   min-height: 400px;
 }
 
-.disclaimer {
-  margin-bottom: 24px;
-  border-radius: 8px;
-}
-
-/* 评估概览卡片 */
+/* ① 评估概览卡片 */
 .overviewCard {
   margin-bottom: 24px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
 }
 
 .levelBadge {
@@ -37,26 +33,33 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
-  border-radius: 16px;
-  border: 2px solid;
+  padding: 28px;
+  border-radius: 20px;
+  border: 3px solid;
   text-align: center;
+  transition: transform 0.3s;
+}
+
+.levelBadge:hover {
+  transform: scale(1.02);
 }
 
 .levelEmoji {
-  font-size: 48px;
-  margin-bottom: 8px;
+  font-size: 56px;
+  margin-bottom: 12px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 }
 
 .levelGrade {
-  font-size: 64px;
-  font-weight: 700;
+  font-size: 72px;
+  font-weight: 800;
   line-height: 1;
   margin-bottom: 8px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .levelTitle {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   color: #333;
 }
@@ -66,7 +69,7 @@
 }
 
 .studentInfo {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -74,16 +77,99 @@
 }
 
 .arrow {
-  font-size: 18px;
+  font-size: 20px;
   color: #999;
-  margin: 0 8px;
+  margin: 0 4px;
 }
 
-.levelDescription {
+.summary {
   font-size: 16px;
-  color: #666;
+  color: #444;
   line-height: 1.6;
   margin-bottom: 0;
+}
+
+/* ② 风险雷达 */
+.riskRadar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.radarItem {
+  padding: 14px 18px;
+  border-radius: 10px;
+  border-left: 4px solid;
+  background: #f9f9f9;
+  transition: transform 0.2s;
+}
+
+.radarItem:hover {
+  transform: translateX(4px);
+}
+
+/* ③ 行动建议区 */
+.actionCard {
+  margin-bottom: 24px;
+  border-radius: 16px;
+  border: 2px solid #1890ff;
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.15);
+}
+
+.actionCard :global(.ant-card-head) {
+  background: linear-gradient(90deg, #e6f7ff 0%, #fff 100%);
+  border-bottom: 1px solid #91d5ff;
+}
+
+.actionCard :global(.ant-card-head-title) {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.actionItem {
+  padding: 16px !important;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fafafa;
+  transition: background 0.2s;
+}
+
+.actionItem:hover {
+  background: #f0f5ff;
+}
+
+.actionNumber {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1890ff, #096dd9);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  margin-right: 16px;
+  flex-shrink: 0;
+}
+
+.actionText {
+  font-size: 15px;
+  color: #333;
+}
+
+/* 转化话术区域 */
+.conversionBox {
+  margin-top: 24px;
+  padding: 24px;
+  border-radius: 12px;
+  border: 2px solid;
+  text-align: center;
+}
+
+.conversionBox h5 {
+  font-size: 18px !important;
+  color: #333;
 }
 
 /* 各区块卡片 */
@@ -113,13 +199,13 @@
 }
 
 .subjectCard {
-  border-radius: 8px;
+  border-radius: 10px;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .subjectCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .subjectHeader {
@@ -140,16 +226,17 @@
 }
 
 .subjectRecommendation {
-  background: #f5f5f5;
-  padding: 8px 12px;
-  border-radius: 6px;
+  background: linear-gradient(135deg, #fffbe6 0%, #fff7e6 100%);
+  padding: 10px 14px;
+  border-radius: 8px;
   font-size: 13px;
-  color: #666;
+  color: #595959;
+  border-left: 3px solid #faad14;
 }
 
 .subjectRecommendation :global(.anticon) {
   color: #faad14;
-  margin-right: 6px;
+  margin-right: 8px;
 }
 
 /* 准备计划折叠面板 */
@@ -164,12 +251,39 @@
   font-size: 16px;
 }
 
+/* ④ 免责声明 */
+.disclaimer {
+  margin: 24px 0;
+  border-radius: 12px;
+  border: 1px solid #ffe58f;
+  background: linear-gradient(135deg, #fffbe6 0%, #fff1b8 100%);
+}
+
+.disclaimer :global(.ant-alert-message) {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.disclaimer :global(.ant-alert-description) {
+  font-size: 13px;
+  color: #666;
+}
+
 /* 底部操作区 */
 .footer {
   text-align: center;
-  padding: 24px 0;
+  padding: 32px 0;
   margin-top: 20px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 2px solid #f0f0f0;
+  background: linear-gradient(180deg, #fff 0%, #f9f9f9 100%);
+  border-radius: 0 0 12px 12px;
+}
+
+.footer button {
+  height: 48px;
+  font-size: 16px;
+  padding: 0 32px;
+  border-radius: 8px;
 }
 
 /* 响应式适配 */
@@ -179,20 +293,21 @@
   }
 
   .levelBadge {
-    padding: 16px;
+    padding: 20px;
   }
 
   .levelEmoji {
-    font-size: 36px;
+    font-size: 40px;
   }
 
   .levelGrade {
-    font-size: 48px;
+    font-size: 56px;
   }
 
   .overviewInfo {
     padding-left: 0;
     padding-top: 16px;
+    text-align: center;
   }
 
   .studentInfo {
@@ -201,5 +316,15 @@
 
   .subjectGrid {
     grid-template-columns: 1fr;
+  }
+
+  .actionNumber {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .conversionBox {
+    padding: 16px;
   }
 }

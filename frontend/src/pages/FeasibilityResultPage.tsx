@@ -1,7 +1,12 @@
 /**
- * 插班可行性评估结果页面
+ * 插班可行性评估结果页面 v2.0
  * 
- * 展示A/B/C/D等级评估结果，不显示具体百分比
+ * 新设计规格：
+ * ① 插班可行性总览卡
+ * ② 风险雷达（文字版）
+ * ③ 行动建议区（最重要）
+ * ④ 免责声明（一定要有）
+ * + 转化导向话术
  */
 
 import React, { useEffect, useState } from 'react'
@@ -18,7 +23,8 @@ import {
   Row,
   Col,
   Divider,
-  Collapse
+  Collapse,
+  Space
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -32,13 +38,15 @@ import {
   BulbOutlined,
   CalendarOutlined,
   TrophyOutlined,
+  SafetyOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import styles from './FeasibilityResultPage.module.css'
 
-const { Text, Paragraph } = Typography
+const { Title, Text, Paragraph } = Typography
 const { Panel } = Collapse
 
-// 可行性等级配置
+// 可行性等级配置 (A-E)
 const LEVEL_CONFIG = {
   A: {
     color: '#52c41a',
@@ -47,6 +55,7 @@ const LEVEL_CONFIG = {
     icon: <CheckCircleOutlined />,
     title: '可行性较高',
     emoji: '🌟',
+    progressColor: '#52c41a',
   },
   B: {
     color: '#1890ff',
@@ -55,6 +64,7 @@ const LEVEL_CONFIG = {
     icon: <CheckCircleOutlined />,
     title: '可行性中等',
     emoji: '💪',
+    progressColor: '#1890ff',
   },
   C: {
     color: '#faad14',
@@ -63,14 +73,25 @@ const LEVEL_CONFIG = {
     icon: <ExclamationCircleOutlined />,
     title: '可行性一般',
     emoji: '📚',
+    progressColor: '#faad14',
   },
   D: {
+    color: '#ff7a45',
+    bgColor: '#fff2e8',
+    borderColor: '#ffbb96',
+    icon: <WarningOutlined />,
+    title: '可行性较低',
+    emoji: '⚠️',
+    progressColor: '#ff7a45',
+  },
+  E: {
     color: '#ff4d4f',
     bgColor: '#fff2f0',
     borderColor: '#ffccc7',
     icon: <WarningOutlined />,
-    title: '可行性较低',
+    title: '需重新评估',
     emoji: '🎯',
+    progressColor: '#ff4d4f',
   },
 }
 
@@ -82,15 +103,38 @@ const STATUS_CONFIG = {
   critical: { color: 'error', text: '需加强', icon: <WarningOutlined /> },
 }
 
+// 风险雷达等级配置
+const RADAR_CONFIG = {
+  safe: { color: '#52c41a', icon: '✅' },
+  warning: { color: '#faad14', icon: '⚠️' },
+  danger: { color: '#ff4d4f', icon: '⚠️' },
+}
+
+interface ConversionCopy {
+  headline: string
+  description: string
+  ctaText: string
+  ctaType: 'primary' | 'secondary' | 'warning'
+  suggestions: string[]
+}
+
+interface RiskRadarItem {
+  area: string
+  level: 'safe' | 'warning' | 'danger'
+  message: string
+}
+
 interface FeasibilityResult {
   id: string
   createdAt: string
-  feasibilityLevel: 'A' | 'B' | 'C' | 'D'
+  feasibilityLevel: 'A' | 'B' | 'C' | 'D' | 'E'
   levelDescription: string
+  summary: string
   overallAssessment: string
   mainRisks: string[]
   keyStrengths: string[]
   recommendations: string[]
+  improvementPlan: string[]
   subjectAnalysis: {
     subject: string
     score: number
@@ -104,6 +148,8 @@ interface FeasibilityResult {
     mediumTermGoals: string[]
     resources: string[]
   }
+  conversionCopy: ConversionCopy
+  riskRadar: RiskRadarItem[]
   disclaimer: string
   request?: {
     student: {
@@ -202,17 +248,7 @@ const FeasibilityResultPage: React.FC = () => {
         </Button>
       </div>
 
-      {/* 免责声明 */}
-      <Alert
-        type="warning"
-        message="重要提示"
-        description={result.disclaimer}
-        showIcon
-        icon={<ExclamationCircleOutlined />}
-        className={styles.disclaimer}
-      />
-
-      {/* 评估概览卡片 */}
+      {/* ① 插班可行性总览卡 */}
       <Card className={styles.overviewCard}>
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} md={8}>
@@ -237,24 +273,110 @@ const FeasibilityResultPage: React.FC = () => {
           <Col xs={24} md={16}>
             <div className={styles.overviewInfo}>
               {result.request && (
-                <div className={styles.studentInfo}>
-                  <Tag color="blue">
-                    {gradeMap[result.request.student.currentGrade] || result.request.student.currentGrade}
-                  </Tag>
-                  <Tag color="purple">{result.request.student.age}岁</Tag>
-                  <span className={styles.arrow}>→</span>
-                  <Tag color="gold">
-                    {result.request.targetSchool.schoolName}
-                  </Tag>
-                  <Tag>Band {result.request.targetSchool.bandLevel}</Tag>
-                </div>
+                <>
+                  <Title level={4} style={{ marginBottom: 8 }}>
+                    目标中学：{result.request.targetSchool.schoolName}
+                  </Title>
+                  <div className={styles.studentInfo}>
+                    <Tag color="blue">
+                      {gradeMap[result.request.student.currentGrade] || result.request.student.currentGrade}
+                    </Tag>
+                    <Tag color="purple">{result.request.student.age}岁</Tag>
+                    <span className={styles.arrow}>→</span>
+                    <Tag color="gold">Band {result.request.targetSchool.bandLevel}</Tag>
+                    <Tag>{result.request.targetSchool.district}</Tag>
+                  </div>
+                </>
               )}
-              <Paragraph className={styles.levelDescription}>
-                {result.levelDescription}
+              <Paragraph className={styles.summary} style={{ marginTop: 12 }}>
+                <Text strong>总体评价：</Text>
+                {result.summary}
               </Paragraph>
             </div>
           </Col>
         </Row>
+      </Card>
+
+      {/* ② 风险雷达（文字版）*/}
+      <Card 
+        title={<><SafetyOutlined /> 风险雷达</>}
+        className={styles.sectionCard}
+      >
+        <div className={styles.riskRadar}>
+          {result.riskRadar && result.riskRadar.map((item, index) => {
+            const config = RADAR_CONFIG[item.level]
+            return (
+              <div 
+                key={index} 
+                className={styles.radarItem}
+                style={{ 
+                  borderLeftColor: config.color,
+                  backgroundColor: item.level === 'safe' ? '#f6ffed' : 
+                                   item.level === 'warning' ? '#fffbe6' : '#fff2f0'
+                }}
+              >
+                <Text style={{ color: config.color, fontSize: 16 }}>
+                  {item.message}
+                </Text>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
+
+      {/* ③ 行动建议区（最重要）*/}
+      <Card 
+        title={<><ThunderboltOutlined style={{ color: '#1890ff' }} /> 未来3个月重点行动</>}
+        className={styles.actionCard}
+      >
+        <List
+          dataSource={result.improvementPlan}
+          renderItem={(item, index) => (
+            <List.Item className={styles.actionItem}>
+              <div className={styles.actionNumber}>{index + 1}</div>
+              <Text className={styles.actionText}>{item}</Text>
+            </List.Item>
+          )}
+        />
+        
+        {/* 转化话术区域 */}
+        {result.conversionCopy && (
+          <div 
+            className={styles.conversionBox}
+            style={{ 
+              backgroundColor: result.feasibilityLevel === 'A' || result.feasibilityLevel === 'B' 
+                ? '#e6f7ff' 
+                : result.feasibilityLevel === 'C' 
+                  ? '#fffbe6' 
+                  : '#fff2f0',
+              borderColor: levelConfig.borderColor
+            }}
+          >
+            <Title level={5} style={{ marginBottom: 8 }}>
+              {result.conversionCopy.headline}
+            </Title>
+            <Paragraph style={{ marginBottom: 16 }}>
+              {result.conversionCopy.description}
+            </Paragraph>
+            <Space wrap>
+              {result.conversionCopy.suggestions.map((sug, i) => (
+                <Tag key={i} color="blue" style={{ padding: '4px 12px' }}>
+                  {sug}
+                </Tag>
+              ))}
+            </Space>
+            <div style={{ marginTop: 16 }}>
+              <Button 
+                type={result.conversionCopy.ctaType === 'primary' ? 'primary' : 'default'}
+                danger={result.conversionCopy.ctaType === 'warning'}
+                size="large"
+                icon={<RocketOutlined />}
+              >
+                {result.conversionCopy.ctaText}
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* 综合评估 */}
@@ -428,6 +550,16 @@ const FeasibilityResultPage: React.FC = () => {
           </div>
         </Panel>
       </Collapse>
+
+      {/* ④ 免责声明（一定要有）*/}
+      <Alert
+        type="warning"
+        message="重要提示"
+        description={result.disclaimer}
+        showIcon
+        icon={<ExclamationCircleOutlined />}
+        className={styles.disclaimer}
+      />
 
       {/* 底部操作 */}
       <div className={styles.footer}>
