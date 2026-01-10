@@ -476,6 +476,11 @@ const AnalysisFormPage = () => {
         subjects: subjects,
         targetSchools: selectedSchools,
         notes: values.notes || '',
+        // 个人特质信息
+        hobbies: values.hobbies || [],
+        strengths: values.strengths || [],
+        extracurriculars: values.extracurriculars || [],
+        achievements: values.achievements || '',
       }
 
       // 更新store
@@ -558,9 +563,10 @@ const AnalysisFormPage = () => {
     <div className={styles.stepContent}>
       <Title level={4}>学生基本信息</Title>
       <Paragraph type="secondary">
-        请填写学生的基本信息，以便进行精准分析
+        请填写学生的基本信息和个人特质，有助于AI进行全面分析
       </Paragraph>
       
+      {/* 基本信息 */}
       <Row gutter={24}>
         <Col xs={24} md={8}>
           <Form.Item
@@ -602,6 +608,106 @@ const AnalysisFormPage = () => {
             <Input
               size="large"
               placeholder="输入学校名称（选填）"
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Divider orientation="left">个人特质（选填，有助于综合评估）</Divider>
+
+      {/* 兴趣爱好 */}
+      <Row gutter={24}>
+        <Col xs={24} md={12}>
+          <Form.Item
+            name="hobbies"
+            label="兴趣爱好"
+            tooltip="如：阅读、音乐、运动、编程等"
+          >
+            <Select
+              mode="tags"
+              size="large"
+              placeholder="输入后按回车添加，可添加多个"
+              tokenSeparators={[',']}
+              options={[
+                { value: '阅读', label: '阅读' },
+                { value: '音乐', label: '音乐' },
+                { value: '运动', label: '运动' },
+                { value: '绘画', label: '绘画' },
+                { value: '编程', label: '编程' },
+                { value: '写作', label: '写作' },
+                { value: '棋艺', label: '棋艺' },
+                { value: '摄影', label: '摄影' },
+              ]}
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={12}>
+          <Form.Item
+            name="strengths"
+            label="个人特长"
+            tooltip="如：领导力、演讲、语言能力、数理逻辑等"
+          >
+            <Select
+              mode="tags"
+              size="large"
+              placeholder="输入后按回车添加，可添加多个"
+              tokenSeparators={[',']}
+              options={[
+                { value: '领导力', label: '领导力' },
+                { value: '演讲', label: '演讲' },
+                { value: '团队协作', label: '团队协作' },
+                { value: '英语口语', label: '英语口语' },
+                { value: '数理逻辑', label: '数理逻辑' },
+                { value: '创意思维', label: '创意思维' },
+                { value: '组织能力', label: '组织能力' },
+                { value: '时间管理', label: '时间管理' },
+              ]}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      {/* 课外活动 */}
+      <Row gutter={24}>
+        <Col xs={24}>
+          <Form.Item
+            name="extracurriculars"
+            label="课外活动与社团"
+            tooltip="如：学生会、辩论队、运动队、志愿服务等"
+          >
+            <Select
+              mode="tags"
+              size="large"
+              placeholder="输入后按回车添加，可添加多个"
+              tokenSeparators={[',']}
+              options={[
+                { value: '学生会', label: '学生会' },
+                { value: '辩论队', label: '辩论队' },
+                { value: '合唱团', label: '合唱团' },
+                { value: '篮球队', label: '篮球队' },
+                { value: '足球队', label: '足球队' },
+                { value: '游泳队', label: '游泳队' },
+                { value: '志愿服务', label: '志愿服务' },
+                { value: '科学社', label: '科学社' },
+                { value: '戏剧社', label: '戏剧社' },
+                { value: '摄影社', label: '摄影社' },
+              ]}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      {/* 成就与奖项 */}
+      <Row gutter={24}>
+        <Col xs={24}>
+          <Form.Item
+            name="achievements"
+            label="获奖经历与成就"
+            tooltip="如：学科竞赛奖项、体育比赛名次、艺术表演获奖等"
+          >
+            <TextArea
+              rows={3}
+              placeholder="请描述获得的奖项或成就，例如：&#10;• 2024年校际数学竞赛银奖&#10;• 学生会副主席&#10;• 钢琴八级证书"
             />
           </Form.Item>
         </Col>

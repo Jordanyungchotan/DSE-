@@ -18,12 +18,17 @@ export interface SubjectScore {
 export interface StudentInfo {
   enrollmentDate: string      // 插班日期
   semester: string            // 学期
-  grade: string               // 年级（中四/中五/中六）
+  grade: string               // 年级（中一至中六）
   age: number                 // 年龄
   currentSchool: string       // 当前学校
   subjects: SubjectScore[]    // 科目成绩列表
   targetSchools: string[]     // 目标学校
   notes: string               // 备注
+  // 个人特质信息
+  hobbies?: string[]          // 兴趣爱好
+  strengths?: string[]        // 个人特长
+  extracurriculars?: string[] // 课外活动
+  achievements?: string       // 获奖经历
 }
 
 /**

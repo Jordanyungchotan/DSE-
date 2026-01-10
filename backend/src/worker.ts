@@ -2218,6 +2218,11 @@ interface StudentInfo {
   subjects: { subject: string; currentScore: string; targetScore: string }[]
   targetSchools: string[]
   notes: string
+  // 个人特质信息
+  hobbies?: string[]           // 兴趣爱好
+  strengths?: string[]         // 个人特长
+  extracurriculars?: string[]  // 课外活动
+  achievements?: string        // 获奖经历
 }
 
 interface AnalysisResult {
@@ -2314,6 +2319,12 @@ ${subjectsText}
 
 【目标学校】（共${studentInfo.targetSchools.length}所）：${studentInfo.targetSchools.join('、')}
 
+【个人特质与综合素质】：
+- 兴趣爱好：${studentInfo.hobbies?.length ? studentInfo.hobbies.join('、') : '未填写'}
+- 个人特长：${studentInfo.strengths?.length ? studentInfo.strengths.join('、') : '未填写'}
+- 课外活动：${studentInfo.extracurriculars?.length ? studentInfo.extracurriculars.join('、') : '未填写'}
+- 获奖经历：${studentInfo.achievements || '未填写'}
+
 【学生备注】：${studentInfo.notes || '无'}
 
 请严格按照以下JSON格式返回分析结果，不要添加任何其他内容：
@@ -2385,7 +2396,15 @@ ${subjectsText}
    - 根据【年级】评估与目标学校课程的衔接
    - 根据【各科成绩】评估学术竞争力
    - 根据【目标学校】评估录取难度
-   - 如有【备注】信息，请纳入分析考量`
+   - 根据【个人特质】评估综合素质和面试优势
+   - 如有【获奖经历】，请作为加分项纳入评估
+   - 如有【课外活动】，请评估是否有助于申请
+   - 如有【备注】信息，请纳入分析考量
+   
+7. 关于个人特质的分析要求：
+   - 如果学生填写了兴趣爱好、特长、课外活动等，请在keyStrengths中体现
+   - 综合评估时考虑学术成绩+综合素质的整体竞争力
+   - 在建议中可以提到如何在面试中展示个人特质`
 }
 
 // 生成模拟结果
