@@ -255,6 +255,8 @@ const AdminDashboardPage = () => {
   const [communityLoading, setCommunityLoading] = useState(false)
 
   // 用户管理相关状态
+  type ConsultantRole = 'user' | 'consultant' | 'admin'
+  
   interface AdminUser {
     id: string
     name: string
@@ -266,11 +268,13 @@ const AdminDashboardPage = () => {
     analysis_count: number
     test_count: number
     post_count: number
+    role?: ConsultantRole  // 顾问角色授权
   }
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [usersPagination, setUsersPagination] = useState({ page: 1, pageSize: 20, total: 0, totalPages: 0 })
   const [usersSearchTerm, setUsersSearchTerm] = useState('')
+  const [roleUpdating, setRoleUpdating] = useState<string | null>(null)  // 正在更新角色的用户ID
 
   const adminKey = sessionStorage.getItem('adminKey')
 
@@ -342,6 +346,42 @@ const AdminDashboardPage = () => {
       message.error('加载用户列表失败')
     } finally {
       setUsersLoading(false)
+    }
+  }
+
+  // 更新用户角色（顾问授权）
+  const handleUpdateUserRole = async (userId: string, newRole: ConsultantRole) => {
+    setRoleUpdating(userId)
+    try {
+      const response = await ragFetch(`/api/admin/users/${userId}/role`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': 'admin'  // 使用管理员身份
+        },
+        body: JSON.stringify({ role: newRole })
+      })
+      
+      if (response.ok) {
+        const roleLabels: Record<ConsultantRole, string> = {
+          user: '普通用户',
+          consultant: '顾问',
+          admin: '管理员'
+        }
+        message.success(`用户角色已更新为「${roleLabels[newRole]}」`)
+        // 更新本地状态
+        setAdminUsers(prev => prev.map(u => 
+          u.id === userId ? { ...u, role: newRole } : u
+        ))
+      } else {
+        const data = await response.json()
+        message.error(data.error || '角色更新失败')
+      }
+    } catch (error) {
+      console.error('更新角色失败:', error)
+      message.error('角色更新失败')
+    } finally {
+      setRoleUpdating(null)
     }
   }
 
@@ -2494,9 +2534,62 @@ const AdminDashboardPage = () => {
   )
 
   // 用户管理标签页
-  const renderUsersTab = () => (
+  const renderUsersTab = () => {
+    // 计算各角色用户数
+    const roleStats = {
+      total: adminUsers.length,
+      user: adminUsers.filter(u => !u.role || u.role === 'user').length,
+      consultant: adminUsers.filter(u => u.role === 'consultant').length,
+      admin: adminUsers.filter(u => u.role === 'admin').length,
+    }
+    
+    return (
     <Spin spinning={usersLoading}>
-      <Card title="用户管理" style={{ marginBottom: 24 }}>
+      {/* 角色统计卡片 */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="总用户数" 
+              value={usersPagination.total || roleStats.total}
+              prefix={<TeamOutlined />}
+              valueStyle={{ color: '#722ed1' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="普通用户" 
+              value={roleStats.user}
+              prefix={<UserOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title={<span style={{ color: '#52c41a', fontWeight: 'bold' }}>🎓 顾问</span>}
+              value={roleStats.consultant}
+              prefix={<SafetyOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={12} sm={6}>
+          <Card className={styles.statCard}>
+            <Statistic 
+              title="管理员" 
+              value={roleStats.admin}
+              prefix={<CrownOutlined />}
+              valueStyle={{ color: '#ff4d4f' }}
+            />
+          </Card>
+        </Col>
+      </Row>
+
+      <Card title="用户管理 / 顾问授权" style={{ marginBottom: 24 }}>
         <Space style={{ marginBottom: 16 }}>
           <Input.Search
             placeholder="搜索用户（ID/姓名/邮箱）"
@@ -2558,6 +2651,41 @@ const AdminDashboardPage = () => {
                 <Tooltip title={id}>
                   <Text copyable style={{ fontSize: 11 }}>{id.substring(0, 8)}...</Text>
                 </Tooltip>
+              )
+            },
+            {
+              title: '角色',
+              dataIndex: 'role',
+              width: 130,
+              filters: [
+                { text: '普通用户', value: 'user' },
+                { text: '顾问', value: 'consultant' },
+                { text: '管理员', value: 'admin' },
+              ],
+              onFilter: (value: unknown, record: AdminUser) => record.role === value,
+              render: (role: ConsultantRole | undefined, record: AdminUser) => (
+                <Select
+                  value={role || 'user'}
+                  onChange={(newRole) => handleUpdateUserRole(record.id, newRole)}
+                  loading={roleUpdating === record.id}
+                  disabled={roleUpdating !== null}
+                  size="small"
+                  style={{ width: 110 }}
+                  options={[
+                    { 
+                      value: 'user', 
+                      label: <span><UserOutlined style={{ marginRight: 4 }} />普通用户</span>
+                    },
+                    { 
+                      value: 'consultant', 
+                      label: <span style={{ color: '#52c41a' }}><TeamOutlined style={{ marginRight: 4 }} />顾问</span>
+                    },
+                    { 
+                      value: 'admin', 
+                      label: <span style={{ color: '#ff4d4f' }}><CrownOutlined style={{ marginRight: 4 }} />管理员</span>
+                    },
+                  ]}
+                />
               )
             },
             {
@@ -2635,7 +2763,7 @@ const AdminDashboardPage = () => {
         />
       </Card>
     </Spin>
-  )
+  )}
 
   const tabItems = [
     {
