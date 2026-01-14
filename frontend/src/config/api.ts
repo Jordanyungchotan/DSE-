@@ -7,9 +7,10 @@
 
 // 获取 API 基础 URL
 // 生产环境直接使用后端 Worker URL
-const PRODUCTION_API_URL = 'https://dse-analysis-api.jordanyungchotan.workers.dev'
+// ⚠️ 2024-01: 统一使用 dse-rag-questions Worker，dse-analysis-api 已废弃
+const PRODUCTION_API_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
 
-// RAG 题库服务 URL
+// RAG 题库服务 URL（与主 API 同一个 Worker）
 const PRODUCTION_RAG_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 

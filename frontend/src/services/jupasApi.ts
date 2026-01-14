@@ -750,6 +750,81 @@ export type RelativePosition =
   | 'far_below_lower_quartile'
   | 'unknown'
 
+/** 关键风险因素类型 */
+export type RiskFactorType = 'subject_gap' | 'competition' | 'subject_weight' | 'missing_subject' | 'trend'
+
+/** 影响级别 */
+export type ImpactLevel = 'low' | 'medium' | 'high'
+
+/** 关键风险因素 */
+export interface KeyRiskFactor {
+  type: RiskFactorType
+  description: string
+  impactLevel: ImpactLevel
+}
+
+/** 提升杠杆 */
+export interface ImprovementLeverage {
+  subject: string
+  expectedImpact: ImpactLevel
+  note: string
+}
+
+/** 解释引擎输出 */
+export interface ExplanationEngine {
+  strengthSubjects: string[]
+  weakSubjects: string[]
+  keyRiskFactors: KeyRiskFactor[]
+  scorePositionReason: string
+  improvementLeverage: ImprovementLeverage[]
+}
+
+/** 位置类型 */
+export type PositionType = 'above_median' | 'around_median' | 'below_median'
+
+/** 位置标签 */
+export type PositionLabel = '稳阵' | '适中' | '冲刺'
+
+/** 位置元数据 */
+export interface PositionMeta {
+  userScore: number
+  fiveYearMedian: number | null
+  fiveYearRange: { min: number; max: number } | null
+  position: PositionType
+  positionLabel: PositionLabel
+}
+
+/** 策略类型 */
+export type StrategyType = 'safe' | 'balanced' | 'aggressive'
+
+/** 目标位置转换类型 */
+export type TargetShift = 'below_to_around' | 'around_to_above' | 'already_above' | 'no_data'
+
+/** 需要提升的科目 */
+export interface RequiredImprovement {
+  subject: string
+  gradeFrom: string
+  gradeTo: string
+  priority: 'high' | 'medium' | 'low'
+}
+
+/** 提升路径 */
+export interface ImprovementPath {
+  targetShift: TargetShift
+  targetShiftLabel: string
+  requiredImprovement: RequiredImprovement[]
+  estimatedScoreGain: number
+}
+
+/** 计分规则元数据 */
+export interface ScoringMeta {
+  scoringMethod: string
+  gradeMapping: Record<string, number>
+  mappingConfidence: 'official' | 'estimated' | 'low' | 'standard'
+  confidenceNote: string
+  formulaDescription: string
+}
+
 /** V2 分析结果 - 单个专业 */
 export interface ProgrammeAnalysisResultV2 {
   programme_code: string
@@ -824,6 +899,21 @@ export interface ProgrammeAnalysisResultV2 {
     total: number
     reason: string
   }
+  
+  // 计分规则元数据
+  scoring_meta?: ScoringMeta
+  
+  // 解释引擎输出（结构化，由系统逻辑生成）
+  explanation_engine?: ExplanationEngine
+  
+  // 位置元数据（简化的位置判断，稳阵/冲刺判断来源）
+  position_meta?: PositionMeta
+  
+  // 该专业所属策略方案
+  strategy?: StrategyType
+  
+  // 提升路径
+  improvement_path?: ImprovementPath
   
   // AI 解释 (预留字段，默认为空，不在大学分析阶段调用 DeepSeek)
   ai_explanation: string | null

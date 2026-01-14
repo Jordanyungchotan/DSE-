@@ -156,9 +156,7 @@
 .resultCard {
   margin-bottom: 16px;
   border-radius: 12px;
-}
-
-.analysisResultContent {
+}.analysisResultContent {
   overflow-y: auto;
   padding-right: 8px;
 }

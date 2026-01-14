@@ -35,7 +35,8 @@ export async function searchUsers(query: string, excludeUserId?: string) {
     params.append('exclude', excludeUserId)
   }
   // 用户数据在 backend 的数据库中，需要调用 backend API
-  const BACKEND_API_BASE = import.meta.env.VITE_API_URL || 'https://dse-analysis-api.jordanyungchotan.workers.dev'
+  // ⚠️ 统一使用 dse-rag-questions Worker
+  const BACKEND_API_BASE = import.meta.env.VITE_API_URL || 'https://dse-rag-questions.jordanyungchotan.workers.dev'
   const response = await fetch(`${BACKEND_API_BASE}/api/users/search?${params}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -54,7 +55,8 @@ export async function getUsersBatch(userIds: string[]): Promise<{
   if (userIds.length === 0) {
     return { success: true, data: [] }
   }
-  const BACKEND_API_BASE = import.meta.env.VITE_API_URL || 'https://dse-analysis-api.jordanyungchotan.workers.dev'
+  // ⚠️ 统一使用 dse-rag-questions Worker
+  const BACKEND_API_BASE = import.meta.env.VITE_API_URL || 'https://dse-rag-questions.jordanyungchotan.workers.dev'
   const response = await fetch(`${BACKEND_API_BASE}/api/users/batch`, {
     method: 'POST',
     headers: {
