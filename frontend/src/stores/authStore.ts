@@ -70,11 +70,13 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(errorMessage)
           }
           
-          const data = await response.json()
+          const responseData = await response.json()
+          // 后端返回格式: { success: true, data: { token, user } }
+          const { token, user } = responseData.data || responseData
           set({
             isAuthenticated: true,
-            user: data.user,
-            token: data.token,
+            user: user,
+            token: token,
             loading: false,
           })
         } catch (error) {
@@ -116,11 +118,13 @@ export const useAuthStore = create<AuthState>()(
             throw new Error(errorMessage)
           }
           
-          const data = await response.json()
+          const responseData = await response.json()
+          // 后端返回格式: { success: true, data: { token, user } }
+          const { token, user } = responseData.data || responseData
           set({
             isAuthenticated: true,
-            user: data.user,
-            token: data.token,
+            user: user,
+            token: token,
             loading: false,
           })
         } catch (error) {
