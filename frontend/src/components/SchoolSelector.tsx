@@ -13,6 +13,8 @@ import {
   Region,
   School,
   REGION_COLORS,
+  formatSchoolType,
+  formatSchoolGender,
 } from '../services/schoolsApi'
 import { useLanguageStore } from '../stores/languageStore'
 
@@ -173,8 +175,8 @@ export default function SchoolSelector({
                   <div style={{ fontSize: 12, color: '#999', marginLeft: 22 }}>
                     <EnvironmentOutlined style={{ marginRight: 4 }} />
                     {school.district_name || school.district}
-                    {school.type && <Tag style={{ marginLeft: 8, fontSize: 12 }}>{school.type}</Tag>}
-                    {school.gender && <Tag style={{ fontSize: 12 }}>{school.gender}</Tag>}
+                    {school.type && <Tag style={{ marginLeft: 8, fontSize: 12 }}>{formatSchoolType(school.type)}</Tag>}
+                    {school.gender && <Tag style={{ fontSize: 12 }}>{formatSchoolGender(school.gender)}</Tag>}
                   </div>
                 </div>
               ))}
@@ -272,8 +274,8 @@ export default function SchoolSelector({
                   <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <BankOutlined style={{ color: '#1890ff' }} />
                     <span>{school.name_zh}</span>
-                    {school.type && <Tag color={school.type === '直資' ? 'blue' : school.type === '官立' ? 'green' : 'default'} style={{ fontSize: 11 }}>{school.type}</Tag>}
-                    {school.gender && <Tag color={school.gender === '男' ? 'cyan' : school.gender === '女' ? 'magenta' : 'default'} style={{ fontSize: 11 }}>{school.gender}</Tag>}
+                    {school.type && <Tag color={school.type === 'dss' ? 'blue' : school.type === 'government' ? 'green' : 'default'} style={{ fontSize: 11 }}>{formatSchoolType(school.type)}</Tag>}
+                    {school.gender && <Tag color={school.gender === 'boys' ? 'cyan' : school.gender === 'girls' ? 'magenta' : 'default'} style={{ fontSize: 11 }}>{formatSchoolGender(school.gender)}</Tag>}
                   </div>
                   {school.name_en && (
                     <div style={{ fontSize: 12, color: '#666', marginLeft: 22, marginTop: 4 }}>

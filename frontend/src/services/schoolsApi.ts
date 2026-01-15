@@ -41,12 +41,20 @@ export interface School {
 
 // 区域颜色映射
 export const REGION_COLORS: Record<string, string> = {
-  '香港島': '#faad14',   // 港岛 - 橙色
-  '九龍': '#52c41a',      // 九龙 - 绿色
-  '新界': '#1890ff',      // 新界 - 蓝色
+  // 中文名称映射
+  '香港島': '#faad14',     // 港岛 - 橙色
+  '港島區域': '#faad14',   // 港岛区域 - 橙色
+  '九龍': '#52c41a',       // 九龙 - 绿色
+  '九龍區域': '#52c41a',   // 九龙区域 - 绿色
+  '新界': '#1890ff',       // 新界 - 蓝色
+  '新界東區域': '#722ed1', // 新界东 - 紫色
+  '新界西區域': '#1890ff', // 新界西 - 蓝色
+  // 英文代码映射
   hk_island: '#faad14',
   kowloon: '#52c41a',
   nt: '#1890ff',
+  nt_east: '#722ed1',      // 新界东 - 紫色
+  nt_west: '#1890ff',      // 新界西 - 蓝色
 }
 
 // 区域图标
@@ -54,6 +62,34 @@ export const REGION_ICONS: Record<string, string> = {
   '香港島': '🏝️',
   '九龍': '🏙️',
   '新界': '🌄',
+}
+
+// 学校类型映射（英文 → 中文）
+export const SCHOOL_TYPE_MAP: Record<string, string> = {
+  government: '官立',
+  aided: '津贴',
+  dss: '直資',
+  private: '私立',
+  caput: '按位津貼',
+}
+
+// 学校性别映射（英文 → 中文）
+export const SCHOOL_GENDER_MAP: Record<string, string> = {
+  boys: '男校',
+  girls: '女校',
+  coed: '男女',
+}
+
+// 辅助函数：转换学校类型
+export function formatSchoolType(type: string | undefined | null): string {
+  if (!type) return ''
+  return SCHOOL_TYPE_MAP[type.toLowerCase()] || type
+}
+
+// 辅助函数：转换学校性别
+export function formatSchoolGender(gender: string | undefined | null): string {
+  if (!gender) return ''
+  return SCHOOL_GENDER_MAP[gender.toLowerCase()] || gender
 }
 
 /**
