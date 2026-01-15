@@ -353,11 +353,11 @@ const AdminDashboardPage = () => {
   const handleUpdateUserRole = async (userId: string, newRole: ConsultantRole) => {
     setRoleUpdating(userId)
     try {
-      const response = await ragFetch(`/api/admin/users/${userId}/role`, {
+      const response = await apiFetch(`/api/admin/users/${userId}/role`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': 'admin'  // 使用管理员身份
+          'X-Admin-Key': adminKey || ''  // 使用统一的 Admin Key 认证
         },
         body: JSON.stringify({ role: newRole })
       })
@@ -565,8 +565,8 @@ const AdminDashboardPage = () => {
   const loadPointsStats = async () => {
     setPointsLoading(true)
     try {
-      const response = await ragFetch('/admin/dashboard/stats', {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch('/api/admin/dashboard/stats', {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       
       if (response.ok) {
@@ -583,8 +583,8 @@ const AdminDashboardPage = () => {
   // 加载积分获取排行榜
   const loadTopEarners = async () => {
     try {
-      const response = await ragFetch('/admin/points/top-earners?limit=10', {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch('/api/admin/points/top-earners?limit=10', {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       
       if (response.ok) {
@@ -599,8 +599,8 @@ const AdminDashboardPage = () => {
   // 加载防刷规则
   const loadFraudRules = async () => {
     try {
-      const response = await ragFetch('/admin/fraud/rules', {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch('/api/admin/fraud/rules', {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       
       if (response.ok) {
@@ -619,8 +619,8 @@ const AdminDashboardPage = () => {
       if (userId) params.append('user_id', userId)
       params.append('limit', '50')
       
-      const response = await ragFetch(`/admin/points/ledger?${params}`, {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch(`/api/admin/points/ledger?${params}`, {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       
       if (response.ok) {
@@ -639,8 +639,8 @@ const AdminDashboardPage = () => {
       if (status) params.append('status', status)
       params.append('limit', '50')
       
-      const response = await ragFetch(`/admin/mall/orders?${params}`, {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch(`/api/admin/mall/orders?${params}`, {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       
       if (response.ok) {
@@ -658,11 +658,11 @@ const AdminDashboardPage = () => {
     
     setUpdating(true)
     try {
-      const response = await ragFetch(`/admin/fraud/rules/${selectedRule.rule_code}`, {
+      const response = await apiFetch(`/api/admin/fraud/rules/${selectedRule.rule_code}`, {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Admin-Token': adminKey || '' 
+          'X-Admin-Key': adminKey || '' 
         },
         body: JSON.stringify({ 
           threshold_value: editThreshold,
@@ -689,8 +689,8 @@ const AdminDashboardPage = () => {
     if (!query && query !== '') return
     setUserSearchLoading(true)
     try {
-      const response = await ragFetch(`/admin/users/search?q=${encodeURIComponent(query)}&limit=20`, {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch(`/api/admin/users/search?q=${encodeURIComponent(query)}&limit=20`, {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       if (response.ok) {
         const data = await response.json()
@@ -707,8 +707,8 @@ const AdminDashboardPage = () => {
   const loadAllUsers = async () => {
     setUserSearchLoading(true)
     try {
-      const response = await ragFetch('/admin/users/search?limit=50', {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch('/api/admin/users/search?limit=50', {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       if (response.ok) {
         const data = await response.json()
@@ -730,11 +730,11 @@ const AdminDashboardPage = () => {
     
     setUpdating(true)
     try {
-      const response = await ragFetch('/admin/points/grant', {
+      const response = await apiFetch('/api/admin/points/grant', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Admin-Token': adminKey || '' 
+          'X-Admin-Key': adminKey || '' 
         },
         body: JSON.stringify({ 
           user_id: grantUserId,
@@ -764,11 +764,11 @@ const AdminDashboardPage = () => {
   // 履约订单
   const handleFulfillOrder = async (orderId: string, status: string) => {
     try {
-      const response = await ragFetch(`/admin/mall/orders/${orderId}/fulfill`, {
+      const response = await apiFetch(`/api/admin/mall/orders/${orderId}/fulfill`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'X-Admin-Token': adminKey || '' 
+          'X-Admin-Key': adminKey || '' 
         },
         body: JSON.stringify({ status })
       })
@@ -791,8 +791,8 @@ const AdminDashboardPage = () => {
   const loadMallItems = async () => {
     setMallItemsLoading(true)
     try {
-      const response = await ragFetch('/admin/mall/items', {
-        headers: { 'X-Admin-Token': adminKey || '' }
+      const response = await apiFetch('/api/admin/mall/items', {
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       
       if (response.ok) {
@@ -885,11 +885,11 @@ const AdminDashboardPage = () => {
     try {
       if (editingItem) {
         // 更新商品
-        const response = await ragFetch(`/admin/mall/items/${editingItem.id}`, {
+        const response = await apiFetch(`/api/admin/mall/items/${editingItem.id}`, {
           method: 'PATCH',
           headers: { 
             'Content-Type': 'application/json',
-            'X-Admin-Token': adminKey || '' 
+            'X-Admin-Key': adminKey || '' 
           },
           body: JSON.stringify(itemForm)
         })
@@ -904,11 +904,11 @@ const AdminDashboardPage = () => {
         }
       } else {
         // 创建商品
-        const response = await ragFetch('/admin/mall/items', {
+        const response = await apiFetch('/api/admin/mall/items', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'X-Admin-Token': adminKey || '' 
+            'X-Admin-Key': adminKey || '' 
           },
           body: JSON.stringify(itemForm)
         })
@@ -932,9 +932,9 @@ const AdminDashboardPage = () => {
   // 切换商品上下架状态
   const handleToggleItem = async (itemId: number) => {
     try {
-      const response = await ragFetch(`/admin/mall/items/${itemId}/toggle`, {
+      const response = await apiFetch(`/api/admin/mall/items/${itemId}/toggle`, {
         method: 'POST',
-        headers: { 'X-Admin-Token': adminKey || '' }
+        headers: { 'X-Admin-Key': adminKey || '' }
       })
       
       if (response.ok) {
@@ -954,12 +954,12 @@ const AdminDashboardPage = () => {
     const doDelete = async () => {
       try {
         const url = force 
-          ? `/admin/mall/items/${item.id}?force=true`
-          : `/admin/mall/items/${item.id}`
+          ? `/api/admin/mall/items/${item.id}?force=true`
+          : `/api/admin/mall/items/${item.id}`
         
-        const response = await ragFetch(url, {
+        const response = await apiFetch(url, {
           method: 'DELETE',
-          headers: { 'X-Admin-Token': adminKey || '' }
+          headers: { 'X-Admin-Key': adminKey || '' }
         })
         
         if (response.ok) {
@@ -1021,11 +1021,11 @@ const AdminDashboardPage = () => {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await ragFetch(`/admin/users/${userId}/freeze`, {
+          const response = await apiFetch(`/api/admin/users/${userId}/freeze`, {
             method: 'POST',
             headers: { 
               'Content-Type': 'application/json',
-              'X-Admin-Token': adminKey || '' 
+              'X-Admin-Key': adminKey || '' 
             },
             body: JSON.stringify({ 
               action,
