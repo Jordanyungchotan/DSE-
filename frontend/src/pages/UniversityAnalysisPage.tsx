@@ -43,31 +43,22 @@ import {
   ComprehensiveAnalysisInput,
   AIAnalysisResponse,
 } from '../services/jupasApi'
+import {
+  SUBJECTS,
+  CIVICS_OPTIONS,
+  DSE_GRADE_OPTIONS,
+  HAS_SPECIAL_GRADING,
+  Subject,
+} from '@/shared/domain'
 import styles from './UniversityAnalysisPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
 
-// DSE科目列表
-const DSE_SUBJECTS = [
-  { value: 'chinese', label: '中国语文', labelEn: 'Chinese' },
-  { value: 'english', label: '英国语文', labelEn: 'English' },
-  { value: 'math', label: '数学', labelEn: 'Mathematics' },
-  { value: 'liberal', label: '公民与社会发展', labelEn: 'Citizenship' },
-  { value: 'physics', label: '物理', labelEn: 'Physics' },
-  { value: 'chemistry', label: '化学', labelEn: 'Chemistry' },
-  { value: 'biology', label: '生物', labelEn: 'Biology' },
-  { value: 'economics', label: '经济', labelEn: 'Economics' },
-  { value: 'bafs', label: '企业会计与财务概论', labelEn: 'BAFS' },
-  { value: 'geography', label: '地理', labelEn: 'Geography' },
-  { value: 'history', label: '历史', labelEn: 'History' },
-  { value: 'ict', label: '资讯及通讯科技', labelEn: 'ICT' },
-  { value: 'm1', label: '数学延伸部分(M1)', labelEn: 'M1' },
-  { value: 'm2', label: '数学延伸部分(M2)', labelEn: 'M2' },
-]
-
-// DSE等级
-const DSE_GRADES = ['5**', '5*', '5', '4', '3', '2', '1', 'U']
+const DSE_GRADE_SELECT_OPTIONS = DSE_GRADE_OPTIONS.map((grade) => ({
+  value: grade,
+  label: grade,
+}))
 
 // 香港大学列表（使用数据库中的代码）
 const HK_UNIVERSITIES = [
@@ -141,10 +132,10 @@ const UniversityAnalysisPage = () => {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [dseResults, setDseResults] = useState<DseResult[]>([
-    { subject: 'chinese', grade: '' },
-    { subject: 'english', grade: '' },
-    { subject: 'math', grade: '' },
-    { subject: 'liberal', grade: '' },
+    { subject: SUBJECTS[0], grade: '' },
+    { subject: SUBJECTS[1], grade: '' },
+    { subject: SUBJECTS[2], grade: '' },
+    { subject: SUBJECTS[3], grade: '' },
   ])
 
   // 分析进度状态
@@ -163,6 +154,8 @@ const UniversityAnalysisPage = () => {
   const resultRef = useRef<HTMLDivElement>(null)
 
   const isEnglish = locale === 'en'
+  const isPassFailSubject = (subjectValue: string) =>
+    HAS_SPECIAL_GRADING.includes(subjectValue as Subject)
 
   // 获取院校可用专业领域
   const fetchAvailableFields = useCallback(async (universities: string[]) => {
@@ -239,7 +232,11 @@ const UniversityAnalysisPage = () => {
   // 更新科目成绩
   const updateDseResult = (index: number, field: 'subject' | 'grade', value: string) => {
     const newResults = [...dseResults]
-    newResults[index][field] = value
+    if (field === 'subject') {
+      newResults[index] = { subject: value, grade: '' }
+    } else {
+      newResults[index][field] = value
+    }
     setDseResults(newResults)
   }
 
@@ -374,19 +371,29 @@ const UniversityAnalysisPage = () => {
                     placeholder={isEnglish ? 'Select Subject' : '选择科目'}
                     value={result.subject || undefined}
                     onChange={(v) => updateDseResult(index, 'subject', v)}
-                    options={DSE_SUBJECTS.map(s => ({ 
-                      value: s.value, 
-                      label: isEnglish ? s.labelEn : s.label 
+                    options={SUBJECTS.map((subject) => ({
+                      value: subject,
+                      label: subject,
                     }))}
                     style={{ flex: 2 }}
                   />
-                  <Select
-                    placeholder={isEnglish ? 'Grade' : '等级'}
-                    value={result.grade || undefined}
-                    onChange={(v) => updateDseResult(index, 'grade', v)}
-                    options={DSE_GRADES.map(g => ({ value: g, label: g }))}
-                    style={{ flex: 1 }}
-                  />
+                  {isPassFailSubject(result.subject) ? (
+                    <Select
+                      placeholder={isEnglish ? 'Grade' : '等级'}
+                      value={result.grade || undefined}
+                      onChange={(v) => updateDseResult(index, 'grade', v)}
+                      options={CIVICS_OPTIONS}
+                      style={{ flex: 1 }}
+                    />
+                  ) : (
+                    <Select
+                      placeholder={isEnglish ? 'Grade' : '等级'}
+                      value={result.grade || undefined}
+                      onChange={(v) => updateDseResult(index, 'grade', v)}
+                      options={DSE_GRADE_SELECT_OPTIONS}
+                      style={{ flex: 1 }}
+                    />
+                  )}
                   {index >= 4 && (
                     <Button 
                       type="text" 

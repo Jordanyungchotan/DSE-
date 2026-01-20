@@ -39,6 +39,15 @@ import {
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useAnalysisStore, SubjectScore } from '../stores/analysisStore'
+import {
+  CORE_SUBJECTS,
+  ELECTIVE_SUBJECTS,
+  CIVICS_OPTIONS,
+  DSE_GRADE_OPTIONS,
+  GRADE_LEVEL_OPTIONS,
+  HAS_SPECIAL_GRADING,
+  Subject,
+} from '@/shared/domain'
 import { useLanguageStore } from '../stores/languageStore'
 import {
   getRegions,
@@ -54,50 +63,13 @@ const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
 
 /**
- * DSE科目列表
- */
-const DSE_SUBJECTS = [
-  { value: 'chinese', label: '中国语文', category: 'core' },
-  { value: 'english', label: '英国语文', category: 'core' },
-  { value: 'math', label: '数学', category: 'core' },
-  { value: 'liberal', label: '公民与社会发展', category: 'core' },
-  { value: 'physics', label: '物理', category: 'elective' },
-  { value: 'chemistry', label: '化学', category: 'elective' },
-  { value: 'biology', label: '生物', category: 'elective' },
-  { value: 'economics', label: '经济', category: 'elective' },
-  { value: 'bafs', label: '企业会计与财务概论', category: 'elective' },
-  { value: 'geography', label: '地理', category: 'elective' },
-  { value: 'history', label: '历史', category: 'elective' },
-  { value: 'ict', label: '资讯及通讯科技', category: 'elective' },
-  { value: 'm1', label: '数学延伸部分(M1)', category: 'elective' },
-  { value: 'm2', label: '数学延伸部分(M2)', category: 'elective' },
-]
-
-/**
  * DSE成绩等级
  */
-const DSE_GRADES = [
-  { value: '5**', label: '5**' },
-  { value: '5*', label: '5*' },
-  { value: '5', label: '5' },
-  { value: '4', label: '4' },
-  { value: '3', label: '3' },
-  { value: '2', label: '2' },
-  { value: '1', label: '1' },
-  { value: 'U', label: 'U (不予评级)' },
-]
+const DSE_GRADE_SELECT_OPTIONS = DSE_GRADE_OPTIONS.map((grade) => ({
+  value: grade,
+  label: grade,
+}))
 
-/**
- * 年级选项（包含初中和高中）
- */
-const GRADE_OPTIONS = [
-  { value: 'S1', label: '中一' },
-  { value: 'S2', label: '中二' },
-  { value: 'S3', label: '中三' },
-  { value: 'S4', label: '中四' },
-  { value: 'S5', label: '中五' },
-  { value: 'S6', label: '中六' },
-]
 
 /**
  * 根据日期计算对应的学期
@@ -174,14 +146,11 @@ const AnalysisFormPage = () => {
   const { t } = useLanguageStore()
   const [showSelector, setShowSelector] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
-  // 核心科目（必填）
-  const CORE_SUBJECTS = ['chinese', 'english', 'math', 'liberal']
-  
   const [subjects, setSubjects] = useState<SubjectScore[]>([
-    { subject: 'chinese', currentScore: '', targetScore: '' },
-    { subject: 'english', currentScore: '', targetScore: '' },
-    { subject: 'math', currentScore: '', targetScore: '' },
-    { subject: 'liberal', currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[0], currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[1], currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[2], currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[3], currentScore: '', targetScore: '' },
   ])
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
   const { updateFormData, submitAnalysis, loading } = useAnalysisStore()
@@ -412,7 +381,11 @@ const AnalysisFormPage = () => {
     value: string
   ) => {
     const newSubjects = [...subjects]
-    newSubjects[index] = { ...newSubjects[index], [field]: value }
+    if (field === 'subject') {
+      newSubjects[index] = { subject: value, currentScore: '', targetScore: '' }
+    } else {
+      newSubjects[index] = { ...newSubjects[index], [field]: value }
+    }
     setSubjects(newSubjects)
   }
 
@@ -577,7 +550,7 @@ const AnalysisFormPage = () => {
             <Select
               size="large"
               placeholder="选择年级"
-              options={GRADE_OPTIONS}
+              options={GRADE_LEVEL_OPTIONS}
             />
           </Form.Item>
         </Col>
@@ -716,17 +689,15 @@ const AnalysisFormPage = () => {
   )
 
   // 获取科目显示名称
-  const getSubjectLabel = (subjectValue: string) => {
-    const found = DSE_SUBJECTS.find(s => s.value === subjectValue)
-    return found?.label || subjectValue
-  }
+  const getSubjectLabel = (subjectValue: string) => subjectValue
+
+  const isPassFailSubject = (subjectValue: string) =>
+    HAS_SPECIAL_GRADING.includes(subjectValue as Subject)
 
   // 获取可选的选修科目（排除已选的）
   const getAvailableElectives = () => {
     const selectedSubjects = subjects.map(s => s.subject)
-    return DSE_SUBJECTS.filter(s => 
-      s.category === 'elective' && !selectedSubjects.includes(s.value)
-    )
+    return ELECTIVE_SUBJECTS.filter((subject) => !selectedSubjects.includes(subject))
   }
 
   /**
@@ -787,15 +758,13 @@ const AnalysisFormPage = () => {
                         value={subject.subject || undefined}
                         onChange={(value) => handleSubjectChange(index, 'subject', value)}
                         options={[
-                          // 当前已选的科目
                           ...(subject.subject ? [{
                             value: subject.subject,
                             label: getSubjectLabel(subject.subject)
                           }] : []),
-                          // 其他可选的选修科目
-                          ...getAvailableElectives().map((s) => ({
-                            value: s.value,
-                            label: s.label,
+                          ...getAvailableElectives().map((subjectName) => ({
+                            value: subjectName,
+                            label: subjectName,
                           }))
                         ]}
                       />
@@ -804,22 +773,40 @@ const AnalysisFormPage = () => {
                 </Col>
                 <Col xs={12} sm={8}>
                   <Form.Item label="当前成绩" required>
-                    <Select
-                      placeholder="选择成绩"
-                      value={subject.currentScore || undefined}
-                      onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
-                      options={DSE_GRADES}
-                    />
+                    {isPassFailSubject(subject.subject) ? (
+                      <Select
+                        placeholder="选择成绩"
+                        value={subject.currentScore || undefined}
+                        onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
+                        options={CIVICS_OPTIONS}
+                      />
+                    ) : (
+                      <Select
+                        placeholder="选择成绩"
+                        value={subject.currentScore || undefined}
+                        onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
+                        options={DSE_GRADE_SELECT_OPTIONS}
+                      />
+                    )}
                   </Form.Item>
                 </Col>
                 <Col xs={12} sm={8}>
                   <Form.Item label="目标成绩" required>
-                    <Select
-                      placeholder="选择目标"
-                      value={subject.targetScore || undefined}
-                      onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
-                      options={DSE_GRADES}
-                    />
+                    {isPassFailSubject(subject.subject) ? (
+                      <Select
+                        placeholder="选择目标"
+                        value={subject.targetScore || undefined}
+                        onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
+                        options={CIVICS_OPTIONS}
+                      />
+                    ) : (
+                      <Select
+                        placeholder="选择目标"
+                        value={subject.targetScore || undefined}
+                        onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
+                        options={DSE_GRADE_SELECT_OPTIONS}
+                      />
+                    )}
                   </Form.Item>
                 </Col>
               </Row>

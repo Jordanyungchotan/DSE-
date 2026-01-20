@@ -5,6 +5,9 @@
  */
 
 import { SCHOOLS_BY_DISTRICT } from './data/schoolsData'
+import { SUBJECTS, SubjectGrade } from '@/shared/domain'
+import { AnalysisInputError, validateSubjectGrades } from './validators/analysisInput.validator.js'
+import { analyzeSubjectGrade } from './analysis/analyzeByRules.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -522,6 +525,8 @@ function intelligentAnswerMatch(
     feedback = '请检查答案格式是否正确。'
   }
   
+  const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects)
+
   return {
     isCorrect: false,
     matchType: 'exact',
@@ -2201,11 +2206,13 @@ async function analyzeWithDeepSeek(studentInfo: StudentInfo, apiKey: string): Pr
       return generateMockResult(studentInfo)
     }
 
+    const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects)
+
     // 解析 AI 返回的结果
     const rawResult = JSON.parse(jsonMatch[0])
     
     // 标准化处理结果，确保格式正确
-    return normalizeAnalysisResult(rawResult)
+    return normalizeAnalysisResult(rawResult, ruleAnalysisBySubject)
   } catch (error) {
     console.error('DeepSeek error:', error)
     return generateMockResult(studentInfo)
@@ -2213,7 +2220,10 @@ async function analyzeWithDeepSeek(studentInfo: StudentInfo, apiKey: string): Pr
 }
 
 // 标准化 AI 返回的分析结果
-function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult {
+function normalizeAnalysisResult(
+  raw: Record<string, unknown>,
+  ruleAnalysisBySubject: Map<string, { current: ReturnType<typeof analyzeSubjectGrade>; target: ReturnType<typeof analyzeSubjectGrade> }>
+): AnalysisResult {
   const overallScore = (raw.overallAssessment as Record<string, unknown>)?.feasibilityScore as number || 70
   const overallLevel = calculateFeasibilityLevel(overallScore)
   
@@ -2252,16 +2262,30 @@ function normalizeAnalysisResult(raw: Record<string, unknown>): AnalysisResult {
       keyStrengths: ((raw.overallAssessment as Record<string, unknown>)?.keyStrengths as string[]) || [],
       keyWeaknesses: ((raw.overallAssessment as Record<string, unknown>)?.keyWeaknesses as string[]) || [],
     },
-    subjectAnalyses: ((raw.subjectAnalyses as Record<string, unknown>[]) || []).map((s) => ({
-      subject: s.subject as string,
-      currentLevel: s.currentLevel as string,
-      targetLevel: s.targetLevel as string,
-      gap: s.gap as string,
-      strengths: (s.strengths as string[]) || [],
-      weaknesses: (s.weaknesses as string[]) || [],
-      recommendations: (s.recommendations as string[]) || [],
-      estimatedTimeToImprove: s.estimatedTimeToImprove as string,
-    })),
+    subjectAnalyses: ((raw.subjectAnalyses as Record<string, unknown>[]) || []).map((s) => {
+      const subjectName = s.subject as string
+      const ruleAnalysis = ruleAnalysisBySubject.get(subjectName) || {
+        current: analyzeSubjectGrade({
+          subject: subjectName as SubjectGrade['subject'],
+          value: (s.currentLevel as string) || '',
+        }),
+        target: analyzeSubjectGrade({
+          subject: subjectName as SubjectGrade['subject'],
+          value: (s.targetLevel as string) || '',
+        }),
+      }
+      return {
+        subject: subjectName,
+        currentLevel: s.currentLevel as string,
+        targetLevel: s.targetLevel as string,
+        gap: s.gap as string,
+        strengths: (s.strengths as string[]) || [],
+        weaknesses: (s.weaknesses as string[]) || [],
+        recommendations: (s.recommendations as string[]) || [],
+        estimatedTimeToImprove: s.estimatedTimeToImprove as string,
+        ruleAnalysis,
+      }
+    }),
     schoolAssessments,
     studyPlan: {
       weeklySchedule: ((raw.studyPlan as Record<string, unknown>)?.weeklySchedule as string[]) || [],
@@ -2357,6 +2381,10 @@ interface AnalysisResult {
     weaknesses: string[]
     recommendations: string[]
     estimatedTimeToImprove: string
+    ruleAnalysis: {
+      current: ReturnType<typeof analyzeSubjectGrade>
+      target: ReturnType<typeof analyzeSubjectGrade>
+    }
   }[]
   schoolAssessments: {
     schoolName: string
@@ -2394,6 +2422,23 @@ const GRADE_NAME_MAP: Record<string, string> = {
   // 直接中文也兼容
   '中一': '中一', '中二': '中二', '中三': '中三',
   '中四': '中四', '中五': '中五', '中六': '中六',
+}
+
+function buildRuleAnalysisBySubject(subjects: StudentInfo['subjects']) {
+  const map = new Map<string, { current: ReturnType<typeof analyzeSubjectGrade>; target: ReturnType<typeof analyzeSubjectGrade> }>()
+  for (const subject of subjects) {
+    map.set(subject.subject, {
+      current: analyzeSubjectGrade({
+        subject: subject.subject as SubjectGrade['subject'],
+        value: subject.currentScore,
+      }),
+      target: analyzeSubjectGrade({
+        subject: subject.subject as SubjectGrade['subject'],
+        value: subject.targetScore,
+      }),
+    })
+  }
+  return map
 }
 
 // 构建分析提示词
@@ -2564,6 +2609,16 @@ function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
       weaknesses: ['需要提升', '部分知识点需巩固'],
       recommendations: ['每天复习30分钟', '完成每周练习题', '定期进行模拟测试'],
       estimatedTimeToImprove: '2-3个月',
+      ruleAnalysis: ruleAnalysisBySubject.get(s.subject) || {
+        current: analyzeSubjectGrade({
+          subject: s.subject as SubjectGrade['subject'],
+          value: s.currentScore,
+        }),
+        target: analyzeSubjectGrade({
+          subject: s.subject as SubjectGrade['subject'],
+          value: s.targetScore,
+        }),
+      },
     })),
     schoolAssessments: studentInfo.targetSchools.map((school, i) => {
       // 根据学校排序计算可行性等级
@@ -2632,6 +2687,11 @@ interface UniversityAnalysisResult {
     personalStatementAdvice: string[]
   }
   backupPlans: string[]
+  subjectAnalyses: {
+    subject: string
+    grade: string
+    ruleAnalysis: ReturnType<typeof analyzeSubjectGrade>
+  }[]
 }
 
 // 大学申请分析
@@ -2681,7 +2741,18 @@ async function analyzeUniversityApplication(
       return generateMockUniversityResult(input, bestFive)
     }
 
-    return JSON.parse(jsonMatch[0]) as UniversityAnalysisResult
+    const parsed = JSON.parse(jsonMatch[0]) as UniversityAnalysisResult
+    return {
+      ...parsed,
+      subjectAnalyses: input.dseResults.map((result) => ({
+        subject: result.subject,
+        grade: result.grade,
+        ruleAnalysis: analyzeSubjectGrade({
+          subject: result.subject as SubjectGrade['subject'],
+          value: result.grade,
+        }),
+      })),
+    }
   } catch (error) {
     console.error('DeepSeek error:', error)
     return generateMockUniversityResult(input, bestFive)
@@ -2779,6 +2850,14 @@ function generateMockUniversityResult(input: UniversityApplicationInput, bestFiv
       personalStatementAdvice: ['突出个人特色', '结合实际经历', '展示对专业的理解'],
     },
     backupPlans: ['考虑副学士课程', '海外升学选项', '重读提升成绩'],
+    subjectAnalyses: input.dseResults.map((result) => ({
+      subject: result.subject,
+      grade: result.grade,
+      ruleAnalysis: analyzeSubjectGrade({
+        subject: result.subject as SubjectGrade['subject'],
+        value: result.grade,
+      }),
+    })),
   }
 }
 
@@ -2945,23 +3024,12 @@ export default {
 
       // 获取支持的科目列表
       if (path === '/api/analysis/subjects' && request.method === 'GET') {
-        const subjects = [
-          { id: 'chinese', name: '中国语文', nameEn: 'Chinese', category: 'core' },
-          { id: 'english', name: '英国语文', nameEn: 'English', category: 'core' },
-          { id: 'math', name: '数学', nameEn: 'Mathematics', category: 'core' },
-          { id: 'liberal', name: '公民与社会发展', nameEn: 'Citizenship', category: 'core' },
-          { id: 'physics', name: '物理', nameEn: 'Physics', category: 'elective' },
-          { id: 'chemistry', name: '化学', nameEn: 'Chemistry', category: 'elective' },
-          { id: 'biology', name: '生物', nameEn: 'Biology', category: 'elective' },
-          { id: 'economics', name: '经济', nameEn: 'Economics', category: 'elective' },
-          { id: 'bafs', name: '企业会计与财务概论', nameEn: 'BAFS', category: 'elective' },
-          { id: 'geography', name: '地理', nameEn: 'Geography', category: 'elective' },
-          { id: 'history', name: '历史', nameEn: 'History', category: 'elective' },
-          { id: 'ict', name: '资讯及通讯科技', nameEn: 'ICT', category: 'elective' },
-          { id: 'science', name: '科学/常识', nameEn: 'Science', category: 'elective' },
-          { id: 'm1', name: '数学延伸部分(M1)', nameEn: 'M1', category: 'elective' },
-          { id: 'm2', name: '数学延伸部分(M2)', nameEn: 'M2', category: 'elective' },
-        ]
+        const subjects = SUBJECTS.map((subject, index) => ({
+          id: subject,
+          name: subject,
+          nameEn: subject,
+          category: index < 4 ? 'core' : 'elective',
+        }))
         return jsonResponse({ subjects }, 200, origin)
       }
 
@@ -3181,6 +3249,12 @@ export default {
       // 提交分析
       if (path === '/api/analysis/submit' && request.method === 'POST') {
         const body = await request.json() as StudentInfo
+
+        const grades: SubjectGrade[] = body.subjects.flatMap((item) => ([
+          { subject: item.subject as SubjectGrade['subject'], value: item.currentScore },
+          { subject: item.subject as SubjectGrade['subject'], value: item.targetScore },
+        ]))
+        validateSubjectGrades(grades)
 
         // 调用 DeepSeek API
         const analysisResult = await analyzeWithDeepSeek(body, env.DEEPSEEK_API_KEY)
@@ -4142,12 +4216,19 @@ export default {
       // 提交大学申请分析
       if (path === '/api/analysis/university' && request.method === 'POST') {
         const body = await request.json() as {
+          grades?: SubjectGrade[]
           dseResults: { subject: string; grade: string }[]
           targetUniversities: string[]
           targetMajors: string[]
           extracurriculars?: string
           careerInterests?: string[]
         }
+
+        const grades: SubjectGrade[] = body.grades ?? body.dseResults.map((result) => ({
+          subject: result.subject as SubjectGrade['subject'],
+          value: result.grade,
+        }))
+        validateSubjectGrades(grades)
 
         /**
          * 计算最佳5科/6科分数
@@ -7172,6 +7253,9 @@ export default {
 
     } catch (error) {
       console.error('Error:', error)
+      if (error instanceof AnalysisInputError) {
+        return errorResponse(error.message, error.status, origin)
+      }
       return errorResponse('服务器错误', 500, origin)
     }
   },

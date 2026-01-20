@@ -4,6 +4,8 @@
  */
 
 import { ApiError } from '../middleware/errorHandler.js'
+import { SubjectGrade } from '@/shared/domain'
+import { analyzeSubjectGrade } from '../analysis/analyzeByRules.js'
 
 /**
  * 学生信息接口
@@ -35,6 +37,10 @@ interface SubjectAnalysis {
   weaknesses: string[]
   recommendations: string[]
   estimatedTimeToImprove: string
+  ruleAnalysis: {
+    current: ReturnType<typeof analyzeSubjectGrade>
+    target: ReturnType<typeof analyzeSubjectGrade>
+  }
 }
 
 /**
@@ -273,7 +279,7 @@ export const analyzeWithDeepSeek = async (studentInfo: StudentInfo): Promise<Ana
     }
 
     const result: AnalysisResult = JSON.parse(jsonMatch[0])
-    return result
+    return attachRuleAnalysis(studentInfo, result)
   } catch (error) {
     if (error instanceof ApiError) {
       throw error
@@ -281,6 +287,43 @@ export const analyzeWithDeepSeek = async (studentInfo: StudentInfo): Promise<Ana
     console.error('DeepSeek API调用错误:', error)
     // 如果API调用失败，返回模拟数据
     return generateMockResult(studentInfo)
+  }
+}
+
+function buildRuleAnalysisBySubject(subjects: StudentInfo['subjects']) {
+  const map = new Map<string, { current: ReturnType<typeof analyzeSubjectGrade>; target: ReturnType<typeof analyzeSubjectGrade> }>()
+  for (const subject of subjects) {
+    map.set(subject.subject, {
+      current: analyzeSubjectGrade({
+        subject: subject.subject as SubjectGrade['subject'],
+        value: subject.currentScore,
+      }),
+      target: analyzeSubjectGrade({
+        subject: subject.subject as SubjectGrade['subject'],
+        value: subject.targetScore,
+      }),
+    })
+  }
+  return map
+}
+
+function attachRuleAnalysis(studentInfo: StudentInfo, result: AnalysisResult): AnalysisResult {
+  const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects)
+  return {
+    ...result,
+    subjectAnalyses: result.subjectAnalyses.map((analysis) => ({
+      ...analysis,
+      ruleAnalysis: ruleAnalysisBySubject.get(analysis.subject) || {
+        current: analyzeSubjectGrade({
+          subject: analysis.subject as SubjectGrade['subject'],
+          value: analysis.currentLevel,
+        }),
+        target: analyzeSubjectGrade({
+          subject: analysis.subject as SubjectGrade['subject'],
+          value: analysis.targetLevel,
+        }),
+      },
+    })),
   }
 }
 
@@ -294,6 +337,8 @@ const generateMockResult = (studentInfo: StudentInfo): AnalysisResult => {
   // 根据年级调整
   if (studentInfo.grade === 'form6') baseScore -= 10
   if (studentInfo.grade === 'form4') baseScore += 5
+
+  const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects)
 
   // 生成科目分析
   const subjectAnalyses: SubjectAnalysis[] = studentInfo.subjects.map((s) => {
@@ -319,6 +364,16 @@ const generateMockResult = (studentInfo: StudentInfo): AnalysisResult => {
         '定期进行模拟测试',
       ],
       estimatedTimeToImprove: diff > 1 ? '3-4个月' : diff > 0 ? '1-2个月' : '保持即可',
+      ruleAnalysis: ruleAnalysisBySubject.get(s.subject) || {
+        current: analyzeSubjectGrade({
+          subject: s.subject as SubjectGrade['subject'],
+          value: s.currentScore,
+        }),
+        target: analyzeSubjectGrade({
+          subject: s.subject as SubjectGrade['subject'],
+          value: s.targetScore,
+        }),
+      },
     }
   })
 

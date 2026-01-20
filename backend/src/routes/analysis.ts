@@ -16,6 +16,8 @@ import {
   FeasibilityRequest,
   FeasibilityResult 
 } from '../services/feasibilityEngine.js'
+import { SUBJECTS, SubjectGrade } from '@/shared/domain'
+import { validateSubjectGrades } from '../validators/analysisInput.validator.js'
 
 export const analysisRouter = Router()
 
@@ -48,6 +50,13 @@ analysisRouter.post('/submit', optionalAuth, async (req, res, next) => {
   try {
     // 验证请求数据
     const studentInfo = analysisRequestSchema.parse(req.body) as StudentInfo
+    const rawGrades = (req.body as { grades?: SubjectGrade[] }).grades
+    const grades = rawGrades ?? studentInfo.subjects.flatMap((item) => ([
+      { subject: item.subject, value: item.currentScore },
+      { subject: item.subject, value: item.targetScore },
+    ]))
+
+    validateSubjectGrades(grades)
     
     console.log('📊 收到分析请求:', {
       grade: studentInfo.grade,
@@ -216,22 +225,11 @@ analysisRouter.delete('/history/:id', requireAuth, async (req, res, next) => {
  * GET /api/analysis/subjects
  */
 analysisRouter.get('/subjects', (_req, res) => {
-  const subjects = [
-    { value: 'chinese', label: '中国语文', category: 'core' },
-    { value: 'english', label: '英国语文', category: 'core' },
-    { value: 'math', label: '数学', category: 'core' },
-    { value: 'liberal', label: '公民与社会发展', category: 'core' },
-    { value: 'physics', label: '物理', category: 'elective' },
-    { value: 'chemistry', label: '化学', category: 'elective' },
-    { value: 'biology', label: '生物', category: 'elective' },
-    { value: 'economics', label: '经济', category: 'elective' },
-    { value: 'bafs', label: '企业会计与财务概论', category: 'elective' },
-    { value: 'geography', label: '地理', category: 'elective' },
-    { value: 'history', label: '历史', category: 'elective' },
-    { value: 'ict', label: '资讯及通讯科技', category: 'elective' },
-    { value: 'm1', label: '数学延伸部分(M1)', category: 'elective' },
-    { value: 'm2', label: '数学延伸部分(M2)', category: 'elective' },
-  ]
+  const subjects = SUBJECTS.map((subject, index) => ({
+    value: subject,
+    label: subject,
+    category: index < 4 ? 'core' : 'elective',
+  }))
 
   res.json({ subjects })
 })

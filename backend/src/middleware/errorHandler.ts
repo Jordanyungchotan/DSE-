@@ -3,6 +3,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express'
+import { AnalysisInputError } from '../validators/analysisInput.validator.js'
 
 /**
  * 自定义API错误类
@@ -33,6 +34,13 @@ export const errorHandler = (
     res.status(err.statusCode).json({
       error: err.message,
       code: err.statusCode,
+    })
+    return
+  }
+
+  if (err instanceof AnalysisInputError) {
+    res.status(err.status).json({
+      error: err.message,
     })
     return
   }
