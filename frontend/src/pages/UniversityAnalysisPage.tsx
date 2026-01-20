@@ -47,8 +47,7 @@ import {
   SUBJECTS,
   CIVICS_OPTIONS,
   DSE_GRADE_OPTIONS,
-  HAS_SPECIAL_GRADING,
-  Subject,
+  hasSpecialGrading,
 } from '@/shared/domain'
 import styles from './UniversityAnalysisPage.module.css'
 
@@ -155,7 +154,7 @@ const UniversityAnalysisPage = () => {
 
   const isEnglish = locale === 'en'
   const isPassFailSubject = (subjectValue: string) =>
-    HAS_SPECIAL_GRADING.includes(subjectValue as Subject)
+    hasSpecialGrading(subjectValue)
 
   // 获取院校可用专业领域
   const fetchAvailableFields = useCallback(async (universities: string[]) => {

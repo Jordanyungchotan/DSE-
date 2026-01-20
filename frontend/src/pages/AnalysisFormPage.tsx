@@ -44,9 +44,9 @@ import {
   ELECTIVE_SUBJECTS,
   CIVICS_OPTIONS,
   DSE_GRADE_OPTIONS,
-  GRADE_LEVEL_OPTIONS,
-  HAS_SPECIAL_GRADING,
-  Subject,
+  GRADE_LEVEL_SELECT_OPTIONS,
+  isCoreSubject,
+  hasSpecialGrading,
 } from '@/shared/domain'
 import { useLanguageStore } from '../stores/languageStore'
 import {
@@ -366,7 +366,7 @@ const AnalysisFormPage = () => {
   const handleRemoveSubject = (index: number) => {
     const subjectToRemove = subjects[index]
     // 核心科目不能删除
-    if (CORE_SUBJECTS.includes(subjectToRemove.subject)) {
+    if (isCoreSubject(subjectToRemove.subject)) {
       return
     }
     setSubjects(subjects.filter((_, i) => i !== index))
@@ -550,7 +550,7 @@ const AnalysisFormPage = () => {
             <Select
               size="large"
               placeholder="选择年级"
-              options={GRADE_LEVEL_OPTIONS}
+              options={GRADE_LEVEL_SELECT_OPTIONS}
             />
           </Form.Item>
         </Col>
@@ -692,7 +692,7 @@ const AnalysisFormPage = () => {
   const getSubjectLabel = (subjectValue: string) => subjectValue
 
   const isPassFailSubject = (subjectValue: string) =>
-    HAS_SPECIAL_GRADING.includes(subjectValue as Subject)
+    hasSpecialGrading(subjectValue)
 
   // 获取可选的选修科目（排除已选的）
   const getAvailableElectives = () => {
@@ -712,7 +712,7 @@ const AnalysisFormPage = () => {
 
       <div className={styles.subjectsContainer}>
         {subjects.map((subject, index) => {
-          const isCore = CORE_SUBJECTS.includes(subject.subject)
+          const isCore = isCoreSubject(subject.subject)
           
           return (
             <Card
