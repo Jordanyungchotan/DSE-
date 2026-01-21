@@ -19,9 +19,23 @@ import {
   getSubjectDisplayName,
   LanguageCode,
   SubjectGrade,
+  TransferAnalysisInput,
+  TransferSubjectStatus,
+  isValidTransferAnalysisInput,
 } from '@/shared/domain'
-import { AnalysisInputError, validateSubjectGrades, validateElectives, SubjectGradeInput } from './validators/analysisInput.validator.js'
-import { analyzeSubjectGrade, analyzeElectiveCombination, SubjectGradeInput as AnalysisGradeInput } from './analysis/analyzeByRules.js'
+import { 
+  AnalysisInputError, 
+  validateSubjectGrades, 
+  validateElectives, 
+  SubjectGradeInput,
+  validateTransferSubjectStatuses,
+} from './validators/analysisInput.validator.js'
+import { 
+  analyzeSubjectGrade, 
+  analyzeElectiveCombination, 
+  SubjectGradeInput as AnalysisGradeInput,
+  analyzeTransferSubjectStatuses,
+} from './analysis/analyzeByRules.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -2595,6 +2609,147 @@ ${subjectsText}
    - 在建议中可以提到如何在面试中展示个人特质`
 }
 
+// ===== 插班分析结果生成（基于学习状态）=====
+
+/**
+ * 生成插班分析结果（新版 - 基于学习状态）
+ * 
+ * ⚠️ 重要：
+ * - 仅使用 status 和 rankPosition 进行分析
+ * - schoolScore 不参与任何分析逻辑
+ */
+async function generateTransferAnalysisResult(
+  input: TransferAnalysisInput,
+  ruleAnalysis: {
+    subjectAnalyses: Array<{
+      subjectKey: string;
+      subjectName: string;
+      status: string;
+      riskLevel: 'low' | 'medium' | 'high';
+      summary: string;
+      advice: string;
+      rankNote?: string;
+      schoolScoreRef?: { score: number; source: 'latest' | 'average' };
+    }>;
+    electiveNotes: string[];
+    overallFeasibility: { score: number; level: 'A' | 'B' | 'C' | 'D' | 'E' };
+  },
+  apiKey: string
+): Promise<AnalysisResult> {
+  // 处理年级名称
+  const gradeName = GRADE_NAME_MAP[input.grade] || input.grade || '中四'
+  
+  // 使用规则引擎的可行性评分
+  const feasibilityScore = ruleAnalysis.overallFeasibility.score
+  const feasibilityLevel = ruleAnalysis.overallFeasibility.level
+  
+  // 统计学习状态分布
+  const statusCounts = {
+    strong: input.subjectStatuses.filter(s => s.status === 'strong').length,
+    ok: input.subjectStatuses.filter(s => s.status === 'ok').length,
+    weak: input.subjectStatuses.filter(s => s.status === 'weak').length,
+  }
+  
+  // 生成优势和劣势
+  const keyStrengths: string[] = []
+  const keyWeaknesses: string[] = []
+  
+  if (statusCounts.strong > 0) {
+    keyStrengths.push(`${statusCounts.strong} 个科目学习状态良好`)
+  }
+  if (statusCounts.strong >= 2) {
+    keyStrengths.push('多个科目有优势，整体竞争力较强')
+  }
+  if (input.hobbies?.length) {
+    keyStrengths.push(`兴趣爱好丰富：${input.hobbies.slice(0, 3).join('、')}`)
+  }
+  if (input.achievements) {
+    keyStrengths.push('有获奖经历，综合素质较好')
+  }
+  
+  if (statusCounts.weak > 0) {
+    keyWeaknesses.push(`${statusCounts.weak} 个科目学习吃力，需要重点加强`)
+  }
+  if (statusCounts.weak >= 2) {
+    keyWeaknesses.push('多个科目需要补强，建议制定系统学习计划')
+  }
+  if (keyWeaknesses.length === 0) {
+    keyWeaknesses.push('需要保持学习状态，持续努力')
+  }
+  
+  // 生成摘要
+  const summary = `该学生目前就读${gradeName}，计划于${input.enrollmentDate || '近期'}插班至${input.targetSchools[0] || '目标学校'}。` +
+    `根据学习状态评估，${statusCounts.strong}个科目表现良好，${statusCounts.ok}个科目状态一般，${statusCounts.weak}个科目需要加强。` +
+    `整体可行性评级为${feasibilityLevel}级（${feasibilityScore}分）。`
+  
+  // 生成科目分析
+  const subjectAnalyses = ruleAnalysis.subjectAnalyses.map(analysis => {
+    const statusLabel = analysis.status === 'strong' ? '优势' : analysis.status === 'ok' ? '一般' : '吃力'
+    return {
+      subject: analysis.subjectName,
+      currentLevel: analysis.status,
+      targetLevel: 'strong',
+      gap: analysis.status === 'strong' ? '已达标' : analysis.status === 'ok' ? '需提升' : '需重点加强',
+      strengths: analysis.status === 'strong' ? ['学习状态良好', '有一定优势'] : ['有基础', '可以提升'],
+      weaknesses: analysis.status === 'weak' ? ['学习吃力', '需要重点辅导'] : ['需要保持', '争取更好'],
+      recommendations: analysis.status === 'weak' 
+        ? ['建议寻求专业辅导', '每天增加该科目学习时间', '多做练习题巩固基础']
+        : ['保持当前学习节奏', '定期复习巩固', '适当拓展提高'],
+      estimatedTimeToImprove: analysis.status === 'weak' ? '3-4个月' : analysis.status === 'ok' ? '1-2个月' : '保持即可',
+    }
+  })
+  
+  // 生成学校评估
+  const schoolAssessments = input.targetSchools.map((school, i) => {
+    // 根据学校排序和整体可行性计算等级
+    const schoolScore = Math.max(30, feasibilityScore - i * 10)
+    const level = calculateFeasibilityLevel(schoolScore)
+    return {
+      schoolName: school,
+      feasibilityLevel: level,
+      levelLabel: FEASIBILITY_LEVEL_CONFIG[level].label,
+      levelColor: FEASIBILITY_LEVEL_CONFIG[level].color,
+      requirements: ['良好的学习状态', '适应能力强', '品行端正'],
+      gaps: statusCounts.weak > 0 ? ['部分科目需要加强', '需要适应新环境'] : ['需要准备面试'],
+      recommendations: ['了解学校特色', '准备面试自我介绍', '展示学习热情'],
+    }
+  })
+  
+  // 生成学习计划
+  const studyPlan = {
+    weeklySchedule: statusCounts.weak > 0 
+      ? ['周一至周五：重点科目每天2小时', '周六：薄弱科目集中训练', '周日：综合复习和休息']
+      : ['周一至周五：每天1.5小时自习', '周六：拓展学习', '周日：综合复习'],
+    monthlyGoals: statusCounts.weak > 0
+      ? ['第1个月：补齐薄弱科目基础', '第2个月：全面提升', '第3个月：模拟训练和面试准备']
+      : ['第1个月：保持状态', '第2个月：针对性提升', '第3个月：面试准备'],
+    resources: ['学校课本和笔记', '历年考试真题', '在线学习平台'],
+  }
+  
+  // 合并建议
+  const additionalAdvice = [
+    ...ruleAnalysis.electiveNotes,
+    '保持积极的学习态度',
+    '与老师保持良好沟通',
+    '注意劳逸结合',
+  ]
+  
+  return {
+    overallAssessment: {
+      feasibilityScore,
+      feasibilityLevel,
+      levelDescription: FEASIBILITY_LEVEL_CONFIG[feasibilityLevel].description,
+      summary,
+      keyStrengths: keyStrengths.slice(0, 4),
+      keyWeaknesses: keyWeaknesses.slice(0, 3),
+    },
+    subjectAnalyses,
+    schoolAssessments,
+    studyPlan,
+    additionalAdvice,
+  }
+}
+
 // 生成模拟结果
 function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
   // 处理各种年级格式
@@ -3306,18 +3461,56 @@ export default {
         }, 200, origin)
       }
 
-      // 提交分析
+      // 提交插班分析（新版 - 基于学习状态）
       if (path === '/api/analysis/submit' && request.method === 'POST') {
-        const body = await request.json() as StudentInfo
+        const body = await request.json() as TransferAnalysisInput
 
-        const grades: SubjectGrade[] = body.subjects.flatMap((item) => ([
-          { subject: item.subject as SubjectGrade['subject'], value: item.currentScore },
-          { subject: item.subject as SubjectGrade['subject'], value: item.targetScore },
-        ]))
-        validateSubjectGrades(grades)
+        // ===== 输入校验 =====
+        
+        // 1. 检查必填字段
+        if (!body.enrollmentDate || !body.semester || !body.grade || !body.age) {
+          return errorResponse('缺少必填字段: enrollmentDate, semester, grade, age', 400, origin)
+        }
+        
+        // 2. 检查 subjectStatuses 是否存在
+        if (!body.subjectStatuses || !Array.isArray(body.subjectStatuses) || body.subjectStatuses.length === 0) {
+          return errorResponse('subjectStatuses 必须是非空数组', 400, origin)
+        }
+        
+        // 3. 拒绝旧的 grade/level/subjects 字段
+        const bodyAny = body as Record<string, unknown>
+        if (bodyAny.subjects && Array.isArray(bodyAny.subjects) && (bodyAny.subjects as unknown[]).length > 0) {
+          const firstSubject = (bodyAny.subjects as Record<string, unknown>[])[0]
+          if (firstSubject && ('currentScore' in firstSubject || 'targetScore' in firstSubject)) {
+            return errorResponse('不接受旧的 subjects 格式，请使用 subjectStatuses', 400, origin)
+          }
+        }
+        if (bodyAny.grades) {
+          return errorResponse('不接受 grades 字段，请使用 subjectStatuses', 400, origin)
+        }
+        
+        // 4. 校验 subjectStatuses 中的每个科目状态
+        try {
+          validateTransferSubjectStatuses(body.subjectStatuses)
+        } catch (e) {
+          if (e instanceof AnalysisInputError) {
+            return errorResponse(e.message, 400, origin)
+          }
+          throw e
+        }
+        
+        // 5. 检查 targetSchools
+        if (!body.targetSchools || !Array.isArray(body.targetSchools) || body.targetSchools.length === 0) {
+          return errorResponse('targetSchools 必须是非空数组', 400, origin)
+        }
 
-        // 调用 DeepSeek API
-        const analysisResult = await analyzeWithDeepSeek(body, env.DEEPSEEK_API_KEY)
+        // ===== 执行分析（基于学习状态）=====
+        
+        // 使用规则引擎分析科目状态
+        const ruleAnalysis = analyzeTransferSubjectStatuses(body.subjectStatuses, 'zh-CN')
+        
+        // 构建分析结果
+        const analysisResult = await generateTransferAnalysisResult(body, ruleAnalysis, env.DEEPSEEK_API_KEY)
 
         const recordId = crypto.randomUUID()
         const now = new Date().toISOString()

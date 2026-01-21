@@ -59,7 +59,10 @@ export interface SubjectScore {
 }
 
 /**
- * 学生信息接口
+ * 学生信息接口（插班分析 - 基于学习状态）
+ * 
+ * ⚠️ 重要：不再包含旧的 subjects / grades / level 字段
+ * 后端会拒绝包含这些旧字段的请求
  */
 export interface StudentInfo {
   enrollmentDate: string      // 插班日期
@@ -69,20 +72,15 @@ export interface StudentInfo {
   currentSchool: string       // 当前学校
   
   /**
-   * 科目学习状态（插班分析专用）
+   * 科目学习状态（插班分析核心输入）
    * 系统分析仅使用 status 字段
    */
   subjectStatuses: TransferSubjectInput[]
   
-  /**
-   * @deprecated 请使用 subjectStatuses
-   * 仅保留用于兼容旧数据
-   */
-  subjects?: SubjectScore[]
-  
   targetSchools: string[]     // 目标学校
   notes: string               // 备注
-  // 个人特质信息
+  
+  // 个人特质信息（可选）
   hobbies?: string[]          // 兴趣爱好
   strengths?: string[]        // 个人特长
   extracurriculars?: string[] // 课外活动
@@ -238,7 +236,7 @@ const defaultFormData: StudentInfo = {
   age: 16,
   currentSchool: '',
   subjectStatuses: [],
-  subjects: [], // 保留兼容
+  // 注意：不包含旧的 subjects 字段，后端会拒绝
   targetSchools: [],
   notes: '',
 }

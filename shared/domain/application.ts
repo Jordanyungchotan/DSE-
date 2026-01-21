@@ -58,30 +58,64 @@ export interface TransferSubjectStatus {
 }
 
 /**
- * 插班申请分析输入
+ * 插班分析完整输入（前后端统一使用）
  * 
  * ⚠️ 重要：
- * - 使用 TransferSubjectStatus[] 作为科目输入
- * - 完全移除任何 grade / level / scoreLevel 字段
+ * - 使用 subjectStatuses: TransferSubjectStatus[] 作为科目输入
+ * - 完全移除任何 grade / level / scoreLevel / subjects 字段
  * - 系统分析仅基于 status 和 rankPosition
  */
-export interface TransferApplicationInput {
-  /** 目标年级 */
-  targetLevel: "中二" | "中三" | "中四" | "中五";
+export interface TransferAnalysisInput {
+  /** 插班日期 */
+  enrollmentDate: string;
+  
+  /** 目标学期 */
+  semester: string;
+  
+  /** 当前就读年级 */
+  grade: string;
+  
+  /** 学生年龄 */
+  age: number;
+  
+  /** 当前学校 */
+  currentSchool?: string;
 
   /** 
-   * 各科目学习状态
+   * 各科目学习状态（核心输入）
    * 系统分析仅使用 status 字段
    */
   subjectStatuses: TransferSubjectStatus[];
 
-  /** 目标学校（可选） */
+  /** 目标学校列表 */
+  targetSchools: string[];
+
+  /** 备注 */
+  notes?: string;
+
+  // ===== 个人特质信息（可选）=====
+  
+  /** 兴趣爱好 */
+  hobbies?: string[];
+  
+  /** 个人特长 */
+  strengths?: string[];
+  
+  /** 课外活动 */
+  extracurriculars?: string[];
+  
+  /** 获奖经历 */
+  achievements?: string;
+}
+
+/**
+ * @deprecated 使用 TransferAnalysisInput 替代
+ */
+export interface TransferApplicationInput {
+  targetLevel: "中二" | "中三" | "中四" | "中五";
+  subjectStatuses: TransferSubjectStatus[];
   targetSchools?: string[];
-
-  /** 学生当前年级（可选） */
   currentGrade?: string;
-
-  /** 当前学校类型（可选） */
   currentSchoolType?: string;
 }
 
@@ -139,6 +173,33 @@ export function isValidTransferSubjectStatus(input: unknown): input is TransferS
   if (obj.scoreSource !== undefined && !['latest', 'average'].includes(obj.scoreSource as string)) {
     return false;
   }
+  
+  return true;
+}
+
+/**
+ * 检查是否为有效的插班分析输入
+ */
+export function isValidTransferAnalysisInput(input: unknown): input is TransferAnalysisInput {
+  if (!input || typeof input !== 'object') return false;
+  const obj = input as Record<string, unknown>;
+  
+  // 必填字段检查
+  if (typeof obj.enrollmentDate !== 'string') return false;
+  if (typeof obj.semester !== 'string') return false;
+  if (typeof obj.grade !== 'string') return false;
+  if (typeof obj.age !== 'number') return false;
+  
+  // subjectStatuses 必须存在且为数组
+  if (!Array.isArray(obj.subjectStatuses)) return false;
+  
+  // 验证每个科目状态
+  for (const status of obj.subjectStatuses) {
+    if (!isValidTransferSubjectStatus(status)) return false;
+  }
+  
+  // targetSchools 必须存在且为数组
+  if (!Array.isArray(obj.targetSchools)) return false;
   
   return true;
 }
