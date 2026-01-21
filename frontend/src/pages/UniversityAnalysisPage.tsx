@@ -129,8 +129,8 @@ const ANALYSIS_STAGES = [
  */
 const UniversityAnalysisPage = () => {
   const navigate = useNavigate()
-  const { t, locale } = useLanguageStore()
-  const currentLang = locale as LanguageCode
+  const { t, locale, currentLanguage } = useLanguageStore()
+  const currentLang = currentLanguage
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [dseResults, setDseResults] = useState<DseResult[]>([

@@ -1,12 +1,12 @@
 // ===== DSE 科目三语支持（繁/简/英）统一规范 =====
 
 /**
- * 支持的语言代码
- * zh-TW: 繁体中文（香港/台湾）
+ * 支持的语言代码（全项目唯一）
+ * zh-HK: 繁体中文（香港）
  * zh-CN: 简体中文
  * en: 英文
  */
-export type LanguageCode = 'zh-TW' | 'zh-CN' | 'en';
+export type LanguageCode = 'zh-HK' | 'zh-CN' | 'en';
 
 /**
  * 科目定义结构
@@ -25,7 +25,7 @@ export const CORE_SUBJECTS: SubjectDefinition[] = [
     category: 'core',
     grading: 'level',
     displayName: {
-      'zh-TW': '中國語文',
+      'zh-HK': '中國語文',
       'zh-CN': '中国语文',
       en: 'Chinese Language',
     },
@@ -35,7 +35,7 @@ export const CORE_SUBJECTS: SubjectDefinition[] = [
     category: 'core',
     grading: 'level',
     displayName: {
-      'zh-TW': '英國語文',
+      'zh-HK': '英國語文',
       'zh-CN': '英国语文',
       en: 'English Language',
     },
@@ -45,7 +45,7 @@ export const CORE_SUBJECTS: SubjectDefinition[] = [
     category: 'core',
     grading: 'level',
     displayName: {
-      'zh-TW': '數學',
+      'zh-HK': '數學',
       'zh-CN': '数学',
       en: 'Mathematics',
     },
@@ -55,7 +55,7 @@ export const CORE_SUBJECTS: SubjectDefinition[] = [
     category: 'core',
     grading: 'passfail',
     displayName: {
-      'zh-TW': '公民與社會發展',
+      'zh-HK': '公民與社會發展',
       'zh-CN': '公民与社会发展',
       en: 'Citizenship and Social Development',
     },
@@ -69,7 +69,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '中國文學',
+      'zh-HK': '中國文學',
       'zh-CN': '中国文学',
       en: 'Chinese Literature',
     },
@@ -79,7 +79,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '英語文學',
+      'zh-HK': '英語文學',
       'zh-CN': '英语文学',
       en: 'English Literature',
     },
@@ -89,7 +89,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '中國歷史',
+      'zh-HK': '中國歷史',
       'zh-CN': '中国历史',
       en: 'Chinese History',
     },
@@ -99,7 +99,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '生物',
+      'zh-HK': '生物',
       'zh-CN': '生物',
       en: 'Biology',
     },
@@ -109,7 +109,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '企業、會計與財務概論',
+      'zh-HK': '企業、會計與財務概論',
       'zh-CN': '企业、会计与财务概论',
       en: 'Business, Accounting and Financial Studies',
     },
@@ -119,7 +119,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '化學',
+      'zh-HK': '化學',
       'zh-CN': '化学',
       en: 'Chemistry',
     },
@@ -129,7 +129,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '設計與應用科技',
+      'zh-HK': '設計與應用科技',
       'zh-CN': '设计与应用科技',
       en: 'Design and Applied Technology',
     },
@@ -139,7 +139,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '物理',
+      'zh-HK': '物理',
       'zh-CN': '物理',
       en: 'Physics',
     },
@@ -149,7 +149,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '健康管理與社會關懷',
+      'zh-HK': '健康管理與社會關懷',
       'zh-CN': '健康管理与社会关怀',
       en: 'Health Management and Social Care',
     },
@@ -159,7 +159,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '經濟',
+      'zh-HK': '經濟',
       'zh-CN': '经济',
       en: 'Economics',
     },
@@ -169,7 +169,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '資訊及通訊科技',
+      'zh-HK': '資訊及通訊科技',
       'zh-CN': '信息及通信技术',
       en: 'Information and Communication Technology',
     },
@@ -179,7 +179,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '倫理與宗教',
+      'zh-HK': '倫理與宗教',
       'zh-CN': '伦理与宗教',
       en: 'Ethics and Religious Studies',
     },
@@ -189,7 +189,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '科技與生活',
+      'zh-HK': '科技與生活',
       'zh-CN': '科技与生活',
       en: 'Technology and Living',
     },
@@ -199,7 +199,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '地理',
+      'zh-HK': '地理',
       'zh-CN': '地理',
       en: 'Geography',
     },
@@ -209,7 +209,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '歷史',
+      'zh-HK': '歷史',
       'zh-CN': '历史',
       en: 'History',
     },
@@ -219,7 +219,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '音樂',
+      'zh-HK': '音樂',
       'zh-CN': '音乐',
       en: 'Music',
     },
@@ -229,7 +229,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '視覺藝術',
+      'zh-HK': '視覺藝術',
       'zh-CN': '视觉艺术',
       en: 'Visual Arts',
     },
@@ -239,7 +239,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '旅遊與款待',
+      'zh-HK': '旅遊與款待',
       'zh-CN': '旅游与款待',
       en: 'Tourism and Hospitality Studies',
     },
@@ -249,7 +249,7 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
     category: 'elective',
     grading: 'level',
     displayName: {
-      'zh-TW': '體育',
+      'zh-HK': '體育',
       'zh-CN': '体育',
       en: 'Physical Education',
     },
@@ -366,17 +366,17 @@ export function getElectiveAnalysisNotes(keys: string[], lang: LanguageCode): st
 
   const NOTES = {
     science: {
-      'zh-TW': '理科背景，對名校插班競爭更有利。',
+      'zh-HK': '理科背景，對名校插班競爭更有利。',
       'zh-CN': '理科背景，对名校插班竞争更有利。',
       en: 'Science background provides competitive advantage for elite school transfers.',
     },
     business: {
-      'zh-TW': '商科取向，需關注學校課程側重。',
+      'zh-HK': '商科取向，需關注學校課程側重。',
       'zh-CN': '商科取向，需关注学校课程侧重。',
       en: 'Business orientation - consider school curriculum focus.',
     },
     artsSports: {
-      'zh-TW': '部分學校對相關特長有額外考核。',
+      'zh-HK': '部分學校對相關特長有額外考核。',
       'zh-CN': '部分学校对相关特长有额外考核。',
       en: 'Some schools have additional assessments for arts/sports talents.',
     },

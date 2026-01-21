@@ -1,19 +1,21 @@
 import { zhCN } from './locales/zh-CN'
 import { zhTW } from './locales/zh-TW'
 import { en } from './locales/en'
+import { LanguageCode } from '@/shared/domain'
 
-export type Locale = 'zh-CN' | 'zh-TW' | 'en'
+// 前端 Locale 类型（与 LanguageCode 对齐）
+export type Locale = LanguageCode
 
 export const locales = {
   'zh-CN': zhCN,
-  'zh-TW': zhTW,
+  'zh-HK': zhTW, // zh-HK 使用繁体中文翻译
   'en': en,
 }
 
 export type Translations = typeof zhCN
 
 // 默认语言
-export const defaultLocale: Locale = 'zh-TW'
+export const defaultLocale: Locale = 'zh-HK'
 
 // 获取嵌套翻译值
 export function getNestedValue(obj: Record<string, unknown>, path: string): string {
@@ -41,4 +43,3 @@ export function createT(locale: Locale) {
 }
 
 export { zhCN, zhTW, en }
-

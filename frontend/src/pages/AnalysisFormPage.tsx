@@ -691,9 +691,9 @@ const AnalysisFormPage = () => {
     </div>
   )
 
-  // 获取当前语言（映射到 LanguageCode）
-  const { locale } = useLanguageStore()
-  const currentLang = locale as LanguageCode
+  // 获取当前语言
+  const { currentLanguage } = useLanguageStore()
+  const currentLang = currentLanguage
 
   // 获取科目显示名称
   const getSubjectLabel = (subjectKey: string) => getSubjectDisplayName(subjectKey, currentLang)

@@ -12,7 +12,7 @@ export type CivicsStatus =
  * CSD 成绩选项（三语支持）
  */
 export const CIVICS_OPTIONS: Record<LanguageCode, { value: CivicsStatus; label: string }[]> = {
-  'zh-TW': [
+  'zh-HK': [
     { value: CIVICS_STATUS.PASS, label: "達標" },
     { value: CIVICS_STATUS.FAIL, label: "未達標" }
   ],
