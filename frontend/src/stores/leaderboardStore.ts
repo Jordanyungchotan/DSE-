@@ -3,20 +3,24 @@ import { apiFetch } from '../config/api'
 import { useAuthStore } from './authStore'
 
 /**
- * 学习排行榜系统 - 状态管理Store
+ * 排行榜系统 - 状态管理Store
  * 
- * 规则：
- * - 排行榜基于学习行为（刷题数、正确率、速度）
- * - 与积分系统完全解耦
- * - 所有排名计算在后端完成
- * - 前端只负责请求 API 和存储数据
+ * 支持两类排行榜：
+ * A. 学习排行榜（核心）- 基于刷题行为
+ * B. 激励排行榜（辅助）- 基于积分
  */
 
-// ===== 类型定义 =====
+// ===== 学习排行榜类型 =====
 
 export type LeaderboardMetric = 'QUIZ_COUNT' | 'ACCURACY' | 'SPEED';
 export type LeaderboardRange = 'ALL' | 'WEEK' | 'DAY';
 export type LeaderboardSubject = 'ALL' | 'MATH' | 'ENG' | 'CHI' | 'PHYS' | 'CHEM' | 'BIO' | 'ECON' | 'HIST' | 'GEO';
+
+// ===== 激励排行榜类型 =====
+
+export type IncentiveLeaderboardType = 'POINTS_TOTAL' | 'POINTS_WEEKLY';
+
+// ===== 接口定义 =====
 
 /**
  * 学习排行榜条目
@@ -30,6 +34,20 @@ export interface LearningLeaderboardEntry {
   accuracy?: number;
   avgTime?: number;
   isCurrentUser?: boolean;
+  effectiveQuizCount?: number;
+}
+
+/**
+ * 我的排名信息（带分析）
+ */
+export interface MyRankInfo extends LearningLeaderboardEntry {
+  percentile: number;
+  gapToNext?: {
+    metric: string;
+    value: number;
+  };
+  strengths: string[];
+  weaknesses: string[];
 }
 
 /**
@@ -40,9 +58,40 @@ export interface LearningLeaderboardResponse {
   range: LeaderboardRange;
   subject: LeaderboardSubject;
   entries: LearningLeaderboardEntry[];
-  myRank?: LearningLeaderboardEntry;
+  myRank?: MyRankInfo;
   totalParticipants: number;
   lastUpdated: string;
+  antiCheatNotice?: string;
+}
+
+/**
+ * 激励排行榜条目
+ */
+export interface IncentiveLeaderboardEntry {
+  userId: string;
+  name: string;
+  avatarUrl?: string;
+  rank: number;
+  totalPoints: number;
+  weeklyPoints?: number;
+  isCurrentUser?: boolean;
+  isTopRanker?: boolean;
+  privileges?: string[];
+}
+
+/**
+ * 激励排行榜响应
+ */
+export interface IncentiveLeaderboardResponse {
+  type: IncentiveLeaderboardType;
+  entries: IncentiveLeaderboardEntry[];
+  myRank?: IncentiveLeaderboardEntry & { percentile: number };
+  totalParticipants: number;
+  lastUpdated: string;
+  topRankerPrivileges?: {
+    rank: number;
+    privileges: string[];
+  }[];
 }
 
 /**
@@ -58,11 +107,12 @@ export interface UserLearningStats {
   longestStreak: number;
   perfectSessions: number;
   recentScores: number[];
+  effectiveQuizzes: number;
+  filteredQuizzes: number;
 }
 
-/**
- * 排行榜筛选选项
- */
+// ===== 筛选选项 =====
+
 export const METRIC_OPTIONS = [
   { id: 'QUIZ_COUNT' as LeaderboardMetric, label: '刷题数量', icon: '📊' },
   { id: 'ACCURACY' as LeaderboardMetric, label: '正确率', icon: '🎯' },
@@ -88,21 +138,36 @@ export const SUBJECT_OPTIONS = [
   { id: 'GEO' as LeaderboardSubject, label: '地理' },
 ];
 
-/**
- * Store状态接口
- */
+export const INCENTIVE_TYPE_OPTIONS = [
+  { id: 'POINTS_TOTAL' as IncentiveLeaderboardType, label: '积分总榜', icon: '💰' },
+  { id: 'POINTS_WEEKLY' as IncentiveLeaderboardType, label: '周积分榜', icon: '📈' },
+];
+
+// ===== Store 状态接口 =====
+
 interface LeaderboardState {
-  // 排行榜数据
-  leaderboardData: LearningLeaderboardResponse | null;
+  // 当前排行榜类型
+  leaderboardCategory: 'learning' | 'incentive';
+  
+  // 学习排行榜数据
+  learningData: LearningLeaderboardResponse | null;
+  
+  // 激励排行榜数据
+  incentiveData: IncentiveLeaderboardResponse | null;
   
   // 当前用户统计
   userStats: UserLearningStats | null;
   
-  // 筛选条件
-  filters: {
+  // 学习排行榜筛选
+  learningFilters: {
     metric: LeaderboardMetric;
     range: LeaderboardRange;
     subject: LeaderboardSubject;
+  };
+  
+  // 激励排行榜筛选
+  incentiveFilters: {
+    type: IncentiveLeaderboardType;
   };
   
   // 状态
@@ -110,35 +175,58 @@ interface LeaderboardState {
   error: string | null;
   
   // 操作
-  fetchLeaderboard: () => Promise<void>;
+  setLeaderboardCategory: (category: 'learning' | 'incentive') => void;
+  fetchLearningLeaderboard: () => Promise<void>;
+  fetchIncentiveLeaderboard: () => Promise<void>;
   fetchUserStats: () => Promise<void>;
-  updateFilters: (filters: Partial<LeaderboardState['filters']>) => void;
+  updateLearningFilters: (filters: Partial<LeaderboardState['learningFilters']>) => void;
+  updateIncentiveFilters: (filters: Partial<LeaderboardState['incentiveFilters']>) => void;
   setError: (error: string | null) => void;
   reset: () => void;
 }
 
-const defaultFilters = {
+const defaultLearningFilters = {
   metric: 'QUIZ_COUNT' as LeaderboardMetric,
   range: 'ALL' as LeaderboardRange,
   subject: 'ALL' as LeaderboardSubject,
 };
 
+const defaultIncentiveFilters = {
+  type: 'POINTS_TOTAL' as IncentiveLeaderboardType,
+};
+
 /**
- * 学习排行榜状态管理Store
+ * 排行榜状态管理Store
  */
 export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   // 初始状态
-  leaderboardData: null,
+  leaderboardCategory: 'learning',
+  learningData: null,
+  incentiveData: null,
   userStats: null,
-  filters: { ...defaultFilters },
+  learningFilters: { ...defaultLearningFilters },
+  incentiveFilters: { ...defaultIncentiveFilters },
   loading: false,
   error: null,
 
   /**
+   * 设置当前排行榜类别
+   */
+  setLeaderboardCategory: (category) => {
+    set({ leaderboardCategory: category });
+    // 自动加载对应数据
+    if (category === 'learning') {
+      get().fetchLearningLeaderboard();
+    } else {
+      get().fetchIncentiveLeaderboard();
+    }
+  },
+
+  /**
    * 获取学习排行榜数据
    */
-  fetchLeaderboard: async () => {
-    const { filters } = get();
+  fetchLearningLeaderboard: async () => {
+    const { learningFilters } = get();
     set({ loading: true, error: null });
 
     try {
@@ -149,9 +237,9 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
       }
 
       const params = new URLSearchParams({
-        metric: filters.metric,
-        range: filters.range,
-        subject: filters.subject,
+        metric: learningFilters.metric,
+        range: learningFilters.range,
+        subject: learningFilters.subject,
         limit: '50',
       });
 
@@ -159,17 +247,59 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || '获取排行榜失败');
+        throw new Error(errorData.message || '获取学习排行榜失败');
       }
 
       const result = await response.json();
       
       if (result.code !== 0) {
-        throw new Error(result.message || '获取排行榜失败');
+        throw new Error(result.message || '获取学习排行榜失败');
       }
 
       set({
-        leaderboardData: result.data,
+        learningData: result.data,
+        loading: false,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      set({ loading: false, error: message });
+    }
+  },
+
+  /**
+   * 获取激励排行榜数据
+   */
+  fetchIncentiveLeaderboard: async () => {
+    const { incentiveFilters } = get();
+    set({ loading: true, error: null });
+
+    try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const params = new URLSearchParams({
+        type: incentiveFilters.type,
+        limit: '50',
+      });
+
+      const response = await apiFetch(`/api/leaderboard/incentive?${params}`, { headers });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '获取积分排行榜失败');
+      }
+
+      const result = await response.json();
+      
+      if (result.code !== 0) {
+        throw new Error(result.message || '获取积分排行榜失败');
+      }
+
+      set({
+        incentiveData: result.data,
         loading: false,
       });
     } catch (error) {
@@ -207,14 +337,23 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   },
 
   /**
-   * 更新筛选条件并重新获取数据
+   * 更新学习排行榜筛选条件
    */
-  updateFilters: (newFilters) => {
+  updateLearningFilters: (newFilters) => {
     set((state) => ({
-      filters: { ...state.filters, ...newFilters },
+      learningFilters: { ...state.learningFilters, ...newFilters },
     }));
-    // 自动重新获取数据
-    get().fetchLeaderboard();
+    get().fetchLearningLeaderboard();
+  },
+
+  /**
+   * 更新激励排行榜筛选条件
+   */
+  updateIncentiveFilters: (newFilters) => {
+    set((state) => ({
+      incentiveFilters: { ...state.incentiveFilters, ...newFilters },
+    }));
+    get().fetchIncentiveLeaderboard();
   },
 
   /**
@@ -229,9 +368,12 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
    */
   reset: () => {
     set({
-      leaderboardData: null,
+      leaderboardCategory: 'learning',
+      learningData: null,
+      incentiveData: null,
       userStats: null,
-      filters: { ...defaultFilters },
+      learningFilters: { ...defaultLearningFilters },
+      incentiveFilters: { ...defaultIncentiveFilters },
       loading: false,
       error: null,
     });
@@ -277,11 +419,3 @@ export interface RankingEntry extends LearningLeaderboardEntry {
 
 /** @deprecated */
 export const TIME_RANGE_OPTIONS = RANGE_OPTIONS;
-
-/** @deprecated */
-export const SPEED_CATEGORIES = {
-  lightning: { maxTime: 15, name: '闪电侠', icon: '⚡', description: '思维敏捷，快速反应' },
-  fast: { minTime: 15, maxTime: 30, name: '快速答题手', icon: '🏃', description: '速度与准确兼备' },
-  average: { minTime: 30, maxTime: 60, name: '稳健型', icon: '📊', description: '稳扎稳打，保证正确率' },
-  careful: { minTime: 60, name: '深思熟虑型', icon: '🤔', description: '仔细思考，追求完美' },
-} as const;

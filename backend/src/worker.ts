@@ -50,6 +50,18 @@ import {
   LeaderboardRange,
   LeaderboardSubject,
 } from './services/learningLeaderboardService.js'
+import {
+  getIncentiveLeaderboard,
+  checkUserPrivileges,
+  IncentiveLeaderboardType,
+} from './services/incentiveLeaderboardService.js'
+import {
+  getMallItems,
+  redeemItem,
+  getUserConsultations,
+  updateConsultationStatus,
+  getConversionFunnelStats,
+} from './services/pointsMallService.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -6274,6 +6286,85 @@ export default {
         }
       }
 
+      // =====================
+      // 激励排行榜 API（积分榜）
+      // =====================
+
+      // 获取激励排行榜（积分总榜/周榜）
+      if (path === '/api/leaderboard/incentive' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const type = (url.searchParams.get('type') || 'POINTS_TOTAL') as IncentiveLeaderboardType
+        const limit = parseInt(url.searchParams.get('limit') || '50')
+
+        // 验证参数
+        const validTypes: IncentiveLeaderboardType[] = ['POINTS_TOTAL', 'POINTS_WEEKLY']
+        if (!validTypes.includes(type)) {
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: `Invalid type. Valid values: ${validTypes.join(', ')}`
+          }, 400, origin)
+        }
+
+        // 获取当前用户（如果已登录）
+        let currentUserId: string | undefined
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          currentUserId = tokenData?.userId
+        }
+
+        try {
+          const leaderboardData = await getIncentiveLeaderboard(env.DB, {
+            type,
+            limit,
+            currentUserId,
+          })
+
+          return jsonResponse({
+            code: 0,
+            data: leaderboardData,
+            message: 'ok'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get incentive leaderboard error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取积分排行榜失败'
+          }, 500, origin)
+        }
+      }
+
+      // 检查用户排行榜特权
+      if (path === '/api/leaderboard/privileges' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const privileges = await checkUserPrivileges(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: privileges,
+            message: 'ok'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Check user privileges error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取特权信息失败'
+          }, 500, origin)
+        }
+      }
+
       // 获取排行榜（旧版，保留兼容）
       if (path === '/api/leaderboard' && request.method === 'GET') {
         const url = new URL(request.url)
@@ -6862,6 +6953,167 @@ export default {
             code: -1,
             data: null,
             message: error instanceof Error ? error.message : '获取积分历史失败'
+          }, 500, origin)
+        }
+      }
+
+      // =====================
+      // 积分商城 API
+      // =====================
+
+      // 获取商城商品列表
+      if (path === '/api/points/mall/items' && request.method === 'GET') {
+        let userId: string | undefined
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          userId = tokenData?.userId
+        }
+
+        try {
+          const items = await getMallItems(env.DB, userId)
+          return jsonResponse({
+            code: 0,
+            data: { items },
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get mall items error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取商品列表失败'
+          }, 500, origin)
+        }
+      }
+
+      // 兑换商品
+      if (path === '/api/points/mall/redeem' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const body = await request.json() as { itemId: string }
+        if (!body.itemId) {
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: '请选择要兑换的商品'
+          }, 400, origin)
+        }
+
+        try {
+          const result = await redeemItem(env.DB, tokenData.userId, body.itemId)
+          return jsonResponse({
+            code: result.success ? 0 : -1,
+            data: result,
+            message: result.message
+          }, result.success ? 200 : 400, origin)
+        } catch (error) {
+          console.error('Redeem item error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '兑换失败'
+          }, 500, origin)
+        }
+      }
+
+      // 获取用户咨询记录
+      if (path === '/api/points/mall/consultations' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const consultations = await getUserConsultations(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: { consultations },
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get user consultations error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取咨询记录失败'
+          }, 500, origin)
+        }
+      }
+
+      // 管理员：更新咨询状态
+      if (path.startsWith('/api/admin/consultations/') && request.method === 'PATCH') {
+        const authHeader = request.headers.get('Authorization')
+        // 简单的管理员验证（实际应该使用更安全的方式）
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== env.ADMIN_KEY) {
+          return errorResponse('无权限', 403, origin)
+        }
+
+        const conversionId = path.replace('/api/admin/consultations/', '')
+        const body = await request.json() as {
+          status?: string
+          scheduledAt?: string
+          completedAt?: string
+          isConverted?: boolean
+          conversionAmount?: number
+          consultantId?: string
+          consultantNotes?: string
+        }
+
+        try {
+          const success = await updateConsultationStatus(env.DB, conversionId, body)
+          return jsonResponse({
+            code: success ? 0 : -1,
+            data: { success },
+            message: success ? '更新成功' : '更新失败'
+          }, success ? 200 : 400, origin)
+        } catch (error) {
+          console.error('Update consultation status error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '更新失败'
+          }, 500, origin)
+        }
+      }
+
+      // 管理员：获取转化漏斗统计
+      if (path === '/api/admin/conversions/funnel' && request.method === 'GET') {
+        const adminKey = request.headers.get('X-Admin-Key')
+        if (adminKey !== env.ADMIN_KEY) {
+          return errorResponse('无权限', 403, origin)
+        }
+
+        const url = new URL(request.url)
+        const days = parseInt(url.searchParams.get('days') || '30')
+
+        try {
+          const stats = await getConversionFunnelStats(env.DB, days)
+          return jsonResponse({
+            code: 0,
+            data: { stats },
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get conversion funnel stats error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取统计失败'
           }, 500, origin)
         }
       }
