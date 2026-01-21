@@ -43,6 +43,13 @@ import {
   getPointHistory,
   getUserRank as getPointsUserRank,
 } from './services/pointsService.js'
+import {
+  getLearningLeaderboard,
+  getUserLearningStats,
+  LeaderboardMetric,
+  LeaderboardRange,
+  LeaderboardSubject,
+} from './services/learningLeaderboardService.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -6169,7 +6176,105 @@ export default {
       // 排行榜 API
       // =====================
 
-      // 获取排行榜
+      // 获取学习排行榜（新版，与积分系统解耦）
+      if (path === '/api/leaderboard/learning' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const metric = (url.searchParams.get('metric') || 'QUIZ_COUNT') as LeaderboardMetric
+        const range = (url.searchParams.get('range') || 'ALL') as LeaderboardRange
+        const subject = (url.searchParams.get('subject') || 'ALL') as LeaderboardSubject
+        const limit = parseInt(url.searchParams.get('limit') || '50')
+
+        // 验证参数
+        const validMetrics: LeaderboardMetric[] = ['QUIZ_COUNT', 'ACCURACY', 'SPEED']
+        const validRanges: LeaderboardRange[] = ['ALL', 'WEEK', 'DAY']
+        const validSubjects: LeaderboardSubject[] = ['ALL', 'MATH', 'ENG', 'CHI', 'PHYS', 'CHEM', 'BIO', 'ECON', 'HIST', 'GEO']
+
+        if (!validMetrics.includes(metric)) {
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: `Invalid metric. Valid values: ${validMetrics.join(', ')}`
+          }, 400, origin)
+        }
+
+        if (!validRanges.includes(range)) {
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: `Invalid range. Valid values: ${validRanges.join(', ')}`
+          }, 400, origin)
+        }
+
+        if (!validSubjects.includes(subject)) {
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: `Invalid subject. Valid values: ${validSubjects.join(', ')}`
+          }, 400, origin)
+        }
+
+        // 获取当前用户（如果已登录）
+        let currentUserId: string | undefined
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          currentUserId = tokenData?.userId
+        }
+
+        try {
+          const leaderboardData = await getLearningLeaderboard(env.DB, {
+            metric,
+            range,
+            subject,
+            limit,
+            currentUserId,
+          })
+
+          return jsonResponse({
+            code: 0,
+            data: leaderboardData,
+            message: 'ok'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get learning leaderboard error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取学习排行榜失败'
+          }, 500, origin)
+        }
+      }
+
+      // 获取用户学习统计
+      if (path === '/api/leaderboard/learning/me' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const stats = await getUserLearningStats(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: stats,
+            message: 'ok'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get user learning stats error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取学习统计失败'
+          }, 500, origin)
+        }
+      }
+
+      // 获取排行榜（旧版，保留兼容）
       if (path === '/api/leaderboard' && request.method === 'GET') {
         const url = new URL(request.url)
         const type = url.searchParams.get('type') || 'weekly'
