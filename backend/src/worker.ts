@@ -36,6 +36,13 @@ import {
   SubjectGradeInput as AnalysisGradeInput,
   analyzeTransferSubjectStatuses,
 } from './analysis/analyzeByRules.js'
+import {
+  getLeaderboard as getPointsLeaderboard,
+  getDailyTaskStatus,
+  getPointsSummary,
+  getPointHistory,
+  getUserRank as getPointsUserRank,
+} from './services/pointsService.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -6593,7 +6600,7 @@ export default {
       }
 
       // =====================
-      // 积分系统 API
+      // 积分系统 API（使用 pointsService 统一处理）
       // =====================
 
       // 获取用户积分摘要
@@ -6608,76 +6615,88 @@ export default {
           return errorResponse('登录已过期', 401, origin)
         }
 
-        const today = new Date().toISOString().split('T')[0]
-
-        // 获取总积分
-        const summary = await env.DB.prepare(
-          'SELECT total_points FROM user_point_summary WHERE user_id = ?'
-        ).bind(tokenData.userId).first<{ total_points: number }>()
-
-        // 获取各任务总完成次数
-        const taskCountsResult = await env.DB.prepare(
-          'SELECT task, COUNT(*) as count FROM point_events WHERE user_id = ? GROUP BY task'
-        ).bind(tokenData.userId).all<{ task: string; count: number }>()
-
-        // 获取今日任务完成次数
-        const todayCountsResult = await env.DB.prepare(
-          'SELECT task, count FROM user_daily_task_counts WHERE user_id = ? AND count_date = ?'
-        ).bind(tokenData.userId, today).all<{ task: string; count: number }>()
-
-        const taskCounts: Record<string, number> = {}
-        const todayCounts: Record<string, number> = {}
-
-        if (taskCountsResult.results) {
-          for (const row of taskCountsResult.results) {
-            taskCounts[row.task] = row.count
-          }
+        try {
+          const summary = await getPointsSummary(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: summary,
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get points summary error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取积分摘要失败'
+          }, 500, origin)
         }
-
-        if (todayCountsResult.results) {
-          for (const row of todayCountsResult.results) {
-            todayCounts[row.task] = row.count
-          }
-        }
-
-        return jsonResponse({
-          totalPoints: summary?.total_points || 0,
-          taskCounts,
-          todayCounts,
-        }, 200, origin)
       }
 
-      // 获取积分排行榜（简化版，基于积分）
+      // 获取每日任务状态（UI 可直接渲染）
+      if (path === '/api/points/daily-tasks' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const url = new URL(request.url)
+        const lang = (url.searchParams.get('lang') || 'zh-CN') as LanguageCode
+
+        try {
+          const dailyTasks = await getDailyTaskStatus(env.DB, tokenData.userId, lang)
+          return jsonResponse({
+            code: 0,
+            data: {
+              tasks: dailyTasks,
+              date: new Date().toISOString().split('T')[0],
+            },
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get daily tasks error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取每日任务状态失败'
+          }, 500, origin)
+        }
+      }
+
+      // 获取积分排行榜（支持并列排名，UI 可直接渲染）
       if (path === '/api/points/leaderboard' && request.method === 'GET') {
         const url = new URL(request.url)
         const limit = parseInt(url.searchParams.get('limit') || '50')
 
-        const results = await env.DB.prepare(`
-          SELECT 
-            s.user_id as userId,
-            u.nickname,
-            u.avatar,
-            s.total_points as totalPoints
-          FROM user_point_summary s
-          JOIN users u ON u.id = s.user_id
-          ORDER BY s.total_points DESC
-          LIMIT ?
-        `).bind(limit).all<{
-          userId: string
-          nickname: string
-          avatar: string | null
-          totalPoints: number
-        }>()
+        // 获取当前用户（如果已登录）
+        let currentUserId: string | undefined
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          if (tokenData) {
+            currentUserId = tokenData.userId
+          }
+        }
 
-        const leaderboard = (results.results || []).map((row, index) => ({
-          rank: index + 1,
-          userId: row.userId,
-          nickname: row.nickname || 'Anonymous',
-          avatar: row.avatar || undefined,
-          totalPoints: row.totalPoints,
-        }))
-
-        return jsonResponse({ leaderboard }, 200, origin)
+        try {
+          const leaderboardData = await getPointsLeaderboard(env.DB, currentUserId, limit)
+          return jsonResponse({
+            code: 0,
+            data: leaderboardData,
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get leaderboard error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取排行榜失败'
+          }, 500, origin)
+        }
       }
 
       // 获取用户积分排名
@@ -6692,24 +6711,21 @@ export default {
           return errorResponse('登录已过期', 401, origin)
         }
 
-        // 获取用户积分
-        const userSummary = await env.DB.prepare(
-          'SELECT total_points FROM user_point_summary WHERE user_id = ?'
-        ).bind(tokenData.userId).first<{ total_points: number }>()
-
-        if (!userSummary) {
-          return jsonResponse({ rank: null, totalPoints: 0 }, 200, origin)
+        try {
+          const rankData = await getPointsUserRank(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: rankData || { rank: null, totalPoints: 0 },
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get user rank error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取用户排名失败'
+          }, 500, origin)
         }
-
-        // 计算排名
-        const rankResult = await env.DB.prepare(
-          'SELECT COUNT(*) as higher_count FROM user_point_summary WHERE total_points > ?'
-        ).bind(userSummary.total_points).first<{ higher_count: number }>()
-
-        return jsonResponse({
-          rank: (rankResult?.higher_count || 0) + 1,
-          totalPoints: userSummary.total_points,
-        }, 200, origin)
       }
 
       // 获取积分历史
@@ -6728,39 +6744,31 @@ export default {
         const limit = parseInt(url.searchParams.get('limit') || '50')
         const offset = parseInt(url.searchParams.get('offset') || '0')
 
-        const results = await env.DB.prepare(`
-          SELECT id, user_id as userId, task, points, created_at as createdAt
-          FROM point_events
-          WHERE user_id = ?
-          ORDER BY created_at DESC
-          LIMIT ? OFFSET ?
-        `).bind(tokenData.userId, limit, offset).all<{
-          id: string
-          userId: string
-          task: string
-          points: number
-          createdAt: string
-        }>()
-
-        return jsonResponse({ history: results.results || [] }, 200, origin)
+        try {
+          const history = await getPointHistory(env.DB, tokenData.userId, limit, offset)
+          return jsonResponse({
+            code: 0,
+            data: { history },
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get point history error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取积分历史失败'
+          }, 500, origin)
+        }
       }
 
-      // 获取积分任务规则
+      // 获取积分任务规则（从 shared/domain 获取）
       if (path === '/api/points/rules' && request.method === 'GET') {
-        const POINT_TASKS = {
-          DAILY_LOGIN: { points: 5, repeatable: true, dailyLimit: 1 },
-          COMPLETE_QUIZ: { points: 10, repeatable: true, dailyLimit: 10 },
-          COMPLETE_LEVEL_TEST: { points: 15, repeatable: true, dailyLimit: 5 },
-          COMPLETE_ANALYSIS: { points: 20, repeatable: true, dailyLimit: 3 },
-          COMPLETE_UNIVERSITY_ANALYSIS: { points: 20, repeatable: true, dailyLimit: 3 },
-          FIRST_ANALYSIS: { points: 30, repeatable: false, dailyLimit: 0 },
-          FIRST_QUIZ: { points: 20, repeatable: false, dailyLimit: 0 },
-          POST_CREATED: { points: 5, repeatable: true, dailyLimit: 3 },
-          POST_LIKED: { points: 2, repeatable: true, dailyLimit: 20 },
-          STREAK_7_DAYS: { points: 50, repeatable: false, dailyLimit: 0 },
-          STREAK_30_DAYS: { points: 200, repeatable: false, dailyLimit: 0 },
-        }
-        return jsonResponse({ rules: POINT_TASKS }, 200, origin)
+        const { POINT_TASKS } = await import('../../../shared/domain/points')
+        return jsonResponse({
+          code: 0,
+          data: { rules: POINT_TASKS },
+          message: 'success'
+        }, 200, origin)
       }
 
       // =====================

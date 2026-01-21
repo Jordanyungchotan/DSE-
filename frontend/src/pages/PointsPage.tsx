@@ -15,20 +15,40 @@ import {
 import { apiFetch } from '../config/api'
 import { useAuthStore } from '../stores/authStore'
 import { useLanguageStore } from '../stores/languageStore'
-import {
-  POINT_TASKS,
-  PointTaskKey,
-  getPointTaskDisplayName,
-  getPointTaskDescription,
-} from '@/shared/domain'
+import type { DailyTaskStatus, PointTaskKey } from '@/shared/domain'
+import { getPointTaskDisplayName, POINT_TASKS } from '@/shared/domain'
 import styles from './PointsPage.module.css'
 
 const { Title, Text } = Typography
 
-interface PointsSummary {
-  totalPoints: number
-  taskCounts: Record<string, number>
-  todayCounts: Record<string, number>
+// 后端返回的每日任务状态（UI 可直接渲染）
+interface DailyTasksResponse {
+  code: number
+  data: {
+    tasks: DailyTaskStatus[]
+    date: string
+  }
+  message: string
+}
+
+// 后端返回的积分摘要
+interface PointsSummaryResponse {
+  code: number
+  data: {
+    totalPoints: number
+    taskCounts: Record<string, number>
+    todayCounts: Record<string, number>
+  }
+  message: string
+}
+
+// 后端返回的积分历史
+interface PointHistoryResponse {
+  code: number
+  data: {
+    history: PointHistory[]
+  }
+  message: string
 }
 
 interface PointHistory {
@@ -54,7 +74,8 @@ export default function PointsPage() {
   const { t, currentLanguage } = useLanguageStore()
   
   const [loading, setLoading] = useState(true)
-  const [summary, setSummary] = useState<PointsSummary | null>(null)
+  const [totalPoints, setTotalPoints] = useState(0)
+  const [dailyTasks, setDailyTasks] = useState<DailyTaskStatus[]>([])
   const [history, setHistory] = useState<PointHistory[]>([])
   const [checkingIn, setCheckingIn] = useState(false)
 
@@ -66,8 +87,12 @@ export default function PointsPage() {
     
     setLoading(true)
     try {
-      const [summaryRes, historyRes] = await Promise.all([
+      // 使用新的 API 获取数据
+      const [summaryRes, dailyTasksRes, historyRes] = await Promise.all([
         apiFetch('/api/points/summary', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        apiFetch(`/api/points/daily-tasks?lang=${currentLanguage}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         apiFetch('/api/points/history?limit=10', {
@@ -76,13 +101,24 @@ export default function PointsPage() {
       ])
 
       if (summaryRes.ok) {
-        const summaryData = await summaryRes.json()
-        setSummary(summaryData)
+        const summaryData: PointsSummaryResponse = await summaryRes.json()
+        if (summaryData.code === 0) {
+          setTotalPoints(summaryData.data.totalPoints)
+        }
+      }
+      
+      if (dailyTasksRes.ok) {
+        const dailyTasksData: DailyTasksResponse = await dailyTasksRes.json()
+        if (dailyTasksData.code === 0) {
+          setDailyTasks(dailyTasksData.data.tasks)
+        }
       }
       
       if (historyRes.ok) {
-        const historyData = await historyRes.json()
-        setHistory(historyData.history || [])
+        const historyData: PointHistoryResponse = await historyRes.json()
+        if (historyData.code === 0) {
+          setHistory(historyData.data.history || [])
+        }
       }
     } catch (error) {
       console.error('Failed to fetch points data:', error)
@@ -90,7 +126,7 @@ export default function PointsPage() {
     } finally {
       setLoading(false)
     }
-  }, [token, t])
+  }, [token, t, currentLanguage])
 
   useEffect(() => {
     fetchData()
@@ -147,18 +183,10 @@ export default function PointsPage() {
     return t(key) || `Lv.${level}`
   }
 
-  // 检查今日是否已签到
+  // 检查今日是否已签到（从后端返回的 dailyTasks 中获取）
   const hasCheckedInToday = () => {
-    return (summary?.todayCounts?.DAILY_LOGIN || 0) >= 1
-  }
-
-  // 获取任务剩余次数
-  const getRemainingTimes = (taskKey: PointTaskKey) => {
-    const task = POINT_TASKS[taskKey]
-    // dailyLimit === 0 表示无限制（一次性任务）
-    if (!task.repeatable || (task.dailyLimit as number) === 0) return null
-    const todayCount = summary?.todayCounts?.[taskKey] || 0
-    return Math.max(0, task.dailyLimit - todayCount)
+    const loginTask = dailyTasks.find(t => t.taskKey === 'DAILY_LOGIN')
+    return loginTask?.completed ?? false
   }
 
   if (loading) {
@@ -186,21 +214,11 @@ export default function PointsPage() {
     )
   }
 
-  const totalPoints = summary?.totalPoints || 0
   const levelConfig = getUserLevel(totalPoints)
   const checkedIn = hasCheckedInToday()
 
-  // 任务列表（从 shared/domain 获取）
-  const taskList = Object.entries(POINT_TASKS)
-    .filter(([_, task]) => task.dailyLimit > 0) // 只显示有每日限制的任务
-    .map(([key, task]) => ({
-      key: key as PointTaskKey,
-      name: getPointTaskDisplayName(key as PointTaskKey, currentLanguage),
-      description: getPointTaskDescription(key as PointTaskKey, currentLanguage),
-      points: task.points,
-      remaining: getRemainingTimes(key as PointTaskKey),
-      isCompleted: getRemainingTimes(key as PointTaskKey) === 0,
-    }))
+  // 任务列表（直接使用后端返回的 dailyTasks，UI 可直接渲染）
+  // 不再在前端做任何计算
 
   return (
     <div className={styles.container}>
@@ -282,38 +300,41 @@ export default function PointsPage() {
           </Card>
         </Col>
 
-        {/* 获取积分方式 */}
+        {/* 获取积分方式（直接使用后端返回的 dailyTasks） */}
         <Col xs={24} md={12}>
           <Card title={<><RiseOutlined /> {t('points.earnPoints')}</>} className={styles.earnCard}>
             <List
               size="small"
-              dataSource={taskList.slice(0, 5)}
-              renderItem={task => (
-                <List.Item className={`${styles.ruleItem} ${task.isCompleted ? styles.ruleCompleted : ''}`}>
-                  <div className={styles.ruleName}>
-                    {task.isCompleted ? (
-                      <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-                    ) : (
-                      <FireOutlined style={{ color: '#faad14', marginRight: 8 }} />
-                    )}
-                    <span style={task.isCompleted ? { color: '#8c8c8c' } : undefined}>{task.name}</span>
-                  </div>
-                  <div className={styles.rulePoints}>
-                    {task.isCompleted ? (
-                      <Tag color="success">{t('points.completed')}</Tag>
-                    ) : (
-                      <>
-                        <Tag color="gold">+{task.points}</Tag>
-                        {task.remaining !== null && (
-                          <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
-                            ({task.remaining}{t('points.rules.times')})
-                          </Text>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </List.Item>
-              )}
+              dataSource={dailyTasks.slice(0, 5)}
+              renderItem={task => {
+                const remaining = task.dailyLimit - task.todayCount
+                return (
+                  <List.Item className={`${styles.ruleItem} ${task.completed ? styles.ruleCompleted : ''}`}>
+                    <div className={styles.ruleName}>
+                      {task.completed ? (
+                        <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+                      ) : (
+                        <FireOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                      )}
+                      <span style={task.completed ? { color: '#8c8c8c' } : undefined}>{task.label}</span>
+                    </div>
+                    <div className={styles.rulePoints}>
+                      {task.completed ? (
+                        <Tag color="success">{t('points.completed')}</Tag>
+                      ) : (
+                        <>
+                          <Tag color="gold">+{task.pointsPerTime}</Tag>
+                          {remaining > 0 && (
+                            <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                              ({remaining}{t('points.rules.times')})
+                            </Text>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </List.Item>
+                )
+              }}
             />
           </Card>
         </Col>

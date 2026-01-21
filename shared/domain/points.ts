@@ -268,19 +268,57 @@ export interface PointsSummary {
   todayCounts: Partial<Record<PointTaskKey, number>>;
 }
 
-// ===== 排行榜条目接口 =====
+// ===== 每日任务状态接口（UI 可直接渲染）=====
+
+export interface DailyTaskStatus {
+  /** 任务 Key */
+  taskKey: PointTaskKey;
+  /** 任务显示名称（当前语言） */
+  label: string;
+  /** 任务描述（当前语言） */
+  description: string;
+  /** 是否已完成（达到每日上限） */
+  completed: boolean;
+  /** 今日已获得积分 */
+  achievedPoints: number;
+  /** 今日可获得最大积分 */
+  maxPoints: number;
+  /** 今日已完成次数 */
+  todayCount: number;
+  /** 每日限制次数 */
+  dailyLimit: number;
+  /** 单次积分 */
+  pointsPerTime: number;
+}
+
+// ===== 排行榜条目接口（UI 可直接渲染）=====
 
 export interface LeaderboardEntry {
-  /** 排名 */
+  /** 排名（后端计算，支持并列） */
   rank: number;
   /** 用户 ID */
   userId: string;
-  /** 用户昵称 */
-  nickname: string;
-  /** 用户头像 */
-  avatar?: string;
+  /** 用户显示名称 */
+  name: string;
+  /** 用户头像 URL */
+  avatarUrl?: string;
   /** 总积分 */
-  totalPoints: number;
+  score: number;
+  /** 是否为当前用户 */
+  isCurrentUser?: boolean;
+}
+
+// ===== 排行榜响应接口 =====
+
+export interface LeaderboardResponse {
+  /** 排行榜列表 */
+  rankings: LeaderboardEntry[];
+  /** 当前用户排名信息（如已登录） */
+  currentUserRank?: LeaderboardEntry;
+  /** 总参与人数 */
+  totalParticipants: number;
+  /** 最后更新时间 */
+  lastUpdated: string;
 }
 
 // ===== 积分事件接口 =====
@@ -291,4 +329,12 @@ export interface PointEvent {
   task: PointTaskKey;
   points: number;
   createdAt: string;
+}
+
+// ===== 统一 API 响应接口 =====
+
+export interface PointsApiResponse<T> {
+  code: number;
+  data: T;
+  message: string;
 }
