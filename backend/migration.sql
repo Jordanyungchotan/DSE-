@@ -487,3 +487,49 @@ CREATE INDEX IF NOT EXISTS idx_learning_events_subject ON learning_events(subjec
 CREATE INDEX IF NOT EXISTS idx_learning_events_created ON learning_events(created_at);
 CREATE INDEX IF NOT EXISTS idx_learning_events_user_type ON learning_events(user_id, event_type);
 CREATE INDEX IF NOT EXISTS idx_learning_events_user_date ON learning_events(user_id, DATE(created_at));
+
+-- =====================
+-- 题目级别事实表（错题本 & 学习档案的唯一数据来源）
+-- =====================
+-- 规则：
+-- 1. 一道题一次作答 = 一条记录
+-- 2. 永远 INSERT，不允许 UPDATE
+-- 3. 这是错题本 & 学习档案的唯一"原始事实"
+
+CREATE TABLE IF NOT EXISTS question_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  
+  -- 题目信息
+  question_id TEXT NOT NULL,              -- 题目唯一 ID
+  question_text TEXT,                     -- 题目内容
+  question_type TEXT,                     -- 选择题 / 计算题 / 简答题
+  subject TEXT,                           -- 科目
+  topic TEXT,                             -- 知识点
+  
+  -- 作答信息
+  selected_answer TEXT,                   -- 用户选择/填写的答案
+  correct_answer TEXT,                    -- 正确答案
+  is_correct INTEGER DEFAULT 0,           -- 是否正确 (0/1)
+  
+  -- 解析 & 时间
+  explanation TEXT,                       -- 解析
+  duration_seconds INTEGER DEFAULT 0,     -- 答题用时（秒）
+  
+  -- 来源信息
+  source_type TEXT,                       -- 来源类型: QUIZ | LEVEL_TEST | WRONG_REVIEW
+  source_id TEXT,                         -- 来源 ID（quiz_session_id / level_test_id）
+  
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 题目级别事实表索引
+CREATE INDEX IF NOT EXISTS idx_question_attempts_user ON question_attempts(user_id);
+CREATE INDEX IF NOT EXISTS idx_question_attempts_question ON question_attempts(question_id);
+CREATE INDEX IF NOT EXISTS idx_question_attempts_subject ON question_attempts(subject);
+CREATE INDEX IF NOT EXISTS idx_question_attempts_topic ON question_attempts(topic);
+CREATE INDEX IF NOT EXISTS idx_question_attempts_correct ON question_attempts(is_correct);
+CREATE INDEX IF NOT EXISTS idx_question_attempts_created ON question_attempts(created_at);
+CREATE INDEX IF NOT EXISTS idx_question_attempts_user_subject ON question_attempts(user_id, subject);
+CREATE INDEX IF NOT EXISTS idx_question_attempts_user_date ON question_attempts(user_id, DATE(created_at));
