@@ -5,6 +5,7 @@
  * - 所有积分操作必须通过此服务
  * - 前端不做任何积分计算
  * - 使用 shared/domain/points.ts 作为唯一规则来源
+ * - 【关键】积分触发基于 learning_events 事实表，而非前端行为
  */
 
 import {
@@ -20,8 +21,42 @@ import {
   DailyTaskStatus,
   PointEvent,
   PointsApiResponse,
+  PointTaskDefinition,
 } from '../../../shared/domain/points';
 import { LanguageCode } from '../../../shared/domain/subjects';
+
+// ===== 积分触发条件配置 =====
+
+/** 
+ * 基于 learning_events 的积分触发条件
+ * 【关键】积分发放条件改为基于 learning_events，而非前端行为
+ */
+export const LEARNING_EVENT_TRIGGERS = {
+  // 单次刷题：至少 5 题，正确率 >= 50%
+  COMPLETE_QUIZ: {
+    minQuestionCount: 5,
+    minAccuracy: 0.5,
+  },
+  // 水平测试：正确率 >= 40%
+  COMPLETE_LEVEL_TEST: {
+    minAccuracy: 0.4,
+  },
+  // 每日刷题 30 题
+  DAILY_QUIZ_30: {
+    dailyMinQuestionCount: 30,
+    minAccuracy: 0.5,
+  },
+  // 每日刷题 50 题
+  DAILY_QUIZ_50: {
+    dailyMinQuestionCount: 50,
+    minAccuracy: 0.5,
+  },
+  // 每日刷题 100 题
+  DAILY_QUIZ_100: {
+    dailyMinQuestionCount: 100,
+    minAccuracy: 0.5,
+  },
+} as const;
 
 // 获取今日日期字符串 (YYYY-MM-DD)
 function getTodayDateString(): string {
@@ -111,6 +146,216 @@ export async function addPoints(
   }
 
   return { success: true, points: rule.points };
+}
+
+// ===== 基于 learning_events 的积分触发 =====
+
+/**
+ * 【核心函数】基于 learning_events 检查并发放积分
+ * 
+ * 调用时机：
+ * - 刷题完成时（recordLearningEvent 后）
+ * - 水平测试完成时（recordLearningEvent 后）
+ * 
+ * 规则：
+ * - 积分触发基于 learning_events 事实表
+ * - 禁止前端直接请求加分
+ * - learning_events 记录事实，point_events 记录奖励
+ */
+export async function checkAndAwardPointsFromLearningEvent(
+  db: D1Database,
+  userId: string,
+  eventType: 'QUIZ' | 'LEVEL_TEST' | 'ANALYSIS',
+  learningEventId: number,
+  eventData: {
+    questionCount: number;
+    correctCount: number;
+    accuracy: number;
+    durationSeconds: number;
+  }
+): Promise<{ awarded: { task: PointTaskKey; points: number }[]; message: string }> {
+  const awarded: { task: PointTaskKey; points: number }[] = [];
+  const today = getTodayDateString();
+
+  // ===== 1. 检查单次事件是否满足积分条件 =====
+  
+  if (eventType === 'QUIZ') {
+    const trigger = LEARNING_EVENT_TRIGGERS.COMPLETE_QUIZ;
+    
+    // 单次刷题积分条件：至少 5 题，正确率 >= 50%
+    if (
+      eventData.questionCount >= trigger.minQuestionCount &&
+      eventData.accuracy >= trigger.minAccuracy
+    ) {
+      const result = await addPoints(db, userId, 'COMPLETE_QUIZ', String(learningEventId));
+      if (result.success) {
+        awarded.push({ task: 'COMPLETE_QUIZ', points: result.points });
+      }
+    }
+    
+    // ===== 2. 检查每日累计刷题里程碑 =====
+    
+    // 从 learning_events 读取今日累计有效题目数
+    const todayStats = await db.prepare(`
+      SELECT 
+        COALESCE(SUM(question_count), 0) as total_questions,
+        COALESCE(SUM(correct_count), 0) as total_correct
+      FROM learning_events
+      WHERE user_id = ?
+      AND event_type = 'QUIZ'
+      AND DATE(created_at) = DATE('now')
+      AND accuracy >= ?
+    `).bind(userId, LEARNING_EVENT_TRIGGERS.DAILY_QUIZ_30.minAccuracy).first<{
+      total_questions: number;
+      total_correct: number;
+    }>();
+    
+    const dailyQuestions = todayStats?.total_questions || 0;
+    
+    // 每日 30 题里程碑
+    if (dailyQuestions >= LEARNING_EVENT_TRIGGERS.DAILY_QUIZ_30.dailyMinQuestionCount) {
+      const result = await addPoints(db, userId, 'DAILY_QUIZ_30');
+      if (result.success) {
+        awarded.push({ task: 'DAILY_QUIZ_30', points: result.points });
+      }
+    }
+    
+    // 每日 50 题里程碑
+    if (dailyQuestions >= LEARNING_EVENT_TRIGGERS.DAILY_QUIZ_50.dailyMinQuestionCount) {
+      const result = await addPoints(db, userId, 'DAILY_QUIZ_50');
+      if (result.success) {
+        awarded.push({ task: 'DAILY_QUIZ_50', points: result.points });
+      }
+    }
+    
+    // 每日 100 题里程碑
+    if (dailyQuestions >= LEARNING_EVENT_TRIGGERS.DAILY_QUIZ_100.dailyMinQuestionCount) {
+      const result = await addPoints(db, userId, 'DAILY_QUIZ_100');
+      if (result.success) {
+        awarded.push({ task: 'DAILY_QUIZ_100', points: result.points });
+      }
+    }
+    
+    // ===== 3. 检查首次刷题成就 =====
+    const result = await addPoints(db, userId, 'FIRST_QUIZ', String(learningEventId));
+    if (result.success) {
+      awarded.push({ task: 'FIRST_QUIZ', points: result.points });
+    }
+  }
+  
+  if (eventType === 'LEVEL_TEST') {
+    const trigger = LEARNING_EVENT_TRIGGERS.COMPLETE_LEVEL_TEST;
+    
+    // 水平测试积分条件：正确率 >= 40%
+    if (eventData.accuracy >= trigger.minAccuracy) {
+      const result = await addPoints(db, userId, 'COMPLETE_LEVEL_TEST', String(learningEventId));
+      if (result.success) {
+        awarded.push({ task: 'COMPLETE_LEVEL_TEST', points: result.points });
+      }
+    }
+  }
+  
+  if (eventType === 'ANALYSIS') {
+    // 分析完成积分
+    const result = await addPoints(db, userId, 'COMPLETE_ANALYSIS', String(learningEventId));
+    if (result.success) {
+      awarded.push({ task: 'COMPLETE_ANALYSIS', points: result.points });
+    }
+    
+    // 首次分析成就
+    const firstResult = await addPoints(db, userId, 'FIRST_ANALYSIS', String(learningEventId));
+    if (firstResult.success) {
+      awarded.push({ task: 'FIRST_ANALYSIS', points: firstResult.points });
+    }
+  }
+
+  const totalPoints = awarded.reduce((sum, a) => sum + a.points, 0);
+  
+  return {
+    awarded,
+    message: awarded.length > 0 
+      ? `获得 ${totalPoints} 积分` 
+      : '未满足积分条件',
+  };
+}
+
+/**
+ * 获取用户今日学习统计（从 learning_events 读取）
+ * 用于前端展示"今日学习进度"
+ */
+export async function getTodayLearningProgress(
+  db: D1Database,
+  userId: string
+): Promise<{
+  totalQuestions: number;
+  totalCorrect: number;
+  accuracy: number;
+  quizCount: number;
+  // 里程碑进度
+  milestones: {
+    target: number;
+    current: number;
+    completed: boolean;
+    task: PointTaskKey;
+  }[];
+}> {
+  const stats = await db.prepare(`
+    SELECT 
+      COALESCE(SUM(question_count), 0) as total_questions,
+      COALESCE(SUM(correct_count), 0) as total_correct,
+      COUNT(*) as quiz_count
+    FROM learning_events
+    WHERE user_id = ?
+    AND event_type = 'QUIZ'
+    AND DATE(created_at) = DATE('now')
+    AND accuracy >= ?
+  `).bind(userId, LEARNING_EVENT_TRIGGERS.COMPLETE_QUIZ.minAccuracy).first<{
+    total_questions: number;
+    total_correct: number;
+    quiz_count: number;
+  }>();
+  
+  const totalQuestions = stats?.total_questions || 0;
+  const totalCorrect = stats?.total_correct || 0;
+  const quizCount = stats?.quiz_count || 0;
+  
+  // 检查里程碑完成状态
+  const today = getTodayDateString();
+  const completedMilestones = await db.prepare(`
+    SELECT task FROM user_daily_task_counts
+    WHERE user_id = ? AND count_date = ?
+    AND task IN ('DAILY_QUIZ_30', 'DAILY_QUIZ_50', 'DAILY_QUIZ_100')
+    AND count > 0
+  `).bind(userId, today).all<{ task: string }>();
+  
+  const completedSet = new Set(completedMilestones.results?.map(r => r.task) || []);
+  
+  return {
+    totalQuestions,
+    totalCorrect,
+    accuracy: totalQuestions > 0 ? totalCorrect / totalQuestions : 0,
+    quizCount,
+    milestones: [
+      {
+        target: 30,
+        current: Math.min(totalQuestions, 30),
+        completed: completedSet.has('DAILY_QUIZ_30'),
+        task: 'DAILY_QUIZ_30' as PointTaskKey,
+      },
+      {
+        target: 50,
+        current: Math.min(totalQuestions, 50),
+        completed: completedSet.has('DAILY_QUIZ_50'),
+        task: 'DAILY_QUIZ_50' as PointTaskKey,
+      },
+      {
+        target: 100,
+        current: Math.min(totalQuestions, 100),
+        completed: completedSet.has('DAILY_QUIZ_100'),
+        task: 'DAILY_QUIZ_100' as PointTaskKey,
+      },
+    ],
+  };
 }
 
 /**

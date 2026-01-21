@@ -5,6 +5,7 @@
  * - 所有积分任务在此定义
  * - 前后端共用同一套规则
  * - 禁止在其他地方定义积分逻辑
+ * - 【关键】积分触发基于 learning_events 事实表，而非前端行为
  */
 
 import { LanguageCode } from './subjects';
@@ -22,6 +23,15 @@ export interface PointTaskDefinition {
   displayName: Record<LanguageCode, string>;
   /** 任务描述（三语） */
   description: Record<LanguageCode, string>;
+  /** 触发条件（基于 learning_events，可选） */
+  trigger?: {
+    /** 基于 learning_events 的事件类型 */
+    eventType?: 'QUIZ' | 'LEVEL_TEST' | 'ANALYSIS';
+    /** 最低题目数要求 */
+    minQuestionCount?: number;
+    /** 最低正确率要求 (0-1) */
+    minAccuracy?: number;
+  };
 }
 
 export const POINT_TASKS = {
@@ -42,7 +52,7 @@ export const POINT_TASKS = {
     },
   },
   
-  // ===== 学习任务 =====
+  // ===== 学习任务（基于 learning_events 触发）=====
   COMPLETE_QUIZ: {
     points: 10,
     repeatable: true,
@@ -53,9 +63,15 @@ export const POINT_TASKS = {
       en: 'Complete Quiz',
     },
     description: {
-      'zh-HK': '完成一次刷題練習',
-      'zh-CN': '完成一次刷题练习',
-      en: 'Complete a quiz session',
+      'zh-HK': '完成一次有效刷題（≥5題，正確率≥50%）',
+      'zh-CN': '完成一次有效刷题（≥5题，正确率≥50%）',
+      en: 'Complete a valid quiz (≥5 questions, ≥50% accuracy)',
+    },
+    // 【关键】基于 learning_events 触发，而非前端行为
+    trigger: {
+      eventType: 'QUIZ',
+      minQuestionCount: 5,
+      minAccuracy: 0.5,
     },
   },
   
@@ -69,9 +85,77 @@ export const POINT_TASKS = {
       en: 'Complete Level Test',
     },
     description: {
-      'zh-HK': '完成一次水平測試',
-      'zh-CN': '完成一次水平测试',
-      en: 'Complete a level test',
+      'zh-HK': '完成一次有效水平測試（正確率≥40%）',
+      'zh-CN': '完成一次有效水平测试（正确率≥40%）',
+      en: 'Complete a valid level test (≥40% accuracy)',
+    },
+    trigger: {
+      eventType: 'LEVEL_TEST',
+      minAccuracy: 0.4,
+    },
+  },
+  
+  // ===== 每日刷题里程碑任务 =====
+  DAILY_QUIZ_30: {
+    points: 20,
+    repeatable: true,
+    dailyLimit: 1,
+    displayName: {
+      'zh-HK': '每日刷題30題',
+      'zh-CN': '每日刷题30题',
+      en: 'Daily 30 Questions',
+    },
+    description: {
+      'zh-HK': '當日累計完成30道有效題目（正確率≥50%）',
+      'zh-CN': '当日累计完成30道有效题目（正确率≥50%）',
+      en: 'Complete 30 valid questions today (≥50% accuracy)',
+    },
+    trigger: {
+      eventType: 'QUIZ',
+      minQuestionCount: 30,
+      minAccuracy: 0.5,
+    },
+  },
+  
+  DAILY_QUIZ_50: {
+    points: 30,
+    repeatable: true,
+    dailyLimit: 1,
+    displayName: {
+      'zh-HK': '每日刷題50題',
+      'zh-CN': '每日刷题50题',
+      en: 'Daily 50 Questions',
+    },
+    description: {
+      'zh-HK': '當日累計完成50道有效題目（正確率≥50%）',
+      'zh-CN': '当日累计完成50道有效题目（正确率≥50%）',
+      en: 'Complete 50 valid questions today (≥50% accuracy)',
+    },
+    trigger: {
+      eventType: 'QUIZ',
+      minQuestionCount: 50,
+      minAccuracy: 0.5,
+    },
+  },
+  
+  DAILY_QUIZ_100: {
+    points: 50,
+    repeatable: true,
+    dailyLimit: 1,
+    displayName: {
+      'zh-HK': '每日刷題100題',
+      'zh-CN': '每日刷题100题',
+      en: 'Daily 100 Questions',
+    },
+    description: {
+      'zh-HK': '當日累計完成100道有效題目（正確率≥50%）',
+      'zh-CN': '当日累计完成100道有效题目（正确率≥50%）',
+      en: 'Complete 100 valid questions today (≥50% accuracy)',
+    },
+    trigger: {
+      eventType: 'QUIZ',
+      minQuestionCount: 100,
+      minAccuracy: 0.5,
     },
   },
   

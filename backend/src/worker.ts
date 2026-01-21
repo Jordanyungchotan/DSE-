@@ -42,6 +42,8 @@ import {
   getPointsSummary,
   getPointHistory,
   getUserRank as getPointsUserRank,
+  checkAndAwardPointsFromLearningEvent,
+  getTodayLearningProgress,
 } from './services/pointsService.js'
 import {
   getLearningLeaderboard,
@@ -5538,7 +5540,7 @@ export default {
           // 【关键】写入 learning_events 事实表
           // 这是排行榜、积分、学习分析的唯一数据来源
           const correctCount = body.questions.filter(q => q.isCorrect).length
-          await recordLearningEvent(env.DB, {
+          const learningEventResult = await recordLearningEvent(env.DB, {
             userId: tokenData.userId,
             eventType: 'QUIZ',
             subject: body.config.subject,
@@ -5554,6 +5556,29 @@ export default {
             },
           })
           console.log(`Learning event recorded for quiz: ${body.sessionId}`)
+
+          // 【关键】基于 learning_events 检查并发放积分
+          // 积分触发条件：题目数 >= 5，正确率 >= 50%
+          // 禁止前端直接请求加分
+          let pointsAwarded: { task: string; points: number }[] = []
+          if (learningEventResult.success && learningEventResult.eventId) {
+            const pointsResult = await checkAndAwardPointsFromLearningEvent(
+              env.DB,
+              tokenData.userId,
+              'QUIZ',
+              learningEventResult.eventId,
+              {
+                questionCount: body.config.questionCount,
+                correctCount,
+                accuracy: body.accuracy / 100,
+                durationSeconds: body.timeSpent,
+              }
+            )
+            pointsAwarded = pointsResult.awarded
+            if (pointsAwarded.length > 0) {
+              console.log(`Points awarded for quiz: ${JSON.stringify(pointsAwarded)}`)
+            }
+          }
 
           // 同时更新排行榜统计
           const existingStats = await env.DB.prepare(
@@ -5604,7 +5629,12 @@ export default {
           return jsonResponse({ 
             success: true, 
             message: '刷题记录已保存',
-            sessionId: body.sessionId
+            sessionId: body.sessionId,
+            // 返回积分奖励信息（基于 learning_events 触发）
+            pointsAwarded: pointsAwarded.length > 0 ? {
+              tasks: pointsAwarded,
+              totalPoints: pointsAwarded.reduce((sum, a) => sum + a.points, 0),
+            } : null,
           }, 200, origin)
         } catch (dbError) {
           console.error('Save quiz session error:', dbError)
@@ -6934,6 +6964,36 @@ export default {
         }
       }
 
+      // 获取今日学习进度（基于 learning_events）
+      // 用于前端展示"今日刷题进度"和"里程碑完成状态"
+      if (path === '/api/points/today-progress' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const progress = await getTodayLearningProgress(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: progress,
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get today learning progress error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取今日进度失败'
+          }, 500, origin)
+        }
+      }
+
       // 获取每日任务状态（UI 可直接渲染）
       if (path === '/api/points/daily-tasks' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
@@ -8020,7 +8080,7 @@ export default {
           // 【关键】写入 learning_events 事实表
           // 水平测试完成也记录到统一事实表
           const correctCount = gradingResults.filter(r => r.isCorrect).length
-          await recordLearningEvent(env.DB, {
+          const learningEventResult = await recordLearningEvent(env.DB, {
             userId: tokenData.userId,
             eventType: 'LEVEL_TEST',
             subject: test.subject as string,
@@ -8038,6 +8098,28 @@ export default {
           })
           console.log(`Learning event recorded for level test: ${testId}`)
 
+          // 【关键】基于 learning_events 检查并发放积分
+          // 积分触发条件：正确率 >= 40%
+          let pointsAwarded: { task: string; points: number }[] = []
+          if (learningEventResult.success && learningEventResult.eventId) {
+            const pointsResult = await checkAndAwardPointsFromLearningEvent(
+              env.DB,
+              tokenData.userId,
+              'LEVEL_TEST',
+              learningEventResult.eventId,
+              {
+                questionCount: questions.length,
+                correctCount,
+                accuracy: correctCount / questions.length,
+                durationSeconds: body.totalTimeSpent,
+              }
+            )
+            pointsAwarded = pointsResult.awarded
+            if (pointsAwarded.length > 0) {
+              console.log(`Points awarded for level test: ${JSON.stringify(pointsAwarded)}`)
+            }
+          }
+
           return jsonResponse({
             success: true,
             testId,
@@ -8049,7 +8131,12 @@ export default {
             correctCount: gradingResults.filter(r => r.isCorrect).length,
             abilityRadar,
             strengthPoints,
-            weaknessPoints
+            weaknessPoints,
+            // 返回积分奖励信息
+            pointsAwarded: pointsAwarded.length > 0 ? {
+              tasks: pointsAwarded,
+              totalPoints: pointsAwarded.reduce((sum, a) => sum + a.points, 0),
+            } : null,
           }, 200, origin)
 
         } catch (error) {
