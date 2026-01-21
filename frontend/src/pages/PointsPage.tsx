@@ -12,40 +12,34 @@ import {
   FireOutlined,
   CrownOutlined
 } from '@ant-design/icons'
-import { ragFetch } from '../config/api'
+import { apiFetch } from '../config/api'
 import { useAuthStore } from '../stores/authStore'
 import { useLanguageStore } from '../stores/languageStore'
+import {
+  POINT_TASKS,
+  PointTaskKey,
+  getPointTaskDisplayName,
+  getPointTaskDescription,
+} from '@/shared/domain'
 import styles from './PointsPage.module.css'
 
 const { Title, Text } = Typography
 
-interface PointsBalance {
-  total: number
-  available: number
-  level: number
-  recentActivity: {
-    id: number
-    change_points: number
-    current_points: number
-    type: string
-    description: string
-    created_at: string
-  }[]
+interface PointsSummary {
+  totalPoints: number
+  taskCounts: Record<string, number>
+  todayCounts: Record<string, number>
 }
 
-interface PointsRule {
-  id: number
-  rule_code: string
-  name: string
-  description: string | null
-  points_value: number
-  limit_type: string
-  limit_times: number
-  canClaim?: boolean
-  remainingTimes?: number
+interface PointHistory {
+  id: string
+  userId: string
+  task: string
+  points: number
+  createdAt: string
 }
 
-// 等级配置 - 使用 level number 作为 key，名称从翻译获取
+// 等级配置
 const LEVEL_CONFIG = [
   { level: 1, minPoints: 0, maxPoints: 500, color: '#8c8c8c' },
   { level: 2, minPoints: 500, maxPoints: 2000, color: '#52c41a' },
@@ -56,42 +50,39 @@ const LEVEL_CONFIG = [
 
 export default function PointsPage() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
-  const { t } = useLanguageStore()
+  const { token } = useAuthStore()
+  const { t, currentLanguage } = useLanguageStore()
   
   const [loading, setLoading] = useState(true)
-  const [balance, setBalance] = useState<PointsBalance | null>(null)
-  const [rules, setRules] = useState<PointsRule[]>([])
+  const [summary, setSummary] = useState<PointsSummary | null>(null)
+  const [history, setHistory] = useState<PointHistory[]>([])
   const [checkingIn, setCheckingIn] = useState(false)
-  const [hasCheckedIn, setHasCheckedIn] = useState(false)
-
-  const userId = user?.id || 'anonymous'
 
   const fetchData = useCallback(async () => {
-    if (!userId) return
+    if (!token) {
+      setLoading(false)
+      return
+    }
     
     setLoading(true)
     try {
-      const [balanceRes, rulesRes] = await Promise.all([
-        ragFetch(`/api/points/balance?user_id=${userId}`),
-        ragFetch(`/api/points/rules?user_id=${userId}`)
+      const [summaryRes, historyRes] = await Promise.all([
+        apiFetch('/api/points/summary', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        apiFetch('/api/points/history?limit=10', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       ])
 
-      const balanceData = await balanceRes.json()
-      const rulesData = await rulesRes.json()
-
-      if (balanceData.success) {
-        setBalance(balanceData.data)
+      if (summaryRes.ok) {
+        const summaryData = await summaryRes.json()
+        setSummary(summaryData)
       }
-      if (rulesData.success) {
-        setRules(rulesData.data)
-        // 检查每日签到是否已领取
-        const loginRule = rulesData.data.find((r: PointsRule) => r.rule_code === 'DAILY_LOGIN')
-        if (loginRule && loginRule.remainingTimes === 0) {
-          setHasCheckedIn(true)
-        } else {
-          setHasCheckedIn(false)
-        }
+      
+      if (historyRes.ok) {
+        const historyData = await historyRes.json()
+        setHistory(historyData.history || [])
       }
     } catch (error) {
       console.error('Failed to fetch points data:', error)
@@ -99,31 +90,25 @@ export default function PointsPage() {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [token, t])
 
   useEffect(() => {
     fetchData()
   }, [fetchData])
 
+  // 每日签到（通过后端积分系统）
   const handleDailyCheckin = async () => {
+    if (!token) {
+      message.warning(t('auth.loginRequired'))
+      navigate('/login')
+      return
+    }
+
     setCheckingIn(true)
     try {
-      const res = await ragFetch('/api/daily-checkin', {
-        method: 'POST',
-        body: JSON.stringify({ user_id: userId })
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        message.success(`${t('points.checkinSuccess')} ${data.points_earned} ${t('points.pointsUnit')}`)
-        setHasCheckedIn(true)
-        fetchData() // 刷新数据
-      } else if (data.already_checked_in) {
-        message.info(t('points.alreadyCheckedIn'))
-        setHasCheckedIn(true)
-      } else {
-        message.error(data.error || t('common.error'))
-      }
+      // 签到逻辑由后端处理，这里只是展示
+      message.info(t('points.checkinProcessing'))
+      await fetchData()
     } catch (error) {
       console.error('Check-in failed:', error)
       message.error(t('common.error'))
@@ -132,31 +117,48 @@ export default function PointsPage() {
     }
   }
 
-  const getLevelConfig = (level: number) => {
-    return LEVEL_CONFIG.find(l => l.level === level) || LEVEL_CONFIG[0]
+  const getUserLevel = (points: number) => {
+    for (let i = LEVEL_CONFIG.length - 1; i >= 0; i--) {
+      if (points >= LEVEL_CONFIG[i].minPoints) {
+        return LEVEL_CONFIG[i]
+      }
+    }
+    return LEVEL_CONFIG[0]
   }
 
-  const getLevelProgress = () => {
-    if (!balance) return 0
-    const config = getLevelConfig(balance.level)
-    const nextConfig = LEVEL_CONFIG.find(l => l.level === balance.level + 1)
+  const getLevelProgress = (points: number) => {
+    const config = getUserLevel(points)
+    const nextConfig = LEVEL_CONFIG.find(l => l.level === config.level + 1)
     if (!nextConfig) return 100
     
-    const progress = ((balance.total - config.minPoints) / (nextConfig.minPoints - config.minPoints)) * 100
+    const progress = ((points - config.minPoints) / (nextConfig.minPoints - config.minPoints)) * 100
     return Math.min(100, Math.max(0, progress))
   }
 
-  const getPointsToNextLevel = () => {
-    if (!balance) return 0
-    const nextConfig = LEVEL_CONFIG.find(l => l.level === balance.level + 1)
+  const getPointsToNextLevel = (points: number) => {
+    const config = getUserLevel(points)
+    const nextConfig = LEVEL_CONFIG.find(l => l.level === config.level + 1)
     if (!nextConfig) return 0
-    return Math.max(0, nextConfig.minPoints - balance.total)
+    return Math.max(0, nextConfig.minPoints - points)
   }
 
-  // 获取等级名称（从翻译）
   const getLevelName = (level: number) => {
     const key = `points.levelNames.${level}` as const
     return t(key) || `Lv.${level}`
+  }
+
+  // 检查今日是否已签到
+  const hasCheckedInToday = () => {
+    return (summary?.todayCounts?.DAILY_LOGIN || 0) >= 1
+  }
+
+  // 获取任务剩余次数
+  const getRemainingTimes = (taskKey: PointTaskKey) => {
+    const task = POINT_TASKS[taskKey]
+    // dailyLimit === 0 表示无限制（一次性任务）
+    if (!task.repeatable || (task.dailyLimit as number) === 0) return null
+    const todayCount = summary?.todayCounts?.[taskKey] || 0
+    return Math.max(0, task.dailyLimit - todayCount)
   }
 
   if (loading) {
@@ -170,7 +172,35 @@ export default function PointsPage() {
     )
   }
 
-  const levelConfig = balance ? getLevelConfig(balance.level) : LEVEL_CONFIG[0]
+  if (!token) {
+    return (
+      <div className={styles.container}>
+        <Card className={styles.mainCard}>
+          <Empty description={t('auth.loginRequired')}>
+            <Button type="primary" onClick={() => navigate('/login')}>
+              {t('auth.login')}
+            </Button>
+          </Empty>
+        </Card>
+      </div>
+    )
+  }
+
+  const totalPoints = summary?.totalPoints || 0
+  const levelConfig = getUserLevel(totalPoints)
+  const checkedIn = hasCheckedInToday()
+
+  // 任务列表（从 shared/domain 获取）
+  const taskList = Object.entries(POINT_TASKS)
+    .filter(([_, task]) => task.dailyLimit > 0) // 只显示有每日限制的任务
+    .map(([key, task]) => ({
+      key: key as PointTaskKey,
+      name: getPointTaskDisplayName(key as PointTaskKey, currentLanguage),
+      description: getPointTaskDescription(key as PointTaskKey, currentLanguage),
+      points: task.points,
+      remaining: getRemainingTimes(key as PointTaskKey),
+      isCompleted: getRemainingTimes(key as PointTaskKey) === 0,
+    }))
 
   return (
     <div className={styles.container}>
@@ -182,10 +212,10 @@ export default function PointsPage() {
           </div>
           <div className={styles.headerInfo}>
             <Text className={styles.levelName} style={{ color: levelConfig.color }}>
-              Lv.{balance?.level || 1} {getLevelName(balance?.level || 1)}
+              Lv.{levelConfig.level} {getLevelName(levelConfig.level)}
             </Text>
             <Title level={2} className={styles.pointsValue}>
-              <TrophyOutlined /> {balance?.total || 0} <span className={styles.pointsUnit}>{t('points.pointsUnit')}</span>
+              <TrophyOutlined /> {totalPoints} <span className={styles.pointsUnit}>{t('points.pointsUnit')}</span>
             </Title>
           </div>
           <Button 
@@ -202,10 +232,10 @@ export default function PointsPage() {
         {/* 等级进度条 */}
         <div className={styles.levelProgress}>
           <div className={styles.progressHeader}>
-            <Text>{t('points.toNextLevel')} <Text strong>{getPointsToNextLevel()}</Text> {t('points.pointsUnit')}</Text>
+            <Text>{t('points.toNextLevel')} <Text strong>{getPointsToNextLevel(totalPoints)}</Text> {t('points.pointsUnit')}</Text>
           </div>
           <Progress 
-            percent={getLevelProgress()} 
+            percent={getLevelProgress(totalPoints)} 
             strokeColor={levelConfig.color}
             showInfo={false}
           />
@@ -219,10 +249,10 @@ export default function PointsPage() {
             icon={<CheckCircleOutlined />}
             onClick={handleDailyCheckin}
             loading={checkingIn}
-            disabled={hasCheckedIn}
-            className={`${styles.checkinBtn} ${hasCheckedIn ? styles.checkedIn : ''}`}
+            disabled={checkedIn}
+            className={`${styles.checkinBtn} ${checkedIn ? styles.checkedIn : ''}`}
           >
-            {hasCheckedIn ? t('points.checkedIn') : t('points.checkinButton')}
+            {checkedIn ? t('points.checkedIn') : t('points.checkinButton')}
           </Button>
         </div>
       </Card>
@@ -235,7 +265,7 @@ export default function PointsPage() {
               <Col span={12}>
                 <Statistic 
                   title={t('points.totalPoints')} 
-                  value={balance?.total || 0} 
+                  value={totalPoints} 
                   prefix={<TrophyOutlined />}
                   valueStyle={{ color: '#1890ff' }}
                 />
@@ -243,7 +273,7 @@ export default function PointsPage() {
               <Col span={12}>
                 <Statistic 
                   title={t('points.availablePoints')} 
-                  value={balance?.available || 0}
+                  value={totalPoints}
                   prefix={<GiftOutlined />}
                   valueStyle={{ color: '#52c41a' }}
                 />
@@ -257,36 +287,33 @@ export default function PointsPage() {
           <Card title={<><RiseOutlined /> {t('points.earnPoints')}</>} className={styles.earnCard}>
             <List
               size="small"
-              dataSource={rules.slice(0, 5)}
-              renderItem={rule => {
-                const isCompleted = rule.remainingTimes === 0
-                return (
-                  <List.Item className={`${styles.ruleItem} ${isCompleted ? styles.ruleCompleted : ''}`}>
-                    <div className={styles.ruleName}>
-                      {isCompleted ? (
-                        <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-                      ) : (
-                        <FireOutlined style={{ color: '#faad14', marginRight: 8 }} />
-                      )}
-                      <span style={isCompleted ? { color: '#8c8c8c' } : undefined}>{rule.name}</span>
-                    </div>
-                    <div className={styles.rulePoints}>
-                      {isCompleted ? (
-                        <Tag color="success">{t('points.completed')}</Tag>
-                      ) : (
-                        <>
-                          <Tag color="gold">+{rule.points_value}</Tag>
-                          {rule.remainingTimes !== undefined && (
-                            <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
-                              ({rule.remainingTimes}{t('points.rules.times')})
-                            </Text>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </List.Item>
-                )
-              }}
+              dataSource={taskList.slice(0, 5)}
+              renderItem={task => (
+                <List.Item className={`${styles.ruleItem} ${task.isCompleted ? styles.ruleCompleted : ''}`}>
+                  <div className={styles.ruleName}>
+                    {task.isCompleted ? (
+                      <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+                    ) : (
+                      <FireOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                    )}
+                    <span style={task.isCompleted ? { color: '#8c8c8c' } : undefined}>{task.name}</span>
+                  </div>
+                  <div className={styles.rulePoints}>
+                    {task.isCompleted ? (
+                      <Tag color="success">{t('points.completed')}</Tag>
+                    ) : (
+                      <>
+                        <Tag color="gold">+{task.points}</Tag>
+                        {task.remaining !== null && (
+                          <Text type="secondary" style={{ fontSize: 12, marginLeft: 4 }}>
+                            ({task.remaining}{t('points.rules.times')})
+                          </Text>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </List.Item>
+              )}
             />
           </Card>
         </Col>
@@ -296,31 +323,30 @@ export default function PointsPage() {
       <Card 
         title={<><HistoryOutlined /> {t('points.recentActivity')}</>} 
         className={styles.historyCard}
-        extra={<Button type="link" onClick={() => navigate('/points/history')}>{t('points.viewAll')}</Button>}
       >
-        {balance?.recentActivity && balance.recentActivity.length > 0 ? (
+        {history.length > 0 ? (
           <List
-            dataSource={balance.recentActivity}
+            dataSource={history}
             renderItem={item => (
               <List.Item className={styles.historyItem}>
                 <div className={styles.historyLeft}>
                   <Badge 
-                    status={item.change_points > 0 ? 'success' : 'error'} 
+                    status={item.points > 0 ? 'success' : 'error'} 
                   />
                   <div>
-                    <Text>{item.description}</Text>
+                    <Text>{getPointTaskDisplayName(item.task as PointTaskKey, currentLanguage)}</Text>
                     <br />
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      <ClockCircleOutlined /> {new Date(item.created_at).toLocaleString()}
+                      <ClockCircleOutlined /> {new Date(item.createdAt).toLocaleString()}
                     </Text>
                   </div>
                 </div>
                 <div className={styles.historyPoints}>
                   <Text 
                     strong 
-                    style={{ color: item.change_points > 0 ? '#52c41a' : '#ff4d4f' }}
+                    style={{ color: item.points > 0 ? '#52c41a' : '#ff4d4f' }}
                   >
-                    {item.change_points > 0 ? '+' : ''}{item.change_points}
+                    {item.points > 0 ? '+' : ''}{item.points}
                   </Text>
                 </div>
               </List.Item>
@@ -343,7 +369,7 @@ export default function PointsPage() {
             >
               <FireOutlined style={{ fontSize: 24, color: '#ff7a45' }} />
               <div>{t('points.goPractice')}</div>
-              <Text type="secondary" style={{ fontSize: 12 }}>{t('points.perTime')}+30</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>+{POINT_TASKS.COMPLETE_QUIZ.points}</Text>
             </Button>
           </Col>
           <Col span={8}>
@@ -355,7 +381,7 @@ export default function PointsPage() {
             >
               <TrophyOutlined style={{ fontSize: 24, color: '#722ed1' }} />
               <div>{t('points.goTest')}</div>
-              <Text type="secondary" style={{ fontSize: 12 }}>{t('points.perTime')}+50</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>+{POINT_TASKS.COMPLETE_LEVEL_TEST.points}</Text>
             </Button>
           </Col>
           <Col span={8}>

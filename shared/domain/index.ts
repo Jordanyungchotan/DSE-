@@ -5,3 +5,4 @@ export * from "./application";
 export * from "./grades";
 export * from "./gradeLevels";
 export * from "./reportReasons";
+export * from "./points";

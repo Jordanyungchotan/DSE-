@@ -6399,6 +6399,177 @@ export default {
       }
 
       // =====================
+      // 积分系统 API
+      // =====================
+
+      // 获取用户积分摘要
+      if (path === '/api/points/summary' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const today = new Date().toISOString().split('T')[0]
+
+        // 获取总积分
+        const summary = await env.DB.prepare(
+          'SELECT total_points FROM user_point_summary WHERE user_id = ?'
+        ).bind(tokenData.userId).first<{ total_points: number }>()
+
+        // 获取各任务总完成次数
+        const taskCountsResult = await env.DB.prepare(
+          'SELECT task, COUNT(*) as count FROM point_events WHERE user_id = ? GROUP BY task'
+        ).bind(tokenData.userId).all<{ task: string; count: number }>()
+
+        // 获取今日任务完成次数
+        const todayCountsResult = await env.DB.prepare(
+          'SELECT task, count FROM user_daily_task_counts WHERE user_id = ? AND count_date = ?'
+        ).bind(tokenData.userId, today).all<{ task: string; count: number }>()
+
+        const taskCounts: Record<string, number> = {}
+        const todayCounts: Record<string, number> = {}
+
+        if (taskCountsResult.results) {
+          for (const row of taskCountsResult.results) {
+            taskCounts[row.task] = row.count
+          }
+        }
+
+        if (todayCountsResult.results) {
+          for (const row of todayCountsResult.results) {
+            todayCounts[row.task] = row.count
+          }
+        }
+
+        return jsonResponse({
+          totalPoints: summary?.total_points || 0,
+          taskCounts,
+          todayCounts,
+        }, 200, origin)
+      }
+
+      // 获取积分排行榜（简化版，基于积分）
+      if (path === '/api/points/leaderboard' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const limit = parseInt(url.searchParams.get('limit') || '50')
+
+        const results = await env.DB.prepare(`
+          SELECT 
+            s.user_id as userId,
+            u.nickname,
+            u.avatar,
+            s.total_points as totalPoints
+          FROM user_point_summary s
+          JOIN users u ON u.id = s.user_id
+          ORDER BY s.total_points DESC
+          LIMIT ?
+        `).bind(limit).all<{
+          userId: string
+          nickname: string
+          avatar: string | null
+          totalPoints: number
+        }>()
+
+        const leaderboard = (results.results || []).map((row, index) => ({
+          rank: index + 1,
+          userId: row.userId,
+          nickname: row.nickname || 'Anonymous',
+          avatar: row.avatar || undefined,
+          totalPoints: row.totalPoints,
+        }))
+
+        return jsonResponse({ leaderboard }, 200, origin)
+      }
+
+      // 获取用户积分排名
+      if (path === '/api/points/rank' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        // 获取用户积分
+        const userSummary = await env.DB.prepare(
+          'SELECT total_points FROM user_point_summary WHERE user_id = ?'
+        ).bind(tokenData.userId).first<{ total_points: number }>()
+
+        if (!userSummary) {
+          return jsonResponse({ rank: null, totalPoints: 0 }, 200, origin)
+        }
+
+        // 计算排名
+        const rankResult = await env.DB.prepare(
+          'SELECT COUNT(*) as higher_count FROM user_point_summary WHERE total_points > ?'
+        ).bind(userSummary.total_points).first<{ higher_count: number }>()
+
+        return jsonResponse({
+          rank: (rankResult?.higher_count || 0) + 1,
+          totalPoints: userSummary.total_points,
+        }, 200, origin)
+      }
+
+      // 获取积分历史
+      if (path === '/api/points/history' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const url = new URL(request.url)
+        const limit = parseInt(url.searchParams.get('limit') || '50')
+        const offset = parseInt(url.searchParams.get('offset') || '0')
+
+        const results = await env.DB.prepare(`
+          SELECT id, user_id as userId, task, points, created_at as createdAt
+          FROM point_events
+          WHERE user_id = ?
+          ORDER BY created_at DESC
+          LIMIT ? OFFSET ?
+        `).bind(tokenData.userId, limit, offset).all<{
+          id: string
+          userId: string
+          task: string
+          points: number
+          createdAt: string
+        }>()
+
+        return jsonResponse({ history: results.results || [] }, 200, origin)
+      }
+
+      // 获取积分任务规则
+      if (path === '/api/points/rules' && request.method === 'GET') {
+        const POINT_TASKS = {
+          DAILY_LOGIN: { points: 5, repeatable: true, dailyLimit: 1 },
+          COMPLETE_QUIZ: { points: 10, repeatable: true, dailyLimit: 10 },
+          COMPLETE_LEVEL_TEST: { points: 15, repeatable: true, dailyLimit: 5 },
+          COMPLETE_ANALYSIS: { points: 20, repeatable: true, dailyLimit: 3 },
+          COMPLETE_UNIVERSITY_ANALYSIS: { points: 20, repeatable: true, dailyLimit: 3 },
+          FIRST_ANALYSIS: { points: 30, repeatable: false, dailyLimit: 0 },
+          FIRST_QUIZ: { points: 20, repeatable: false, dailyLimit: 0 },
+          POST_CREATED: { points: 5, repeatable: true, dailyLimit: 3 },
+          POST_LIKED: { points: 2, repeatable: true, dailyLimit: 20 },
+          STREAK_7_DAYS: { points: 50, repeatable: false, dailyLimit: 0 },
+          STREAK_30_DAYS: { points: 200, repeatable: false, dailyLimit: 0 },
+        }
+        return jsonResponse({ rules: POINT_TASKS }, 200, origin)
+      }
+
+      // =====================
       // API 文档端点
       // =====================
 
@@ -6522,6 +6693,12 @@ export default {
             'GET /api/leaderboard',
             'GET /api/leaderboard/me',
             'POST /api/leaderboard/submit',
+            // 积分系统 API
+            'GET /api/points/summary',
+            'GET /api/points/leaderboard',
+            'GET /api/points/rank',
+            'GET /api/points/history',
+            'GET /api/points/rules',
             'PUT /api/user/profile',
             'POST /api/user/avatar',
             'PUT /api/user/password',

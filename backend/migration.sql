@@ -384,3 +384,78 @@ CREATE INDEX IF NOT EXISTS idx_autosave_user ON test_autosave(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_review_queue_status ON question_review_queue(status);
 
+
+-- =====================
+-- 积分系统表迁移
+-- =====================
+
+-- 积分事件表（唯一事实来源）
+CREATE TABLE IF NOT EXISTS point_events (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  task TEXT NOT NULL,
+  points INTEGER NOT NULL,
+  description TEXT,
+  related_id TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 积分聚合表（排行榜 & 快速读取）
+CREATE TABLE IF NOT EXISTS user_point_summary (
+  user_id TEXT PRIMARY KEY,
+  total_points INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 用户每日任务计数表
+CREATE TABLE IF NOT EXISTS user_daily_task_counts (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  task TEXT NOT NULL,
+  count_date TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(user_id, task, count_date)
+);
+
+-- 积分商城商品表
+CREATE TABLE IF NOT EXISTS point_mall_items (
+  id TEXT PRIMARY KEY,
+  name_zh TEXT NOT NULL,
+  name_en TEXT,
+  description_zh TEXT,
+  description_en TEXT,
+  category TEXT NOT NULL,
+  required_points INTEGER NOT NULL,
+  stock INTEGER DEFAULT -1,
+  image_url TEXT,
+  is_active INTEGER DEFAULT 1,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 积分兑换记录表
+CREATE TABLE IF NOT EXISTS point_redemptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  item_id TEXT NOT NULL,
+  points_spent INTEGER NOT NULL,
+  status TEXT DEFAULT 'pending',
+  fulfilled_at TEXT,
+  notes TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (item_id) REFERENCES point_mall_items(id)
+);
+
+-- 积分系统索引
+CREATE INDEX IF NOT EXISTS idx_point_events_user ON point_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_point_events_task ON point_events(task);
+CREATE INDEX IF NOT EXISTS idx_point_events_created ON point_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_point_summary_points ON user_point_summary(total_points DESC);
+CREATE INDEX IF NOT EXISTS idx_daily_task_user_date ON user_daily_task_counts(user_id, count_date);
+CREATE INDEX IF NOT EXISTS idx_redemptions_user ON point_redemptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_mall_items_category ON point_mall_items(category);

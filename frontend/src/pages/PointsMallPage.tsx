@@ -8,7 +8,7 @@ import {
   TrophyOutlined,
   InboxOutlined
 } from '@ant-design/icons'
-import { ragFetch } from '../config/api'
+import { ragFetch, apiFetch } from '../config/api'
 import { useAuthStore } from '../stores/authStore'
 import { useLanguageStore } from '../stores/languageStore'
 import styles from './PointsMallPage.module.css'
@@ -38,7 +38,7 @@ interface PointsOrder {
 
 export default function PointsMallPage() {
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  const { user, token } = useAuthStore()
   const { t } = useLanguageStore()
   
   const [loading, setLoading] = useState(true)
@@ -53,26 +53,30 @@ export default function PointsMallPage() {
   const userId = user?.id || 'anonymous'
 
   const fetchData = useCallback(async () => {
-    if (!userId) return
+    if (!token) return
     
     setLoading(true)
     try {
-      const [itemsRes, balanceRes, ordersRes] = await Promise.all([
-        ragFetch('/api/mall/items'),
-        ragFetch(`/api/points/balance?user_id=${userId}`),
-        ragFetch(`/api/mall/orders?user_id=${userId}`)
-      ])
+      // 获取积分（从后端获取唯一真源）
+      const balanceRes = await apiFetch('/api/points/summary', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      if (balanceRes.ok) {
+        const balanceData = await balanceRes.json()
+        setBalance(balanceData.totalPoints || 0)
+      }
 
+      // 获取商品列表（RAG API）
+      const itemsRes = await ragFetch('/api/mall/items')
       const itemsData = await itemsRes.json()
-      const balanceData = await balanceRes.json()
-      const ordersData = await ordersRes.json()
-
       if (itemsData.success) {
         setItems(itemsData.data)
       }
-      if (balanceData.success) {
-        setBalance(balanceData.data.available)
-      }
+
+      // 获取订单列表（RAG API）
+      const ordersRes = await ragFetch(`/api/mall/orders?user_id=${userId}`)
+      const ordersData = await ordersRes.json()
       if (ordersData.success) {
         setOrders(ordersData.data)
       }
@@ -82,7 +86,7 @@ export default function PointsMallPage() {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [token, userId, t])
 
   useEffect(() => {
     fetchData()
