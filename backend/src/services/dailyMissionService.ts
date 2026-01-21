@@ -198,6 +198,8 @@ function generateMissionId(type: MissionType, suffix?: string): string {
 
 /**
  * 获取用户今日学习任务
+ * 
+ * 【重要】此函数必须健壮，即使用户没有任何学习数据也能正常返回
  */
 export async function getDailyMissions(
   db: D1Database,
@@ -206,24 +208,43 @@ export async function getDailyMissions(
   const today = getTodayDateString();
   const missions: DailyMission[] = [];
 
-  // 1. 获取用户当前学习状态
-  const [quizCountRank, accuracyRank, speedRank, todayStats, userStreak] = await Promise.all([
-    getUserLearningRankWithAnalysis(db, userId, { metric: 'QUIZ_COUNT', range: 'ALL' }),
-    getUserLearningRankWithAnalysis(db, userId, { metric: 'ACCURACY', range: 'ALL' }),
-    getUserLearningRankWithAnalysis(db, userId, { metric: 'SPEED', range: 'ALL' }),
-    getTodayQuizStats(db, userId),
-    getUserStreak(db, userId),
-  ]);
+  // 默认值（用户无数据时使用）
+  let quizCountRank: Awaited<ReturnType<typeof getUserLearningRankWithAnalysis>> | null = null;
+  let accuracyRank: Awaited<ReturnType<typeof getUserLearningRankWithAnalysis>> | null = null;
+  let todayStats = { todayQuizCount: 0, todayAccuracy: 0, todayAvgTime: 0 };
+  let userStreak = { currentStreak: 0, longestStreak: 0 };
+  let mistakeCount = 0;
 
-  // 2. 获取用户积分特权
-  const privileges = await checkUserPrivileges(db, userId);
+  // 1. 获取用户当前学习状态（使用 try-catch 确保不会因为数据问题导致整个函数失败）
+  try {
+    const results = await Promise.allSettled([
+      getUserLearningRankWithAnalysis(db, userId, { metric: 'QUIZ_COUNT', range: 'ALL' }),
+      getUserLearningRankWithAnalysis(db, userId, { metric: 'ACCURACY', range: 'ALL' }),
+      getTodayQuizStats(db, userId),
+      getUserStreak(db, userId),
+      getMistakeCount(db, userId),
+    ]);
 
-  // 3. 获取错题数量
-  const mistakeCount = await getMistakeCount(db, userId);
+    // 安全地提取结果
+    if (results[0].status === 'fulfilled') quizCountRank = results[0].value;
+    if (results[1].status === 'fulfilled') accuracyRank = results[1].value;
+    if (results[2].status === 'fulfilled') todayStats = results[2].value;
+    if (results[3].status === 'fulfilled') userStreak = results[3].value;
+    if (results[4].status === 'fulfilled') mistakeCount = results[4].value;
+  } catch (error) {
+    console.error('获取用户学习状态失败，使用默认值:', error);
+  }
+
+  // 2. 获取用户积分特权（可选，失败不影响任务生成）
+  try {
+    await checkUserPrivileges(db, userId);
+  } catch (error) {
+    console.error('获取用户积分特权失败:', error);
+  }
 
   // ===== 任务生成规则 =====
 
-  // 规则 1: 每日基础刷题任务（必选）
+  // 规则 1: 每日基础刷题任务（必选，即使没有数据也显示）
   const dailyQuizTarget = calculateDailyQuizTarget(quizCountRank, todayStats);
   missions.push(createDailyQuizMission(dailyQuizTarget, todayStats.todayQuizCount));
 
@@ -253,16 +274,29 @@ export async function getDailyMissions(
 
   // 规则 6: 错题复习任务（如果有错题）
   if (mistakeCount > 0) {
-    const reviewTarget = Math.min(mistakeCount, 10);
-    const reviewedToday = await getReviewedMistakesToday(db, userId);
-    missions.push(createReviewMistakesMission(reviewTarget, reviewedToday));
+    try {
+      const reviewTarget = Math.min(mistakeCount, 10);
+      const reviewedToday = await getReviewedMistakesToday(db, userId);
+      missions.push(createReviewMistakesMission(reviewTarget, reviewedToday));
+    } catch (error) {
+      console.error('获取错题复习进度失败:', error);
+    }
   }
 
   // 规则 7: 科目专攻任务（基于最薄弱科目）
-  const weakestSubject = await findWeakestSubject(db, userId);
-  if (weakestSubject) {
-    const subjectProgress = await getSubjectProgressToday(db, userId, weakestSubject.key);
-    missions.push(createSubjectFocusMission(weakestSubject.key, weakestSubject.name, subjectProgress));
+  try {
+    const weakestSubject = await findWeakestSubject(db, userId);
+    if (weakestSubject) {
+      const subjectProgress = await getSubjectProgressToday(db, userId, weakestSubject.key);
+      missions.push(createSubjectFocusMission(weakestSubject.key, weakestSubject.name, subjectProgress));
+    }
+  } catch (error) {
+    console.error('获取最薄弱科目失败:', error);
+  }
+
+  // 如果没有生成任何任务，至少添加一个新手任务
+  if (missions.length === 0) {
+    missions.push(createNewUserMission());
   }
 
   // 4. 排序（按优先级和完成状态）
@@ -288,6 +322,33 @@ export async function getDailyMissions(
     totalCount: finalMissions.length,
     bonusUnlocked: completedCount >= 3, // 完成 3 个任务解锁额外奖励
     nextRefreshAt: getMidnightUTC(),
+  };
+}
+
+/**
+ * 为新用户创建欢迎任务
+ */
+function createNewUserMission(): DailyMission {
+  return {
+    id: generateMissionId('DAILY_QUIZ', 'welcome'),
+    type: 'DAILY_QUIZ',
+    title: '完成第一次刷题',
+    description: '开始你的学习之旅',
+    reason: '欢迎！完成第一道题目开始学习吧！',
+    priority: 'high',
+    reward: {
+      points: 20,
+      leaderboardBoost: true,
+    },
+    progress: {
+      current: 0,
+      target: 1,
+      unit: '道',
+    },
+    actionPath: '/quiz',
+    actionLabel: '开始刷题',
+    completed: false,
+    expiresAt: getMidnightUTC(),
   };
 }
 
