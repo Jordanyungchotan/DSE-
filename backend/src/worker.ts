@@ -5901,9 +5901,10 @@ export default {
         }
       }
 
-      // 重置错题状态（删除状态记录，恢复为 UNREVIEWED）
-      // 注意：不删除 question_attempts 中的记录
-      if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+\/status$/) && request.method === 'DELETE') {
+      // 删除错题（标记为 MASTERED，从待复习列表移除）
+      // DELETE /api/quiz/wrong-questions/:questionId
+      // 【关键】历史事实不可删除，只更新 wrong_question_status 为 MASTERED
+      if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+$/) && !path.endsWith('/status') && request.method === 'DELETE') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
           return errorResponse('请先登录', 401, origin)
@@ -5914,12 +5915,26 @@ export default {
           return errorResponse('登录已过期', 401, origin)
         }
 
-        const pathParts = path.split('/')
-        const questionId = pathParts[pathParts.length - 2]
+        const questionId = path.split('/').pop()
+        if (!questionId) {
+          return errorResponse('缺少题目 ID', 400, origin)
+        }
         
-        const result = await deleteWrongQuestionStatus(env.DB, tokenData.userId, questionId)
+        // 将状态标记为 MASTERED（已掌握），从待复习列表移除
+        // 不删除 question_attempts 中的历史作答记录
+        const result = await updateWrongQuestionStatus(
+          env.DB, 
+          tokenData.userId, 
+          questionId, 
+          'MASTERED'
+        )
         
-        return jsonResponse({ message: '状态已重置', success: result.success }, 200, origin)
+        return jsonResponse({ 
+          message: '错题已标记为已掌握', 
+          success: result.success,
+          status: 'MASTERED',
+          note: '历史作答记录已保留'
+        }, 200, origin)
       }
 
       // 获取学习档案
