@@ -254,6 +254,26 @@ export const ELECTIVE_SUBJECTS: SubjectDefinition[] = [
       en: 'Physical Education',
     },
   },
+  {
+    key: 'MATHEMATICS_M1',
+    category: 'elective',
+    grading: 'level',
+    displayName: {
+      'zh-HK': '數學延伸單元一（M1）',
+      'zh-CN': '数学延伸单元一（M1）',
+      en: 'Mathematics Extended Module 1 (M1)',
+    },
+  },
+  {
+    key: 'MATHEMATICS_M2',
+    category: 'elective',
+    grading: 'level',
+    displayName: {
+      'zh-HK': '數學延伸單元二（M2）',
+      'zh-CN': '数学延伸单元二（M2）',
+      en: 'Mathematics Extended Module 2 (M2)',
+    },
+  },
 ];
 
 // ===== 统一入口 =====
@@ -268,7 +288,7 @@ export const CORE_SUBJECT_KEYS = CORE_SUBJECTS.map((s) => s.key);
 export const ELECTIVE_SUBJECT_KEYS = ELECTIVE_SUBJECTS.map((s) => s.key);
 
 // ===== 选修科目分类（用于分析系统，基于 key） =====
-export const SCIENCE_ELECTIVE_KEYS = ['BIOLOGY', 'CHEMISTRY', 'PHYSICS', 'ICT'] as const;
+export const SCIENCE_ELECTIVE_KEYS = ['BIOLOGY', 'CHEMISTRY', 'PHYSICS', 'ICT', 'MATHEMATICS_M1', 'MATHEMATICS_M2'] as const;
 export const BUSINESS_ELECTIVE_KEYS = ['ECONOMICS', 'BAFS'] as const;
 export const ARTS_SPORTS_ELECTIVE_KEYS = ['MUSIC', 'VISUAL_ARTS', 'PHYSICAL_EDUCATION'] as const;
 
