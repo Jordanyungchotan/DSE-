@@ -200,12 +200,47 @@ function generateMissionId(type: MissionType, suffix?: string): string {
  * 获取用户今日学习任务
  * 
  * 【重要】此函数必须健壮，即使用户没有任何学习数据也能正常返回
+ * 整个函数被 try-catch 包裹，确保任何情况下都返回有效响应
  */
 export async function getDailyMissions(
   db: D1Database,
   userId: string
 ): Promise<DailyMissionResponse> {
   const today = getTodayDateString();
+  
+  // 最外层 try-catch，确保任何情况下都返回有效响应
+  try {
+    return await generateDailyMissionsInternal(db, userId, today);
+  } catch (error) {
+    console.error('getDailyMissions 顶层错误，返回默认任务:', error);
+    // 返回一个安全的默认响应
+    return createFallbackResponse(userId, today);
+  }
+}
+
+/**
+ * 创建一个安全的默认响应（当一切都失败时使用）
+ */
+function createFallbackResponse(userId: string, today: string): DailyMissionResponse {
+  return {
+    date: today,
+    userId,
+    missions: [createNewUserMission()],
+    completedCount: 0,
+    totalCount: 1,
+    bonusUnlocked: false,
+    nextRefreshAt: getMidnightUTC(),
+  };
+}
+
+/**
+ * 内部任务生成逻辑
+ */
+async function generateDailyMissionsInternal(
+  db: D1Database,
+  userId: string,
+  today: string
+): Promise<DailyMissionResponse> {
   const missions: DailyMission[] = [];
 
   // 默认值（用户无数据时使用）
@@ -215,21 +250,21 @@ export async function getDailyMissions(
   let userStreak = { currentStreak: 0, longestStreak: 0 };
   let mistakeCount = 0;
 
-  // 1. 获取用户当前学习状态（使用 try-catch 确保不会因为数据问题导致整个函数失败）
+  // 1. 获取用户当前学习状态（使用 Promise.allSettled 确保不会因为单个查询失败导致整体失败）
   try {
     const results = await Promise.allSettled([
-      getUserLearningRankWithAnalysis(db, userId, { metric: 'QUIZ_COUNT', range: 'ALL' }),
-      getUserLearningRankWithAnalysis(db, userId, { metric: 'ACCURACY', range: 'ALL' }),
-      getTodayQuizStats(db, userId),
-      getUserStreak(db, userId),
-      getMistakeCount(db, userId),
+      safeGetUserLearningRank(db, userId, 'QUIZ_COUNT'),
+      safeGetUserLearningRank(db, userId, 'ACCURACY'),
+      safeTodayQuizStats(db, userId),
+      safeUserStreak(db, userId),
+      safeMistakeCount(db, userId),
     ]);
 
     // 安全地提取结果
     if (results[0].status === 'fulfilled') quizCountRank = results[0].value;
     if (results[1].status === 'fulfilled') accuracyRank = results[1].value;
-    if (results[2].status === 'fulfilled') todayStats = results[2].value;
-    if (results[3].status === 'fulfilled') userStreak = results[3].value;
+    if (results[2].status === 'fulfilled' && results[2].value) todayStats = results[2].value;
+    if (results[3].status === 'fulfilled' && results[3].value) userStreak = results[3].value;
     if (results[4].status === 'fulfilled') mistakeCount = results[4].value;
   } catch (error) {
     console.error('获取用户学习状态失败，使用默认值:', error);
@@ -239,59 +274,80 @@ export async function getDailyMissions(
   try {
     await checkUserPrivileges(db, userId);
   } catch (error) {
-    console.error('获取用户积分特权失败:', error);
+    // 忽略错误，不影响任务生成
   }
 
   // ===== 任务生成规则 =====
 
   // 规则 1: 每日基础刷题任务（必选，即使没有数据也显示）
-  const dailyQuizTarget = calculateDailyQuizTarget(quizCountRank, todayStats);
-  missions.push(createDailyQuizMission(dailyQuizTarget, todayStats.todayQuizCount));
+  try {
+    const dailyQuizTarget = calculateDailyQuizTarget(quizCountRank, todayStats);
+    missions.push(createDailyQuizMission(dailyQuizTarget, todayStats.todayQuizCount));
+  } catch (error) {
+    console.error('创建每日刷题任务失败:', error);
+    missions.push(createNewUserMission()); // 使用新手任务作为后备
+  }
 
   // 规则 2: 连续学习任务（如果有连续天数）
-  if (userStreak.currentStreak > 0) {
-    missions.push(createStreakMission(userStreak.currentStreak + 1, todayStats.todayQuizCount > 0));
+  try {
+    if (userStreak.currentStreak > 0) {
+      missions.push(createStreakMission(userStreak.currentStreak + 1, todayStats.todayQuizCount > 0));
+    }
+  } catch (error) {
+    console.error('创建连续学习任务失败:', error);
   }
 
   // 规则 3: 排名突破任务（如果接近临界点）
-  const rankBreakthrough = findRankBreakthroughOpportunity(quizCountRank, accuracyRank);
-  if (rankBreakthrough) {
-    missions.push(createRankBreakthroughMission(rankBreakthrough));
+  try {
+    const rankBreakthrough = findRankBreakthroughOpportunity(quizCountRank, accuracyRank);
+    if (rankBreakthrough) {
+      missions.push(createRankBreakthroughMission(rankBreakthrough));
+    }
+  } catch (error) {
+    console.error('创建排名突破任务失败:', error);
   }
 
   // 规则 4: 弱项补强任务（基于 weaknesses 分析）
-  if (quizCountRank?.weaknesses && quizCountRank.weaknesses.length > 0) {
-    const weaknessMission = createWeaknessMission(quizCountRank.weaknesses[0]);
-    if (weaknessMission) {
-      missions.push(weaknessMission);
+  try {
+    if (quizCountRank?.weaknesses && quizCountRank.weaknesses.length > 0) {
+      const weaknessMission = createWeaknessMission(quizCountRank.weaknesses[0]);
+      if (weaknessMission) {
+        missions.push(weaknessMission);
+      }
     }
+  } catch (error) {
+    console.error('创建弱项补强任务失败:', error);
   }
 
   // 规则 5: 正确率提升任务（如果正确率偏低）
-  if (accuracyRank && accuracyRank.accuracy !== undefined && accuracyRank.accuracy < 70) {
-    missions.push(createAccuracyBoostMission(accuracyRank.accuracy));
+  try {
+    if (accuracyRank && accuracyRank.accuracy !== undefined && accuracyRank.accuracy < 70) {
+      missions.push(createAccuracyBoostMission(accuracyRank.accuracy));
+    }
+  } catch (error) {
+    console.error('创建正确率提升任务失败:', error);
   }
 
   // 规则 6: 错题复习任务（如果有错题）
-  if (mistakeCount > 0) {
-    try {
+  try {
+    if (mistakeCount > 0) {
       const reviewTarget = Math.min(mistakeCount, 10);
-      const reviewedToday = await getReviewedMistakesToday(db, userId);
+      const reviewedToday = await safeReviewedMistakesToday(db, userId);
       missions.push(createReviewMistakesMission(reviewTarget, reviewedToday));
-    } catch (error) {
-      console.error('获取错题复习进度失败:', error);
     }
+  } catch (error) {
+    console.error('创建错题复习任务失败:', error);
   }
 
   // 规则 7: 科目专攻任务（基于最薄弱科目）
   try {
-    const weakestSubject = await findWeakestSubject(db, userId);
+    const weakestSubject = await safeFindWeakestSubject(db, userId);
     if (weakestSubject) {
-      const subjectProgress = await getSubjectProgressToday(db, userId, weakestSubject.key);
+      const subjectProgress = await safeSubjectProgressToday(db, userId, weakestSubject.key);
       missions.push(createSubjectFocusMission(weakestSubject.key, weakestSubject.name, subjectProgress));
     }
   } catch (error) {
-    console.error('获取最薄弱科目失败:', error);
+    console.error('创建科目专攻任务失败:', error);
   }
 
   // 如果没有生成任何任务，至少添加一个新手任务
@@ -323,6 +379,88 @@ export async function getDailyMissions(
     bonusUnlocked: completedCount >= 3, // 完成 3 个任务解锁额外奖励
     nextRefreshAt: getMidnightUTC(),
   };
+}
+
+// ===== 安全包装函数（捕获所有可能的错误）=====
+
+async function safeGetUserLearningRank(
+  db: D1Database,
+  userId: string,
+  metric: LeaderboardMetric
+): Promise<Awaited<ReturnType<typeof getUserLearningRankWithAnalysis>> | null> {
+  try {
+    return await getUserLearningRankWithAnalysis(db, userId, { metric, range: 'ALL' });
+  } catch (error) {
+    console.error(`safeGetUserLearningRank(${metric}) 失败:`, error);
+    return null;
+  }
+}
+
+async function safeTodayQuizStats(
+  db: D1Database,
+  userId: string
+): Promise<{ todayQuizCount: number; todayAccuracy: number; todayAvgTime: number }> {
+  try {
+    return await getTodayQuizStats(db, userId);
+  } catch (error) {
+    console.error('safeTodayQuizStats 失败:', error);
+    return { todayQuizCount: 0, todayAccuracy: 0, todayAvgTime: 0 };
+  }
+}
+
+async function safeUserStreak(
+  db: D1Database,
+  userId: string
+): Promise<{ currentStreak: number; longestStreak: number }> {
+  try {
+    return await getUserStreak(db, userId);
+  } catch (error) {
+    console.error('safeUserStreak 失败:', error);
+    return { currentStreak: 0, longestStreak: 0 };
+  }
+}
+
+async function safeMistakeCount(db: D1Database, userId: string): Promise<number> {
+  try {
+    return await getMistakeCount(db, userId);
+  } catch (error) {
+    console.error('safeMistakeCount 失败:', error);
+    return 0;
+  }
+}
+
+async function safeReviewedMistakesToday(db: D1Database, userId: string): Promise<number> {
+  try {
+    return await getReviewedMistakesToday(db, userId);
+  } catch (error) {
+    console.error('safeReviewedMistakesToday 失败:', error);
+    return 0;
+  }
+}
+
+async function safeFindWeakestSubject(
+  db: D1Database,
+  userId: string
+): Promise<{ key: string; name: string } | null> {
+  try {
+    return await findWeakestSubject(db, userId);
+  } catch (error) {
+    console.error('safeFindWeakestSubject 失败:', error);
+    return null;
+  }
+}
+
+async function safeSubjectProgressToday(
+  db: D1Database,
+  userId: string,
+  subjectKey: string
+): Promise<number> {
+  try {
+    return await getSubjectProgressToday(db, userId, subjectKey);
+  } catch (error) {
+    console.error('safeSubjectProgressToday 失败:', error);
+    return 0;
+  }
 }
 
 /**
