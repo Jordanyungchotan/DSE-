@@ -78,10 +78,7 @@ import {
   getWrongQuestionsByUser,
   updateWrongQuestionStatus,
   deleteWrongQuestionStatus,
-  getSubjectMasteryByUser,
-  getTopicMasteryByUser,
-  getRecentActivityByUser,
-  getLearningProfileStats,
+  getLearningProfile,
   WrongQuestionStatus,
 } from './services/questionAttemptRecorder.js'
 
@@ -5938,7 +5935,8 @@ export default {
       }
 
       // 获取学习档案
-      // 【关键】数据来源于 question_attempts 事实表
+      // 【关键】前端只渲染，不做任何计算
+      // 数据来源：overview/recentActivity → learning_events，subjectMastery/topicMastery → question_attempts
       if (path === '/api/quiz/learning-profile' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
@@ -5950,190 +5948,26 @@ export default {
           return errorResponse('登录已过期', 401, origin)
         }
 
-        const userId = tokenData.userId
-        const today = new Date().toISOString().split('T')[0]
-
         try {
-          // 1. 从 question_attempts 获取总体统计
-          const stats = await getLearningProfileStats(env.DB, userId)
-
-          // 2. 从 question_attempts 获取科目掌握度
-          const subjectMasteryData = await getSubjectMasteryByUser(env.DB, userId)
-          
-          const subjectNameMap: Record<string, string> = {
-            math: '数学',
-            physics: '物理',
-            chemistry: '化学',
-            biology: '生物',
-            english: '英国语文',
-            chinese: '中国语文',
-            liberal: '公民与社会发展',
-            economics: '经济',
-            bafs: '企业、会计与财务概论',
-            geography: '地理',
-            history: '历史',
-            ict: '资讯及通讯科技',
-          }
-
-          const subjectMastery = subjectMasteryData.map(s => ({
-            subjectId: s.subject,
-            subjectName: subjectNameMap[s.subject] || s.subject,
-            totalQuestions: s.totalQuestions,
-            correctAnswers: s.correctCount,
-            accuracy: Math.round(s.accuracy * 1000) / 10,
-            recentTrend: s.recentTrend,
-            lastPracticed: s.lastPracticed,
-          }))
-
-          // 3. 从 question_attempts 获取知识点掌握度
-          const topicMasteryData = await getTopicMasteryByUser(env.DB, userId, { limit: 10 })
-          const topicMastery = topicMasteryData.map(t => ({
-            topic: t.topic,
-            subject: t.subject,
-            mastery: t.mastery,
-            questionsAttempted: t.totalQuestions,
-            lastAttempted: t.lastAttempted,
-          }))
-
-          // 4. 从 question_attempts 获取最近活动
-          const recentActivityData = await getRecentActivityByUser(env.DB, userId, 7)
-          const recentActivity = recentActivityData.map(a => ({
-            date: a.date,
-            quizCount: a.quizCount,
-            questionsAnswered: a.questionsAnswered,
-            accuracy: Math.round(a.accuracy * 10) / 10,
-          }))
-
-          // 5. 计算连续学习天数（从 question_attempts）
-          const studyDays = await env.DB.prepare(`
-            SELECT DISTINCT DATE(created_at) as study_date
-            FROM question_attempts
-            WHERE user_id = ?
-            ORDER BY study_date DESC
-          `).bind(userId).all()
-
-          let currentStreak = 0
-          let longestStreak = 0
-          let tempStreak = 0
-          let lastDate: Date | null = null
-          let lastStudyDate = today
-
-          if (studyDays.results && studyDays.results.length > 0) {
-            lastStudyDate = studyDays.results[0].study_date as string
-
-            for (const row of studyDays.results) {
-              const dateStr = row.study_date as string
-              const currentDate = new Date(dateStr)
-              
-              if (lastDate === null) {
-                tempStreak = 1
-                const todayDate = new Date(today)
-                const diffDays = Math.floor((todayDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
-                if (diffDays <= 1) {
-                  currentStreak = 1
-                }
-              } else {
-                const diffDays = Math.floor((lastDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24))
-                if (diffDays === 1) {
-                  tempStreak++
-                  if (currentStreak > 0) {
-                    currentStreak = tempStreak
-                  }
-                } else {
-                  tempStreak = 1
-                }
-              }
-              
-              longestStreak = Math.max(longestStreak, tempStreak)
-              lastDate = currentDate
-            }
-          }
-
-          // 6. 计算成就
-          const achievements = [
-            {
-              id: '1',
-              name: '初露锋芒',
-              description: '完成第一次刷题',
-              icon: '🌟',
-              unlockedAt: stats.totalQuizzes >= 1 ? lastStudyDate : null,
-              progress: stats.totalQuizzes >= 1 ? 100 : 0,
-            },
-            {
-              id: '2',
-              name: '勤学不倦',
-              description: '连续学习7天',
-              icon: '🔥',
-              unlockedAt: longestStreak >= 7 ? lastStudyDate : null,
-              progress: Math.min(100, Math.round((longestStreak / 7) * 100)),
-            },
-            {
-              id: '3',
-              name: '百题斩',
-              description: '完成100道题目',
-              icon: '💯',
-              unlockedAt: stats.totalQuestions >= 100 ? lastStudyDate : null,
-              progress: Math.min(100, Math.round((stats.totalQuestions / 100) * 100)),
-            },
-            {
-              id: '4',
-              name: '千题王',
-              description: '完成1000道题目',
-              icon: '👑',
-              unlockedAt: stats.totalQuestions >= 1000 ? lastStudyDate : null,
-              progress: Math.min(100, Math.round((stats.totalQuestions / 1000) * 100)),
-            },
-          ]
-
-          // 7. 计算学习目标（从 question_attempts）
-          const goalStats = await env.DB.prepare(`
-            SELECT 
-              SUM(CASE WHEN DATE(created_at) = DATE('now') THEN 1 ELSE 0 END) as today_count,
-              SUM(CASE WHEN created_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) as week_count,
-              SUM(CASE WHEN created_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END) as month_count
-            FROM question_attempts
-            WHERE user_id = ?
-          `).bind(userId).first<{
-            today_count: number;
-            week_count: number;
-            month_count: number;
-          }>()
-
-          const goals = [
-            { id: '1', title: '每日刷题', target: 20, current: goalStats?.today_count || 0, deadline: today, type: 'daily' },
-            { id: '2', title: '本周目标', target: 100, current: goalStats?.week_count || 0, deadline: today, type: 'weekly' },
-            { id: '3', title: '月度挑战', target: 500, current: goalStats?.month_count || 0, deadline: today, type: 'monthly' },
-          ]
-
-          return jsonResponse({
-            totalQuizzes: stats.totalQuizzes,
-            totalQuestions: stats.totalQuestions,
-            correctAnswers: stats.correctAnswers,
-            totalTimeSpent: Math.round(stats.totalTimeSpent / 60), // 秒转分钟
-            currentStreak,
-            longestStreak,
-            lastStudyDate,
-            subjectMastery,
-            topicMastery,
-            achievements,
-            goals,
-            recentActivity,
-          }, 200, origin)
+          // 调用统一的学习档案服务，返回结构完全对齐前端
+          const profile = await getLearningProfile(env.DB, tokenData.userId)
+          return jsonResponse(profile, 200, origin)
 
         } catch (error) {
           console.error('获取学习档案失败:', error)
+          const today = new Date().toISOString().split('T')[0]
           return jsonResponse({
-            totalQuizzes: 0,
-            totalQuestions: 0,
-            correctAnswers: 0,
-            totalTimeSpent: 0,
-            currentStreak: 0,
-            longestStreak: 0,
-            lastStudyDate: today,
+            overview: {
+              totalQuizzes: 0,
+              totalQuestions: 0,
+              correctAnswers: 0,
+              totalTimeSpent: 0,
+              currentStreak: 0,
+              longestStreak: 0,
+              lastStudyDate: today,
+            },
             subjectMastery: [],
             topicMastery: [],
-            achievements: [],
-            goals: [],
             recentActivity: [],
           }, 200, origin)
         }

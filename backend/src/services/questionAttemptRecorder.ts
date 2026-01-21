@@ -584,7 +584,7 @@ export async function getRecentActivityByUser(
 }
 
 /**
- * 获取用户学习档案总体统计
+ * 获取用户学习档案总体统计（从 question_attempts）
  */
 export async function getLearningProfileStats(
   db: D1Database,
@@ -631,5 +631,225 @@ export async function getLearningProfileStats(
     totalTimeSpent: result?.total_time_spent || 0,
     uniqueSubjects: result?.unique_subjects || 0,
     uniqueTopics: result?.unique_topics || 0,
+  };
+}
+
+// ===== 学习档案完整响应（对齐前端）=====
+
+export interface LearningProfileOverview {
+  totalQuizzes: number;
+  totalQuestions: number;
+  correctAnswers: number;
+  totalTimeSpent: number;
+  currentStreak: number;
+  longestStreak: number;
+  lastStudyDate: string;
+}
+
+export interface SubjectMasteryItem {
+  subjectId: string;
+  subjectName: string;
+  totalQuestions: number;
+  correctAnswers: number;
+  accuracy: number;
+  recentTrend: 'up' | 'down' | 'stable';
+  lastPracticed: string;
+}
+
+export interface TopicMasteryItem {
+  topic: string;
+  subject: string;
+  mastery: number;
+  questionsAttempted: number;
+  lastAttempted: string;
+}
+
+export interface RecentActivityItem {
+  date: string;
+  quizCount: number;
+  questionsAnswered: number;
+  accuracy: number;
+}
+
+export interface LearningProfileResponse {
+  overview: LearningProfileOverview;
+  subjectMastery: SubjectMasteryItem[];
+  topicMastery: TopicMasteryItem[];
+  recentActivity: RecentActivityItem[];
+}
+
+/**
+ * 获取完整学习档案（对齐前端结构）
+ * 
+ * 数据来源：
+ * - overview: learning_events（总体统计 + streak）
+ * - recentActivity: learning_events（每日活动）
+ * - subjectMastery: question_attempts（科目掌握度）
+ * - topicMastery: question_attempts（知识点掌握度）
+ */
+export async function getLearningProfile(
+  db: D1Database,
+  userId: string
+): Promise<LearningProfileResponse> {
+  const today = new Date().toISOString().split('T')[0];
+
+  // 1️⃣ 从 learning_events 获取概览数据
+  const overviewQuery = `
+    SELECT 
+      COUNT(*) as total_quizzes,
+      COALESCE(SUM(question_count), 0) as total_questions,
+      COALESCE(SUM(correct_count), 0) as correct_answers,
+      COALESCE(SUM(duration_seconds), 0) as total_time_spent,
+      MAX(DATE(created_at)) as last_study_date
+    FROM learning_events
+    WHERE user_id = ? AND event_type = 'QUIZ'
+  `;
+  
+  const overviewResult = await db.prepare(overviewQuery)
+    .bind(userId)
+    .first<{
+      total_quizzes: number;
+      total_questions: number;
+      correct_answers: number;
+      total_time_spent: number;
+      last_study_date: string | null;
+    }>();
+
+  // 2️⃣ 从 learning_events 计算 streak
+  const streakQuery = `
+    SELECT DISTINCT DATE(created_at) as study_date
+    FROM learning_events
+    WHERE user_id = ? AND event_type = 'QUIZ'
+    ORDER BY study_date DESC
+    LIMIT 60
+  `;
+  
+  const streakDays = await db.prepare(streakQuery)
+    .bind(userId)
+    .all<{ study_date: string }>();
+
+  let currentStreak = 0;
+  let longestStreak = 0;
+  let tempStreak = 0;
+  let lastDate: Date | null = null;
+  const todayDate = new Date(today);
+  const yesterday = new Date(todayDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (streakDays.results && streakDays.results.length > 0) {
+    for (const row of streakDays.results) {
+      const dateStr = row.study_date;
+      const currentDate = new Date(dateStr);
+      
+      if (lastDate === null) {
+        tempStreak = 1;
+        // 检查是否是今天或昨天
+        const diffDays = Math.floor((todayDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 1) {
+          currentStreak = 1;
+        }
+      } else {
+        const diffDays = Math.floor((lastDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 1) {
+          tempStreak++;
+          if (currentStreak > 0) {
+            currentStreak = tempStreak;
+          }
+        } else {
+          tempStreak = 1;
+        }
+      }
+      
+      longestStreak = Math.max(longestStreak, tempStreak);
+      lastDate = currentDate;
+    }
+  }
+
+  // 3️⃣ 从 learning_events 获取最近活动
+  const recentActivityQuery = `
+    SELECT 
+      DATE(created_at) as date,
+      COUNT(*) as quiz_count,
+      SUM(question_count) as questions_answered,
+      CASE 
+        WHEN SUM(question_count) > 0 
+        THEN ROUND(SUM(correct_count) * 100.0 / SUM(question_count), 1)
+        ELSE 0 
+      END as accuracy
+    FROM learning_events
+    WHERE user_id = ? 
+      AND event_type = 'QUIZ'
+      AND created_at >= datetime('now', '-7 days')
+    GROUP BY DATE(created_at)
+    ORDER BY date DESC
+  `;
+  
+  const recentActivityResults = await db.prepare(recentActivityQuery)
+    .bind(userId)
+    .all<{
+      date: string;
+      quiz_count: number;
+      questions_answered: number;
+      accuracy: number;
+    }>();
+
+  // 4️⃣ 从 question_attempts 获取科目掌握度
+  const subjectMasteryData = await getSubjectMasteryByUser(db, userId);
+  
+  const subjectNameMap: Record<string, string> = {
+    math: '数学',
+    physics: '物理',
+    chemistry: '化学',
+    biology: '生物',
+    english: '英国语文',
+    chinese: '中国语文',
+    liberal: '公民与社会发展',
+    economics: '经济',
+    bafs: '企业、会计与财务概论',
+    geography: '地理',
+    history: '历史',
+    ict: '资讯及通讯科技',
+  };
+
+  const subjectMastery: SubjectMasteryItem[] = subjectMasteryData.map(s => ({
+    subjectId: s.subject,
+    subjectName: subjectNameMap[s.subject] || s.subject,
+    totalQuestions: s.totalQuestions,
+    correctAnswers: s.correctCount,
+    accuracy: Math.round(s.accuracy * 1000) / 10, // 保留一位小数
+    recentTrend: s.recentTrend,
+    lastPracticed: s.lastPracticed,
+  }));
+
+  // 5️⃣ 从 question_attempts 获取知识点掌握度
+  const topicMasteryData = await getTopicMasteryByUser(db, userId, { limit: 15 });
+  
+  const topicMastery: TopicMasteryItem[] = topicMasteryData.map(t => ({
+    topic: t.topic,
+    subject: t.subject,
+    mastery: t.mastery,
+    questionsAttempted: t.totalQuestions,
+    lastAttempted: t.lastAttempted,
+  }));
+
+  // 6️⃣ 组装返回结构
+  return {
+    overview: {
+      totalQuizzes: overviewResult?.total_quizzes || 0,
+      totalQuestions: overviewResult?.total_questions || 0,
+      correctAnswers: overviewResult?.correct_answers || 0,
+      totalTimeSpent: Math.round((overviewResult?.total_time_spent || 0) / 60), // 秒转分钟
+      currentStreak,
+      longestStreak,
+      lastStudyDate: overviewResult?.last_study_date || today,
+    },
+    subjectMastery,
+    topicMastery,
+    recentActivity: (recentActivityResults.results || []).map(row => ({
+      date: row.date,
+      quizCount: row.quiz_count,
+      questionsAnswered: row.questions_answered,
+      accuracy: row.accuracy,
+    })),
   };
 }
