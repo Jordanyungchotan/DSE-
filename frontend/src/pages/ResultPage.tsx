@@ -301,7 +301,7 @@ const ResultPage = () => {
     name: school.schoolName,
     probability: school.feasibilityLevel 
       ? levelToScore(school.feasibilityLevel)
-      : (school.admissionProbability || 50),
+      : ((school as { admissionProbability?: number }).admissionProbability || 50),
     level: school.feasibilityLevel || 'C',
   }))
 

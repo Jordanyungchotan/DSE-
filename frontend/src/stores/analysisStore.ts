@@ -2,9 +2,55 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { apiFetch } from '../config/api'
 import { useAuthStore } from './authStore'
+import type { LearningStatus, RankPosition, ScoreSource } from '@/shared/domain'
 
 /**
- * 科目成绩接口
+ * 插班科目学习状态（核心输入结构）
+ * 
+ * 设计说明：
+ * - status: 系统分析的唯一判断依据
+ * - rankPosition: 可选辅助信息
+ * - schoolScore: 仅供顾问参考，不参与系统分析
+ */
+export interface TransferSubjectInput {
+  /** 科目 Key */
+  subject: string
+
+  /** 
+   * 学习状态（系统分析主判断）
+   * - strong: 明显跟得上 / 有优势
+   * - ok: 勉强跟得上
+   * - weak: 明显吃力
+   */
+  status: LearningStatus
+
+  /**
+   * 校内相对位置（可选辅助信息）
+   * - top: 前 25%
+   * - mid: 中间 50%
+   * - bottom: 后 25%
+   */
+  rankPosition?: RankPosition
+
+  // ===== 以下为顾问参考字段，不参与系统分析 =====
+
+  /**
+   * 校内成绩（0-100）
+   * ⚠️ 仅供顾问/老师参考，不得用于系统分析或风险判断
+   */
+  schoolScore?: number
+
+  /**
+   * 成绩来源
+   * - latest: 最近一次
+   * - average: 学期平均
+   */
+  scoreSource?: ScoreSource
+}
+
+/**
+ * 科目成绩接口（旧版，仅用于大学申请分析）
+ * @deprecated 插班分析请使用 TransferSubjectInput
  */
 export interface SubjectScore {
   subject: string      // 科目名称
@@ -21,7 +67,19 @@ export interface StudentInfo {
   grade: string               // 年级（中一至中六）
   age: number                 // 年龄
   currentSchool: string       // 当前学校
-  subjects: SubjectScore[]    // 科目成绩列表
+  
+  /**
+   * 科目学习状态（插班分析专用）
+   * 系统分析仅使用 status 字段
+   */
+  subjectStatuses: TransferSubjectInput[]
+  
+  /**
+   * @deprecated 请使用 subjectStatuses
+   * 仅保留用于兼容旧数据
+   */
+  subjects?: SubjectScore[]
+  
   targetSchools: string[]     // 目标学校
   notes: string               // 备注
   // 个人特质信息
@@ -179,7 +237,8 @@ const defaultFormData: StudentInfo = {
   grade: '',
   age: 16,
   currentSchool: '',
-  subjects: [],
+  subjectStatuses: [],
+  subjects: [], // 保留兼容
   targetSchools: [],
   notes: '',
 }
@@ -382,4 +441,3 @@ export const useAnalysisStore = create<AnalysisState>()(
     }
   )
 )
-

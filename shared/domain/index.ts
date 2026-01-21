@@ -6,3 +6,4 @@ export * from "./grades";
 export * from "./gradeLevels";
 export * from "./reportReasons";
 export * from "./points";
+export * from "./learningStatus";

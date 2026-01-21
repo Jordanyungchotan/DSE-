@@ -18,6 +18,7 @@ import {
   hasPassFailGrading,
   getSubjectDisplayName,
   LanguageCode,
+  SubjectGrade,
 } from '@/shared/domain'
 import { AnalysisInputError, validateSubjectGrades, validateElectives, SubjectGradeInput } from './validators/analysisInput.validator.js'
 import { analyzeSubjectGrade, analyzeElectiveCombination, SubjectGradeInput as AnalysisGradeInput } from './analysis/analyzeByRules.js'

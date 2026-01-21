@@ -20,6 +20,7 @@ import {
   Progress,
   Spin,
   Empty,
+  Tooltip,
 } from 'antd'
 import {
   CalendarOutlined,
@@ -36,18 +37,20 @@ import {
   RobotOutlined,
   SearchOutlined,
   EnvironmentOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { useAnalysisStore, SubjectScore } from '../stores/analysisStore'
+import { useAnalysisStore, TransferSubjectInput } from '../stores/analysisStore'
 import {
   CORE_SUBJECTS,
   ELECTIVE_SUBJECTS,
-  DSE_GRADE_OPTIONS,
   GRADE_LEVEL_SELECT_OPTIONS,
   isCoreSubject,
-  hasPassFailGrading,
   getSubjectDisplayName,
-  getCivicsOptions,
+  LEARNING_STATUS_OPTIONS,
+  RANK_POSITION_OPTIONS,
+  SCORE_SOURCE_OPTIONS,
+  LearningStatus,
 } from '@/shared/domain'
 import { useLanguageStore } from '../stores/languageStore'
 import {
@@ -62,15 +65,6 @@ import styles from './AnalysisFormPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
 const { TextArea } = Input
-
-/**
- * DSE成绩等级
- */
-const DSE_GRADE_SELECT_OPTIONS = DSE_GRADE_OPTIONS.map((grade) => ({
-  value: grade,
-  label: grade,
-}))
-
 
 /**
  * 根据日期计算对应的学期
@@ -131,7 +125,7 @@ const SEMESTER_OPTIONS = generateSemesterOptions()
 const ANALYSIS_STAGES = [
   { progress: 10, text: '正在连接AI分析服务...' },
   { progress: 25, text: '正在解析学生信息...' },
-  { progress: 40, text: '正在分析各科目成绩...' },
+  { progress: 40, text: '正在分析各科目学习状态...' },
   { progress: 55, text: '正在评估目标学校录取概率...' },
   { progress: 70, text: '正在生成学习计划建议...' },
   { progress: 85, text: '正在整理分析报告...' },
@@ -144,15 +138,19 @@ const ANALYSIS_STAGES = [
 const AnalysisFormPage = () => {
   const navigate = useNavigate()
   const [form] = Form.useForm()
-  const { t } = useLanguageStore()
+  const { t, currentLanguage } = useLanguageStore()
+  const currentLang = currentLanguage
   const [showSelector, setShowSelector] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
-  const [subjects, setSubjects] = useState<SubjectScore[]>([
-    { subject: CORE_SUBJECTS[0].key, currentScore: '', targetScore: '' },
-    { subject: CORE_SUBJECTS[1].key, currentScore: '', targetScore: '' },
-    { subject: CORE_SUBJECTS[2].key, currentScore: '', targetScore: '' },
-    { subject: CORE_SUBJECTS[3].key, currentScore: '', targetScore: '' },
+  
+  // 使用新的学习状态输入模型
+  const [subjectStatuses, setSubjectStatuses] = useState<TransferSubjectInput[]>([
+    { subject: CORE_SUBJECTS[0].key, status: 'ok' as LearningStatus },
+    { subject: CORE_SUBJECTS[1].key, status: 'ok' as LearningStatus },
+    { subject: CORE_SUBJECTS[2].key, status: 'ok' as LearningStatus },
+    { subject: CORE_SUBJECTS[3].key, status: 'ok' as LearningStatus },
   ])
+  
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
   const { updateFormData, submitAnalysis, loading } = useAnalysisStore()
 
@@ -292,7 +290,7 @@ const AnalysisFormPage = () => {
             </div>
             <div className={styles.selectorFeatures}>
               <span className={styles.featureTag}>智能学校推荐</span>
-              <span className={styles.featureTag}>科目分析</span>
+              <span className={styles.featureTag}>学习状态分析</span>
               <span className={styles.featureTag}>学习计划</span>
             </div>
           </Card>
@@ -340,9 +338,9 @@ const AnalysisFormPage = () => {
       description: '填写基本信息',
     },
     {
-      title: '科目成绩',
+      title: '学习状态',
       icon: <BookOutlined />,
-      description: '录入各科成绩',
+      description: '评估各科学习情况',
     },
     {
       title: '目标学校',
@@ -355,9 +353,9 @@ const AnalysisFormPage = () => {
    * 添加科目
    */
   const handleAddSubject = () => {
-    setSubjects([
-      ...subjects,
-      { subject: '', currentScore: '', targetScore: '' },
+    setSubjectStatuses([
+      ...subjectStatuses,
+      { subject: '', status: 'ok' as LearningStatus },
     ])
   }
 
@@ -365,29 +363,36 @@ const AnalysisFormPage = () => {
    * 删除科目（不能删除核心科目）
    */
   const handleRemoveSubject = (index: number) => {
-    const subjectToRemove = subjects[index]
+    const subjectToRemove = subjectStatuses[index]
     // 核心科目不能删除
     if (isCoreSubject(subjectToRemove.subject)) {
       return
     }
-    setSubjects(subjects.filter((_, i) => i !== index))
+    setSubjectStatuses(subjectStatuses.filter((_, i) => i !== index))
   }
 
   /**
-   * 更新科目信息
+   * 更新科目学习状态
    */
-  const handleSubjectChange = (
+  const handleSubjectStatusChange = (
     index: number,
-    field: keyof SubjectScore,
-    value: string
+    field: keyof TransferSubjectInput,
+    value: string | number | undefined
   ) => {
-    const newSubjects = [...subjects]
+    const newStatuses = [...subjectStatuses]
     if (field === 'subject') {
-      newSubjects[index] = { subject: value, currentScore: '', targetScore: '' }
+      // 切换科目时清空其他输入
+      newStatuses[index] = { 
+        subject: value as string, 
+        status: 'ok' as LearningStatus 
+      }
     } else {
-      newSubjects[index] = { ...newSubjects[index], [field]: value }
+      newStatuses[index] = { 
+        ...newStatuses[index], 
+        [field]: value 
+      }
     }
-    setSubjects(newSubjects)
+    setSubjectStatuses(newStatuses)
   }
 
   /**
@@ -401,16 +406,16 @@ const AnalysisFormPage = () => {
       } else if (currentStep === 1) {
         await form.validateFields(['grade', 'age'])
       } else if (currentStep === 2) {
-        if (subjects.length === 0) {
+        if (subjectStatuses.length === 0) {
           message.warning('请至少添加一个科目')
           return
         }
-        // 验证所有科目都已填写
-        const incomplete = subjects.some(
-          (s) => !s.subject || !s.currentScore || !s.targetScore
+        // 验证所有科目都已填写学习状态
+        const incomplete = subjectStatuses.some(
+          (s) => !s.subject || !s.status
         )
         if (incomplete) {
-          message.warning('请完整填写所有科目信息')
+          message.warning('请完整填写所有科目的学习状态')
           return
         }
       }
@@ -440,14 +445,14 @@ const AnalysisFormPage = () => {
 
       const values = await form.validateFields()
       
-      // 构建完整的表单数据
+      // 构建完整的表单数据（使用新的学习状态模型）
       const formData = {
         enrollmentDate: values.enrollmentDate?.format('YYYY-MM-DD') || '',
         semester: values.semester,
         grade: values.grade,
         age: values.age,
         currentSchool: values.currentSchool || '',
-        subjects: subjects,
+        subjectStatuses: subjectStatuses,
         targetSchools: selectedSchools,
         notes: values.notes || '',
         // 个人特质信息
@@ -689,35 +694,44 @@ const AnalysisFormPage = () => {
     </div>
   )
 
-  // 获取当前语言
-  const { currentLanguage } = useLanguageStore()
-  const currentLang = currentLanguage
-
   // 获取科目显示名称
   const getSubjectLabel = (subjectKey: string) => getSubjectDisplayName(subjectKey, currentLang)
 
-  const isPassFailSubject = (subjectKey: string) =>
-    hasPassFailGrading(subjectKey)
-
   // 获取可选的选修科目（排除已选的）
   const getAvailableElectives = () => {
-    const selectedSubjectKeys = subjects.map(s => s.subject)
+    const selectedSubjectKeys = subjectStatuses.map(s => s.subject)
     return ELECTIVE_SUBJECTS.filter((subject) => !selectedSubjectKeys.includes(subject.key))
   }
 
   /**
-   * 渲染步骤3 - 科目成绩
+   * 渲染步骤3 - 学习状态（核心改动）
+   * 
+   * ⚠️ 重要设计原则：
+   * - 系统判断仅基于"学习状态"（status），不使用任何等级分数
+   * - 校内成绩仅供顾问参考，不参与系统分析
+   * - 中一至中五学生无需了解 DSE 等级概念
    */
   const renderStep3 = () => (
     <div className={styles.stepContent}>
-      <Title level={4}>科目成绩录入</Title>
+      <Title level={4}>科目学习状态评估</Title>
       <Paragraph type="secondary">
-        核心科目（中文、英文、数学、公民与社会发展）为必填项，可添加其他选修科目
+        请根据学生在各科目的实际学习情况进行评估，系统将据此分析插班可行性
       </Paragraph>
 
+      {/* 说明提示 */}
+      <Card size="small" style={{ marginBottom: 20, background: '#f6ffed', border: '1px solid #b7eb8f' }}>
+        <Space>
+          <InfoCircleOutlined style={{ color: '#52c41a' }} />
+          <Text>
+            <strong>填写说明：</strong>
+            「学习状态」为系统分析依据，「校内成绩」仅供顾问参考，不影响分析结果
+          </Text>
+        </Space>
+      </Card>
+
       <div className={styles.subjectsContainer}>
-        {subjects.map((subject, index) => {
-          const isCore = isCoreSubject(subject.subject)
+        {subjectStatuses.map((subjectStatus, index) => {
+          const isCore = isCoreSubject(subjectStatus.subject)
           
           return (
             <Card
@@ -740,18 +754,19 @@ const AnalysisFormPage = () => {
                 )
               }
             >
-              <Row gutter={16}>
-                <Col xs={24} sm={8}>
-                  <Form.Item label="科目" required>
+              <Row gutter={[16, 16]}>
+                {/* 科目选择 */}
+                <Col xs={24} sm={6}>
+                  <Form.Item label="科目" required style={{ marginBottom: 0 }}>
                     {isCore ? (
                       <Select
-                        value={subject.subject}
+                        value={subjectStatus.subject}
                         disabled
                         options={[{
-                          value: subject.subject,
+                          value: subjectStatus.subject,
                           label: (
                             <span>
-                              {getSubjectLabel(subject.subject)}
+                              {getSubjectLabel(subjectStatus.subject)}
                               <Tag color="blue" style={{ marginLeft: 8 }}>核心</Tag>
                             </span>
                           ),
@@ -760,12 +775,12 @@ const AnalysisFormPage = () => {
                     ) : (
                       <Select
                         placeholder="选择科目"
-                        value={subject.subject || undefined}
-                        onChange={(value) => handleSubjectChange(index, 'subject', value)}
+                        value={subjectStatus.subject || undefined}
+                        onChange={(value) => handleSubjectStatusChange(index, 'subject', value)}
                         options={[
-                          ...(subject.subject ? [{
-                            value: subject.subject,
-                            label: getSubjectLabel(subject.subject)
+                          ...(subjectStatus.subject ? [{
+                            value: subjectStatus.subject,
+                            label: getSubjectLabel(subjectStatus.subject)
                           }] : []),
                           ...getAvailableElectives().map((subjectDef) => ({
                             value: subjectDef.key,
@@ -776,42 +791,89 @@ const AnalysisFormPage = () => {
                     )}
                   </Form.Item>
                 </Col>
-                <Col xs={12} sm={8}>
-                  <Form.Item label="当前成绩" required>
-                    {isPassFailSubject(subject.subject) ? (
-                      <Select
-                        placeholder="选择成绩"
-                        value={subject.currentScore || undefined}
-                        onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
-                        options={getCivicsOptions(currentLang)}
-                      />
-                    ) : (
-                      <Select
-                        placeholder="选择成绩"
-                        value={subject.currentScore || undefined}
-                        onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
-                        options={DSE_GRADE_SELECT_OPTIONS}
-                      />
-                    )}
+
+                {/* 学习状态（必填，系统分析主判断） */}
+                <Col xs={24} sm={6}>
+                  <Form.Item 
+                    label={
+                      <Space>
+                        <span>学习状态</span>
+                        <Tooltip title="系统将根据此项进行插班可行性分析">
+                          <InfoCircleOutlined style={{ color: '#1890ff' }} />
+                        </Tooltip>
+                      </Space>
+                    }
+                    required 
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      placeholder="选择学习状态"
+                      value={subjectStatus.status || undefined}
+                      onChange={(value) => handleSubjectStatusChange(index, 'status', value)}
+                      options={LEARNING_STATUS_OPTIONS.map(opt => ({
+                        value: opt.value,
+                        label: opt.label[currentLang],
+                      }))}
+                    />
                   </Form.Item>
                 </Col>
-                <Col xs={12} sm={8}>
-                  <Form.Item label="目标成绩" required>
-                    {isPassFailSubject(subject.subject) ? (
-                      <Select
-                        placeholder="选择目标"
-                        value={subject.targetScore || undefined}
-                        onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
-                        options={getCivicsOptions(currentLang)}
-                      />
-                    ) : (
-                      <Select
-                        placeholder="选择目标"
-                        value={subject.targetScore || undefined}
-                        onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
-                        options={DSE_GRADE_SELECT_OPTIONS}
-                      />
-                    )}
+
+                {/* 校内位置（可选） */}
+                <Col xs={12} sm={6}>
+                  <Form.Item 
+                    label="校内位置" 
+                    tooltip="班级/年级相对排名"
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Select
+                      placeholder="选填"
+                      value={subjectStatus.rankPosition || undefined}
+                      onChange={(value) => handleSubjectStatusChange(index, 'rankPosition', value)}
+                      allowClear
+                      options={RANK_POSITION_OPTIONS.map(opt => ({
+                        value: opt.value,
+                        label: opt.label[currentLang],
+                      }))}
+                    />
+                  </Form.Item>
+                </Col>
+
+                {/* 校内成绩（可选，仅供参考） */}
+                <Col xs={12} sm={6}>
+                  <Form.Item 
+                    label={
+                      <Space>
+                        <span>校内成绩</span>
+                        <Tooltip title="仅供老师参考，不直接用于系统分析">
+                          <InfoCircleOutlined style={{ color: '#faad14' }} />
+                        </Tooltip>
+                      </Space>
+                    }
+                    style={{ marginBottom: 0 }}
+                  >
+                    <InputNumber
+                      placeholder="0-100"
+                      value={subjectStatus.schoolScore}
+                      onChange={(value) => handleSubjectStatusChange(index, 'schoolScore', value ?? undefined)}
+                      min={0}
+                      max={100}
+                      style={{ width: '100%' }}
+                      addonAfter={
+                        <Select
+                          value={subjectStatus.scoreSource || 'latest'}
+                          onChange={(value) => handleSubjectStatusChange(index, 'scoreSource', value)}
+                          style={{ width: 80 }}
+                          bordered={false}
+                          size="small"
+                        >
+                          {SCORE_SOURCE_OPTIONS.map(opt => (
+                            <Select.Option key={opt.value} value={opt.value}>
+                              {opt.label[currentLang]}
+                            </Select.Option>
+                          ))}
+                        </Select>
+                      }
+                    />
                   </Form.Item>
                 </Col>
               </Row>
@@ -1192,7 +1254,7 @@ const AnalysisFormPage = () => {
           
           <div className={styles.analysisTips}>
             <Text type="secondary" style={{ fontSize: 12 }}>
-              💡 提示：AI正在综合分析您的成绩、目标学校录取标准等多维度数据
+              💡 提示：AI正在综合分析学生的学习状态、目标学校要求等多维度数据
             </Text>
           </div>
         </div>
@@ -1202,4 +1264,3 @@ const AnalysisFormPage = () => {
 }
 
 export default AnalysisFormPage
-

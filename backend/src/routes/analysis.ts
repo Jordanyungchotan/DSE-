@@ -410,7 +410,9 @@ analysisRouter.get('/feasibility/:id', async (req, res, next) => {
       student_info: string
       result: string
       created_at: string
-    } | undefined    if (!record) {
+    } | undefined
+
+    if (!record) {
       throw new ApiError('评估记录不存在', 404)
     }
 
