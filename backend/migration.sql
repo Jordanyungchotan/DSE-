@@ -533,3 +533,23 @@ CREATE INDEX IF NOT EXISTS idx_question_attempts_correct ON question_attempts(is
 CREATE INDEX IF NOT EXISTS idx_question_attempts_created ON question_attempts(created_at);
 CREATE INDEX IF NOT EXISTS idx_question_attempts_user_subject ON question_attempts(user_id, subject);
 CREATE INDEX IF NOT EXISTS idx_question_attempts_user_date ON question_attempts(user_id, DATE(created_at));
+
+-- =====================
+-- 错题状态表（用户主动标记）
+-- =====================
+-- 规则：
+-- 1. 用户可以标记错题为 UNREVIEWED / REVIEWED / MASTERED
+-- 2. 默认状态为 UNREVIEWED
+-- 3. 只有用户主动操作才会更新状态
+
+CREATE TABLE IF NOT EXISTS wrong_question_status (
+  user_id TEXT NOT NULL,
+  question_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'UNREVIEWED',  -- UNREVIEWED | REVIEWED | MASTERED
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, question_id)
+);
+
+-- 错题状态表索引
+CREATE INDEX IF NOT EXISTS idx_wrong_question_status_user ON wrong_question_status(user_id);
+CREATE INDEX IF NOT EXISTS idx_wrong_question_status_status ON wrong_question_status(status);

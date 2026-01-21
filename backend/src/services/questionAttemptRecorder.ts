@@ -128,11 +128,45 @@ export async function recordQuestionAttemptsBatch(
   };
 }
 
+// ===== 错题状态类型 =====
+
+export type WrongQuestionStatus = 'UNREVIEWED' | 'REVIEWED' | 'MASTERED';
+
+export interface WrongQuestionItem {
+  id: string;
+  questionText: string;
+  questionType: string;
+  subject: string;
+  topic: string;
+  userAnswer: string;
+  correctAnswer: string;
+  explanation: string;
+  wrongCount: number;
+  status: WrongQuestionStatus;
+  firstAttemptDate: string;
+  lastAttemptDate: string;
+}
+
+export interface WrongQuestionsResponse {
+  stats: {
+    total: number;
+    unreviewed: number;
+    reviewed: number;
+    mastered: number;
+  };
+  items: WrongQuestionItem[];
+}
+
 // ===== 查询函数（用于错题本 & 学习档案）=====
 
 /**
  * 获取用户错题列表（从原始事实聚合）
- * 【关键】数据来源于 question_attempts，而非 wrong_questions 表
+ * 
+ * 【数据来源】
+ * - question_attempts: 题目作答事实
+ * - wrong_question_status: 用户标记的状态
+ * 
+ * 【返回结构完全对齐前端】
  */
 export async function getWrongQuestionsByUser(
   db: D1Database,
@@ -140,56 +174,47 @@ export async function getWrongQuestionsByUser(
   options?: {
     subject?: string;
     topic?: string;
+    status?: WrongQuestionStatus;
     limit?: number;
     offset?: number;
   }
-): Promise<{
-  questions: Array<{
-    questionId: string;
-    questionText: string;
-    questionType: string;
-    subject: string;
-    topic: string;
-    correctAnswer: string;
-    explanation: string;
-    wrongCount: number;
-    lastWrongAnswer: string;
-    firstAttemptDate: string;
-    lastAttemptDate: string;
-  }>;
-  total: number;
-}> {
-  const { subject, topic, limit = 50, offset = 0 } = options || {};
+): Promise<WrongQuestionsResponse> {
+  const { subject, topic, status, limit = 100, offset = 0 } = options || {};
   
-  let whereClause = 'WHERE user_id = ? AND is_correct = 0';
+  // 构建筛选条件
+  let whereClause = 'WHERE qa.user_id = ? AND qa.is_correct = 0';
   const params: any[] = [userId];
   
   if (subject) {
-    whereClause += ' AND subject = ?';
+    whereClause += ' AND qa.subject = ?';
     params.push(subject);
   }
   if (topic) {
-    whereClause += ' AND topic = ?';
+    whereClause += ' AND qa.topic = ?';
     params.push(topic);
   }
 
-  // 聚合查询：统计每道题的错误次数和最近错误信息
+  // 聚合查询：从 question_attempts 聚合 + 从 wrong_question_status 获取状态
   const query = `
     SELECT 
-      question_id,
-      MAX(question_text) as question_text,
-      MAX(question_type) as question_type,
-      MAX(subject) as subject,
-      MAX(topic) as topic,
-      MAX(correct_answer) as correct_answer,
-      MAX(explanation) as explanation,
+      qa.question_id,
+      MAX(qa.question_text) as question_text,
+      MAX(qa.question_type) as question_type,
+      MAX(qa.subject) as subject,
+      MAX(qa.topic) as topic,
+      MAX(qa.selected_answer) as user_answer,
+      MAX(qa.correct_answer) as correct_answer,
+      MAX(qa.explanation) as explanation,
       COUNT(*) as wrong_count,
-      MAX(selected_answer) as last_wrong_answer,
-      MIN(created_at) as first_attempt_date,
-      MAX(created_at) as last_attempt_date
-    FROM question_attempts
+      MIN(qa.created_at) as first_attempt_date,
+      MAX(qa.created_at) as last_attempt_date,
+      COALESCE(wqs.status, 'UNREVIEWED') as status
+    FROM question_attempts qa
+    LEFT JOIN wrong_question_status wqs 
+      ON wqs.user_id = qa.user_id AND wqs.question_id = qa.question_id
     ${whereClause}
-    GROUP BY question_id
+    GROUP BY qa.question_id
+    ${status ? `HAVING COALESCE(wqs.status, 'UNREVIEWED') = '${status}'` : ''}
     ORDER BY last_attempt_date DESC
     LIMIT ? OFFSET ?
   `;
@@ -202,40 +227,131 @@ export async function getWrongQuestionsByUser(
       question_type: string;
       subject: string;
       topic: string;
+      user_answer: string;
       correct_answer: string;
       explanation: string;
       wrong_count: number;
-      last_wrong_answer: string;
       first_attempt_date: string;
       last_attempt_date: string;
+      status: string;
     }>();
 
-  // 获取总数
-  const countQuery = `
-    SELECT COUNT(DISTINCT question_id) as total
-    FROM question_attempts
-    ${whereClause}
+  // 获取统计数据（不受 status 筛选影响）
+  const statsQuery = `
+    SELECT 
+      COUNT(DISTINCT qa.question_id) as total,
+      COUNT(DISTINCT CASE WHEN COALESCE(wqs.status, 'UNREVIEWED') = 'UNREVIEWED' THEN qa.question_id END) as unreviewed,
+      COUNT(DISTINCT CASE WHEN wqs.status = 'REVIEWED' THEN qa.question_id END) as reviewed,
+      COUNT(DISTINCT CASE WHEN wqs.status = 'MASTERED' THEN qa.question_id END) as mastered
+    FROM question_attempts qa
+    LEFT JOIN wrong_question_status wqs 
+      ON wqs.user_id = qa.user_id AND wqs.question_id = qa.question_id
+    WHERE qa.user_id = ? AND qa.is_correct = 0
+    ${subject ? `AND qa.subject = '${subject}'` : ''}
+    ${topic ? `AND qa.topic = '${topic}'` : ''}
   `;
-  const countResult = await db.prepare(countQuery)
-    .bind(...params)
-    .first<{ total: number }>();
+  
+  const statsResult = await db.prepare(statsQuery)
+    .bind(userId)
+    .first<{
+      total: number;
+      unreviewed: number;
+      reviewed: number;
+      mastered: number;
+    }>();
 
   return {
-    questions: (results.results || []).map(row => ({
-      questionId: row.question_id,
-      questionText: row.question_text,
-      questionType: row.question_type,
-      subject: row.subject,
-      topic: row.topic,
-      correctAnswer: row.correct_answer,
-      explanation: row.explanation,
+    stats: {
+      total: statsResult?.total || 0,
+      unreviewed: statsResult?.unreviewed || 0,
+      reviewed: statsResult?.reviewed || 0,
+      mastered: statsResult?.mastered || 0,
+    },
+    items: (results.results || []).map(row => ({
+      id: row.question_id,
+      questionText: row.question_text || '',
+      questionType: row.question_type || 'multiple_choice',
+      subject: row.subject || '',
+      topic: row.topic || '',
+      userAnswer: row.user_answer || '',
+      correctAnswer: row.correct_answer || '',
+      explanation: row.explanation || '',
       wrongCount: row.wrong_count,
-      lastWrongAnswer: row.last_wrong_answer,
+      status: (row.status as WrongQuestionStatus) || 'UNREVIEWED',
       firstAttemptDate: row.first_attempt_date,
       lastAttemptDate: row.last_attempt_date,
     })),
-    total: countResult?.total || 0,
   };
+}
+
+/**
+ * 更新错题状态（用户主动标记）
+ */
+export async function updateWrongQuestionStatus(
+  db: D1Database,
+  userId: string,
+  questionId: string,
+  status: WrongQuestionStatus
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const now = new Date().toISOString();
+    
+    await db.prepare(`
+      INSERT INTO wrong_question_status (user_id, question_id, status, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, question_id) DO UPDATE SET
+        status = excluded.status,
+        updated_at = excluded.updated_at
+    `).bind(userId, questionId, status, now).run();
+
+    return { success: true };
+  } catch (error) {
+    console.error('Update wrong question status error:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    };
+  }
+}
+
+/**
+ * 批量更新错题状态
+ */
+export async function updateWrongQuestionStatusBatch(
+  db: D1Database,
+  userId: string,
+  questionIds: string[],
+  status: WrongQuestionStatus
+): Promise<{ success: boolean; count: number }> {
+  let count = 0;
+  
+  for (const questionId of questionIds) {
+    const result = await updateWrongQuestionStatus(db, userId, questionId, status);
+    if (result.success) count++;
+  }
+  
+  return { success: count === questionIds.length, count };
+}
+
+/**
+ * 删除错题状态（用于重置）
+ */
+export async function deleteWrongQuestionStatus(
+  db: D1Database,
+  userId: string,
+  questionId: string
+): Promise<{ success: boolean }> {
+  try {
+    await db.prepare(`
+      DELETE FROM wrong_question_status
+      WHERE user_id = ? AND question_id = ?
+    `).bind(userId, questionId).run();
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Delete wrong question status error:', error);
+    return { success: false };
+  }
 }
 
 /**

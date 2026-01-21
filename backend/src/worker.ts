@@ -76,10 +76,13 @@ import {
 import {
   recordQuestionAttemptsBatch,
   getWrongQuestionsByUser,
+  updateWrongQuestionStatus,
+  deleteWrongQuestionStatus,
   getSubjectMasteryByUser,
   getTopicMasteryByUser,
   getRecentActivityByUser,
   getLearningProfileStats,
+  WrongQuestionStatus,
 } from './services/questionAttemptRecorder.js'
 
 export interface Env {
@@ -5759,54 +5762,47 @@ export default {
       }
 
       // 获取错题列表
-      // 【关键】数据来源于 question_attempts 事实表（聚合后的错题）
+      // 【关键】前端只"拿数据"，不"算数据"
+      // 数据来源：question_attempts + wrong_question_status
       if (path === '/api/quiz/wrong-questions' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
-          return jsonResponse({ questions: [] }, 200, origin)
+          return jsonResponse({ 
+            stats: { total: 0, unreviewed: 0, reviewed: 0, mastered: 0 },
+            items: [] 
+          }, 200, origin)
         }
 
         const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
         if (!tokenData) {
-          return jsonResponse({ questions: [] }, 200, origin)
+          return jsonResponse({ 
+            stats: { total: 0, unreviewed: 0, reviewed: 0, mastered: 0 },
+            items: [] 
+          }, 200, origin)
         }
 
         try {
           const url = new URL(request.url)
           const subject = url.searchParams.get('subject') || undefined
           const topic = url.searchParams.get('topic') || undefined
+          const status = url.searchParams.get('status') as WrongQuestionStatus | undefined
           
-          // 从 question_attempts 事实表聚合错题数据
+          // 从 question_attempts + wrong_question_status 聚合数据
+          // 返回结构完全对齐前端
           const result = await getWrongQuestionsByUser(env.DB, tokenData.userId, {
             subject,
             topic,
+            status,
             limit: 100,
           })
 
-          // 转换为前端期望的格式
-          const questions = result.questions.map((q, index) => ({
-            id: `wrong_${index}_${q.questionId}`,
-            questionId: q.questionId,
-            questionText: q.questionText,
-            questionType: q.questionType,
-            subject: q.subject,
-            topic: q.topic,
-            userAnswer: q.lastWrongAnswer,
-            correctAnswer: q.correctAnswer,
-            explanation: q.explanation,
-            wrongCount: q.wrongCount,
-            status: 'unreviewed', // 默认状态
-            firstAttemptDate: q.firstAttemptDate,
-            lastAttemptDate: q.lastAttemptDate,
-          }))
-
-          return jsonResponse({ 
-            questions,
-            total: result.total,
-          }, 200, origin)
+          return jsonResponse(result, 200, origin)
         } catch (error) {
           console.error('获取错题列表失败:', error)
-          return jsonResponse({ questions: [] }, 200, origin)
+          return jsonResponse({ 
+            stats: { total: 0, unreviewed: 0, reviewed: 0, mastered: 0 },
+            items: [] 
+          }, 200, origin)
         }
       }
 
@@ -5870,6 +5866,7 @@ export default {
       }
 
       // 更新错题状态
+      // 【关键】更新 wrong_question_status 表，不更新 question_attempts
       if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+\/status$/) && request.method === 'PATCH') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
@@ -5883,17 +5880,30 @@ export default {
 
         const pathParts = path.split('/')
         const questionId = pathParts[pathParts.length - 2]
-        const body = await request.json() as { status: string }
+        const body = await request.json() as { status: WrongQuestionStatus }
 
-        await env.DB.prepare(
-          'UPDATE wrong_questions SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?'
-        ).bind(body.status, new Date().toISOString(), questionId, tokenData.userId).run()
+        // 验证状态值
+        if (!['UNREVIEWED', 'REVIEWED', 'MASTERED'].includes(body.status)) {
+          return errorResponse('无效的状态值', 400, origin)
+        }
 
-        return jsonResponse({ message: '状态已更新' }, 200, origin)
+        const result = await updateWrongQuestionStatus(
+          env.DB, 
+          tokenData.userId, 
+          questionId, 
+          body.status
+        )
+
+        if (result.success) {
+          return jsonResponse({ message: '状态已更新', status: body.status }, 200, origin)
+        } else {
+          return errorResponse(result.error || '更新失败', 500, origin)
+        }
       }
 
-      // 删除错题
-      if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+$/) && request.method === 'DELETE') {
+      // 重置错题状态（删除状态记录，恢复为 UNREVIEWED）
+      // 注意：不删除 question_attempts 中的记录
+      if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+\/status$/) && request.method === 'DELETE') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
           return errorResponse('请先登录', 401, origin)
@@ -5904,12 +5914,12 @@ export default {
           return errorResponse('登录已过期', 401, origin)
         }
 
-        const questionId = path.split('/').pop()
-        await env.DB.prepare(
-          'DELETE FROM wrong_questions WHERE id = ? AND user_id = ?'
-        ).bind(questionId, tokenData.userId).run()
-
-        return jsonResponse({ message: '删除成功' }, 200, origin)
+        const pathParts = path.split('/')
+        const questionId = pathParts[pathParts.length - 2]
+        
+        const result = await deleteWrongQuestionStatus(env.DB, tokenData.userId, questionId)
+        
+        return jsonResponse({ message: '状态已重置', success: result.success }, 200, origin)
       }
 
       // 获取学习档案
