@@ -4,16 +4,39 @@
  * ⚠️ 数据唯一来源：learning_events / question_attempts
  * ⚠️ 禁止从其他表读取刷题或积分依据
  * 
- * 规则：
- * - 所有积分操作必须通过此服务
- * - 前端不做任何积分计算
- * - 使用 shared/domain/points.ts 作为唯一规则来源
- * - 【关键】积分触发基于 learning_events 事实表，而非前端行为
+ * ==============================
+ * 【积分触发来源（全部来自 learning_events）】
  * 
- * 禁止数据源：
- * - ❌ quiz_sessions / quiz_results 表
- * - ❌ 前端统计结果
- * - ❌ session / store 中的临时值
+ * - DAILY_LOGIN
+ *   → learning_events 中当日第一条事件
+ * 
+ * - COMPLETE_QUIZ
+ *   → learning_events.event_type = 'QUIZ'
+ * 
+ * - COMPLETE_LEVEL_TEST
+ *   → learning_events.event_type = 'LEVEL_TEST'
+ * 
+ * - COMPLETE_ANALYSIS
+ *   → learning_events.event_type = 'ANALYSIS'
+ * 
+ * - DAILY_QUIZ_30/50/100
+ *   → 当日 learning_events 累计题目数达到阈值
+ * 
+ * ==============================
+ * 【禁止】
+ * 
+ * ❌ 前端调用"加积分" API
+ * ❌ 页面点击直接加分
+ * ❌ 从排行榜反推积分
+ * ❌ 直接读取 quiz 表
+ * 
+ * ==============================
+ * 【允许】
+ * 
+ * ✅ 后端在写入 learning_events 后 → 同步写入 point_events
+ * ✅ 通过 checkAndAwardPointsFromLearningEvent() 触发积分
+ * 
+ * ==============================
  */
 
 import {
@@ -28,56 +51,58 @@ import {
   LeaderboardResponse,
   DailyTaskStatus,
   PointEvent,
-  PointsApiResponse,
-  PointTaskDefinition,
 } from '../../../shared/domain/points';
 import { LanguageCode } from '../../../shared/domain/subjects';
 
-// ===== 积分触发条件配置 =====
+// ===== 积分触发条件配置（基于 learning_events）=====
 
-/** 
- * 基于 learning_events 的积分触发条件
- * 【关键】积分发放条件改为基于 learning_events，而非前端行为
+/**
+ * 积分发放条件（全部基于 learning_events 事实表）
+ * 
+ * ⚠️ 禁止任何基于前端行为的触发
  */
 export const LEARNING_EVENT_TRIGGERS = {
-  // 单次刷题：至少 5 题，正确率 >= 50%
+  // 单次刷题积分条件
   COMPLETE_QUIZ: {
     minQuestionCount: 5,
     minAccuracy: 0.5,
   },
-  // 水平测试：正确率 >= 40%
+  // 水平测试积分条件
   COMPLETE_LEVEL_TEST: {
     minAccuracy: 0.4,
   },
-  // 每日刷题 30 题
+  // 每日里程碑条件
   DAILY_QUIZ_30: {
     dailyMinQuestionCount: 30,
     minAccuracy: 0.5,
   },
-  // 每日刷题 50 题
   DAILY_QUIZ_50: {
     dailyMinQuestionCount: 50,
     minAccuracy: 0.5,
   },
-  // 每日刷题 100 题
   DAILY_QUIZ_100: {
     dailyMinQuestionCount: 100,
     minAccuracy: 0.5,
   },
 } as const;
 
-// 获取今日日期字符串 (YYYY-MM-DD)
+// ===== 工具函数 =====
+
 function getTodayDateString(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-// 生成 UUID
 function generateId(): string {
   return crypto.randomUUID();
 }
 
+// ===== 核心积分函数 =====
+
 /**
- * 添加积分
+ * 【内部函数】添加积分到 point_events
+ * 
+ * ⚠️ 此函数不应被外部直接调用
+ * ⚠️ 请使用 checkAndAwardPointsFromLearningEvent() 触发积分
  */
 export async function addPoints(
   db: D1Database,
@@ -85,7 +110,6 @@ export async function addPoints(
   task: PointTaskKey,
   relatedId?: string
 ): Promise<{ success: boolean; points: number; message?: string }> {
-  // 验证任务类型
   if (!isValidPointTaskKey(task)) {
     return { success: false, points: 0, message: 'Invalid task type' };
   }
@@ -156,19 +180,24 @@ export async function addPoints(
   return { success: true, points: rule.points };
 }
 
-// ===== 基于 learning_events 的积分触发 =====
+// ===== 基于 learning_events 的积分触发（唯一入口）=====
 
 /**
  * 【核心函数】基于 learning_events 检查并发放积分
  * 
+ * ⚠️ 这是积分发放的唯一合法入口
+ * ⚠️ 必须在 recordLearningEvent() 之后调用
+ * 
  * 调用时机：
  * - 刷题完成时（recordLearningEvent 后）
  * - 水平测试完成时（recordLearningEvent 后）
+ * - 分析完成时（recordLearningEvent 后）
  * 
- * 规则：
- * - 积分触发基于 learning_events 事实表
- * - 禁止前端直接请求加分
- * - learning_events 记录事实，point_events 记录奖励
+ * 触发映射：
+ * - DAILY_LOGIN      → 当日第一条 learning_events
+ * - COMPLETE_QUIZ    → event_type = 'QUIZ'
+ * - COMPLETE_LEVEL_TEST → event_type = 'LEVEL_TEST'
+ * - DAILY_QUIZ_30/50/100 → 当日累计题目数
  */
 export async function checkAndAwardPointsFromLearningEvent(
   db: D1Database,
@@ -183,9 +212,40 @@ export async function checkAndAwardPointsFromLearningEvent(
   }
 ): Promise<{ awarded: { task: PointTaskKey; points: number }[]; message: string }> {
   const awarded: { task: PointTaskKey; points: number }[] = [];
-  const today = getTodayDateString();
 
-  // ===== 1. 检查单次事件是否满足积分条件 =====
+  // ===== 1. 检查每日登录（当日第一条 learning_events）=====
+  
+  const todayEventCount = await db.prepare(`
+    SELECT COUNT(*) as count
+    FROM learning_events
+    WHERE user_id = ?
+    AND DATE(created_at) = DATE('now')
+  `).bind(userId).first<{ count: number }>();
+  
+  // 如果这是今天的第一条事件，触发 DAILY_LOGIN
+  if (todayEventCount?.count === 1) {
+    const loginResult = await addPoints(db, userId, 'DAILY_LOGIN', String(learningEventId));
+    if (loginResult.success) {
+      awarded.push({ task: 'DAILY_LOGIN', points: loginResult.points });
+    }
+    
+    // 检查连续登录成就
+    const streakInfo = await checkLoginStreak(db, userId);
+    if (streakInfo.streak === 7) {
+      const streakResult = await addPoints(db, userId, 'STREAK_7_DAYS');
+      if (streakResult.success) {
+        awarded.push({ task: 'STREAK_7_DAYS', points: streakResult.points });
+      }
+    }
+    if (streakInfo.streak === 30) {
+      const streakResult = await addPoints(db, userId, 'STREAK_30_DAYS');
+      if (streakResult.success) {
+        awarded.push({ task: 'STREAK_30_DAYS', points: streakResult.points });
+      }
+    }
+  }
+
+  // ===== 2. 检查刷题相关积分 =====
   
   if (eventType === 'QUIZ') {
     const trigger = LEARNING_EVENT_TRIGGERS.COMPLETE_QUIZ;
@@ -201,13 +261,17 @@ export async function checkAndAwardPointsFromLearningEvent(
       }
     }
     
-    // ===== 2. 检查每日累计刷题里程碑 =====
+    // 首次刷题成就
+    const firstQuizResult = await addPoints(db, userId, 'FIRST_QUIZ', String(learningEventId));
+    if (firstQuizResult.success) {
+      awarded.push({ task: 'FIRST_QUIZ', points: firstQuizResult.points });
+    }
     
-    // 从 learning_events 读取今日累计有效题目数
+    // ===== 3. 检查每日累计刷题里程碑 =====
+    
     const todayStats = await db.prepare(`
       SELECT 
-        COALESCE(SUM(question_count), 0) as total_questions,
-        COALESCE(SUM(correct_count), 0) as total_correct
+        COALESCE(SUM(question_count), 0) as total_questions
       FROM learning_events
       WHERE user_id = ?
       AND event_type = 'QUIZ'
@@ -215,7 +279,6 @@ export async function checkAndAwardPointsFromLearningEvent(
       AND accuracy >= ?
     `).bind(userId, LEARNING_EVENT_TRIGGERS.DAILY_QUIZ_30.minAccuracy).first<{
       total_questions: number;
-      total_correct: number;
     }>();
     
     const dailyQuestions = todayStats?.total_questions || 0;
@@ -243,18 +306,13 @@ export async function checkAndAwardPointsFromLearningEvent(
         awarded.push({ task: 'DAILY_QUIZ_100', points: result.points });
       }
     }
-    
-    // ===== 3. 检查首次刷题成就 =====
-    const result = await addPoints(db, userId, 'FIRST_QUIZ', String(learningEventId));
-    if (result.success) {
-      awarded.push({ task: 'FIRST_QUIZ', points: result.points });
-    }
   }
+  
+  // ===== 4. 检查水平测试积分 =====
   
   if (eventType === 'LEVEL_TEST') {
     const trigger = LEARNING_EVENT_TRIGGERS.COMPLETE_LEVEL_TEST;
     
-    // 水平测试积分条件：正确率 >= 40%
     if (eventData.accuracy >= trigger.minAccuracy) {
       const result = await addPoints(db, userId, 'COMPLETE_LEVEL_TEST', String(learningEventId));
       if (result.success) {
@@ -263,8 +321,9 @@ export async function checkAndAwardPointsFromLearningEvent(
     }
   }
   
+  // ===== 5. 检查分析积分 =====
+  
   if (eventType === 'ANALYSIS') {
-    // 分析完成积分
     const result = await addPoints(db, userId, 'COMPLETE_ANALYSIS', String(learningEventId));
     if (result.success) {
       awarded.push({ task: 'COMPLETE_ANALYSIS', points: result.points });
@@ -288,8 +347,49 @@ export async function checkAndAwardPointsFromLearningEvent(
 }
 
 /**
- * 获取用户今日学习统计（从 learning_events 读取）
- * 用于前端展示"今日学习进度"
+ * 检查用户登录连续天数（从 learning_events 读取）
+ */
+async function checkLoginStreak(
+  db: D1Database,
+  userId: string
+): Promise<{ streak: number }> {
+  // 从 learning_events 读取最近 30 天有活动的日期
+  const result = await db.prepare(`
+    SELECT DISTINCT DATE(created_at) as activity_date
+    FROM learning_events
+    WHERE user_id = ?
+    AND created_at >= DATE('now', '-30 days')
+    ORDER BY activity_date DESC
+    LIMIT 31
+  `).bind(userId).all<{ activity_date: string }>();
+  
+  if (!result.results || result.results.length === 0) {
+    return { streak: 0 };
+  }
+  
+  let streak = 0;
+  const today = getTodayDateString();
+  
+  for (let i = 0; i < result.results.length; i++) {
+    const date = result.results[i].activity_date;
+    const expectedDate = new Date();
+    expectedDate.setDate(expectedDate.getDate() - i);
+    const expected = expectedDate.toISOString().split('T')[0];
+    
+    if (date === expected || (i === 0 && date === today)) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  
+  return { streak };
+}
+
+// ===== 查询函数 =====
+
+/**
+ * 获取用户今日学习进度（从 learning_events 读取）
  */
 export async function getTodayLearningProgress(
   db: D1Database,
@@ -299,7 +399,6 @@ export async function getTodayLearningProgress(
   totalCorrect: number;
   accuracy: number;
   quizCount: number;
-  // 里程碑进度
   milestones: {
     target: number;
     current: number;
@@ -375,19 +474,16 @@ export async function getPointsSummary(
 ): Promise<PointsSummary> {
   const today = getTodayDateString();
 
-  // 获取总积分
   const summary = await db
     .prepare('SELECT total_points FROM user_point_summary WHERE user_id = ?')
     .bind(userId)
     .first<{ total_points: number }>();
 
-  // 获取各任务总完成次数
   const taskCountsResult = await db
     .prepare('SELECT task, COUNT(*) as count FROM point_events WHERE user_id = ? GROUP BY task')
     .bind(userId)
     .all<{ task: string; count: number }>();
 
-  // 获取今日任务完成次数
   const todayCountsResult = await db
     .prepare('SELECT task, count FROM user_daily_task_counts WHERE user_id = ? AND count_date = ?')
     .bind(userId, today)
@@ -420,7 +516,7 @@ export async function getPointsSummary(
 }
 
 /**
- * 获取排行榜（支持并列排名）
+ * 获取积分排行榜（积分来源于 point_events，而非 learning_events）
  */
 export async function getLeaderboard(
   db: D1Database,
@@ -447,7 +543,6 @@ export async function getLeaderboard(
       score: number;
     }>();
 
-  // 获取总参与人数
   const totalResult = await db
     .prepare('SELECT COUNT(*) as total FROM user_point_summary')
     .first<{ total: number }>();
@@ -462,17 +557,13 @@ export async function getLeaderboard(
     };
   }
 
-  // 计算排名（支持并列：相同分数同排名）
+  // Dense Rank（同分并列）
   let currentRank = 1;
   let previousScore: number | null = null;
-  let skipCount = 0;
 
-  const rankings: LeaderboardEntry[] = results.results.map((row, index) => {
+  const rankings: LeaderboardEntry[] = results.results.map((row) => {
     if (previousScore !== null && row.score < previousScore) {
-      currentRank += skipCount + 1;
-      skipCount = 0;
-    } else if (previousScore !== null && row.score === previousScore) {
-      skipCount++;
+      currentRank++;
     }
     previousScore = row.score;
 
@@ -486,14 +577,13 @@ export async function getLeaderboard(
     };
   });
 
-  // 获取当前用户排名（如果不在榜单中）
+  // 获取当前用户排名
   let currentUserRank: LeaderboardEntry | undefined;
   if (currentUserId) {
     const userInRankings = rankings.find(r => r.userId === currentUserId);
     if (userInRankings) {
       currentUserRank = userInRankings;
     } else {
-      // 用户不在前 N 名，需要单独查询
       const userRankInfo = await getUserRank(db, currentUserId);
       if (userRankInfo) {
         const userInfo = await db
@@ -528,7 +618,6 @@ export async function getUserRank(
   db: D1Database,
   userId: string
 ): Promise<{ rank: number; totalPoints: number } | null> {
-  // 获取用户积分
   const userSummary = await db
     .prepare('SELECT total_points FROM user_point_summary WHERE user_id = ?')
     .bind(userId)
@@ -538,10 +627,10 @@ export async function getUserRank(
     return null;
   }
 
-  // 计算排名（比该用户积分高的人数 + 1，支持并列）
+  // Dense Rank
   const rankResult = await db
     .prepare(
-      'SELECT COUNT(*) as higher_count FROM user_point_summary WHERE total_points > ?'
+      'SELECT COUNT(DISTINCT total_points) as higher_count FROM user_point_summary WHERE total_points > ?'
     )
     .bind(userSummary.total_points)
     .first<{ higher_count: number }>();
@@ -562,7 +651,6 @@ export async function getDailyTaskStatus(
 ): Promise<DailyTaskStatus[]> {
   const today = getTodayDateString();
 
-  // 获取今日任务完成次数
   const todayCountsResult = await db
     .prepare('SELECT task, count FROM user_daily_task_counts WHERE user_id = ? AND count_date = ?')
     .bind(userId, today)
@@ -575,7 +663,6 @@ export async function getDailyTaskStatus(
     }
   }
 
-  // 检查一次性任务是否已完成
   const oneTimeTasksResult = await db
     .prepare('SELECT DISTINCT task FROM point_events WHERE user_id = ?')
     .bind(userId)
@@ -588,13 +675,11 @@ export async function getDailyTaskStatus(
     }
   }
 
-  // 构建任务状态列表（只返回有每日限制的任务）
   const taskStatuses: DailyTaskStatus[] = [];
 
   for (const taskKey of POINT_TASK_KEYS) {
     const task = POINT_TASKS[taskKey];
     
-    // 跳过一次性任务（没有每日限制）
     if (task.dailyLimit === 0) {
       continue;
     }
@@ -682,13 +767,11 @@ export async function deductPoints(
   points: number,
   reason: string
 ): Promise<{ success: boolean; message?: string }> {
-  // 检查积分是否足够
   const hasEnough = await hasEnoughPoints(db, userId, points);
   if (!hasEnough) {
     return { success: false, message: 'Insufficient points' };
   }
 
-  // 插入负积分事件
   const eventId = generateId();
   await db
     .prepare(
@@ -697,7 +780,6 @@ export async function deductPoints(
     .bind(eventId, userId, 'REDEMPTION', -points, reason, new Date().toISOString())
     .run();
 
-  // 更新积分聚合表
   await db
     .prepare(`
       UPDATE user_point_summary
