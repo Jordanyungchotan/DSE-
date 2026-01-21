@@ -8,6 +8,7 @@
  */
 
 import { checkUserPrivileges } from './incentiveLeaderboardService.js';
+import { getUserLearningRankWithAnalysis, type LeaderboardMetric } from './learningLeaderboardService.js';
 
 // ===== 类型定义 =====
 
@@ -442,4 +443,429 @@ export async function getConversionFunnelStats(
       ? Math.round((s.convertedCount / s.totalRedemptions) * 100) 
       : 0,
   }));
+}
+
+// ===== 转化触发机制 =====
+
+export type TriggerType = 
+  | 'RANK_RISING'           // 排名连续上升
+  | 'CLOSE_TO_TOP'          // 接近前列
+  | 'SUBJECT_RISK'          // 科目风险
+  | 'STREAK_MILESTONE'      // 连续学习里程碑
+  | 'ACCURACY_BREAKTHROUGH' // 正确率突破
+  | 'WEAKNESS_CRITICAL';    // 弱项关键期
+
+export interface TriggeredOffer {
+  id: string;
+  triggerType: TriggerType;
+  title: string;
+  description: string;
+  reason: string;
+  urgencyLevel: 'high' | 'medium' | 'low';
+  offer: {
+    itemId: string;
+    itemName: string;
+    originalPoints: number;
+    discountedPoints: number;
+    discountPercent: number;
+    expiresAt: string;
+  };
+  dataInsight: {
+    metric: string;
+    currentValue: number | string;
+    targetValue?: number | string;
+    trend?: 'up' | 'down' | 'stable';
+  };
+}
+
+export interface TriggeredOffersResponse {
+  offers: TriggeredOffer[];
+  isHighConversionZone: boolean;
+  conversionZoneReason?: string;
+  userSummary: {
+    rank: number | null;
+    rankTrend: 'up' | 'down' | 'stable';
+    consecutiveRisingDays: number;
+    weaknesses: string[];
+    strengths: string[];
+  };
+}
+
+// 触发规则配置
+const TRIGGER_RULES = {
+  RANK_RISING: {
+    minConsecutiveDays: 3,
+    discountPercent: 20,
+    urgency: 'high' as const,
+  },
+  CLOSE_TO_TOP: {
+    thresholds: [
+      { rank: 10, discountPercent: 30, urgency: 'high' as const },
+      { rank: 20, discountPercent: 20, urgency: 'medium' as const },
+      { rank: 50, discountPercent: 10, urgency: 'low' as const },
+    ],
+  },
+  SUBJECT_RISK: {
+    accuracyThreshold: 60, // 低于此正确率视为风险
+    discountPercent: 25,
+    urgency: 'high' as const,
+  },
+  STREAK_MILESTONE: {
+    milestones: [7, 14, 30],
+    discountPercent: 15,
+    urgency: 'medium' as const,
+  },
+};
+
+/**
+ * 获取用户的个性化转化触发推荐
+ */
+export async function getTriggeredOffers(
+  db: D1Database,
+  userId: string
+): Promise<TriggeredOffersResponse> {
+  const offers: TriggeredOffer[] = [];
+  let isHighConversionZone = false;
+  let conversionZoneReason: string | undefined;
+
+  // 1. 获取用户当前学习状态
+  const [quizRank, privileges, rankHistory, streakInfo, weakSubjects] = await Promise.all([
+    getUserLearningRankWithAnalysis(db, userId, { metric: 'QUIZ_COUNT', range: 'ALL' }),
+    checkUserPrivileges(db, userId),
+    getRankHistory(db, userId, 7), // 最近7天排名历史
+    getUserStreakInfo(db, userId),
+    getWeakSubjects(db, userId),
+  ]);
+
+  // 2. 计算排名趋势
+  const rankTrend = calculateRankTrend(rankHistory);
+  const consecutiveRisingDays = countConsecutiveRisingDays(rankHistory);
+
+  // 用户摘要
+  const userSummary = {
+    rank: quizRank?.rank || null,
+    rankTrend,
+    consecutiveRisingDays,
+    weaknesses: quizRank?.weaknesses || [],
+    strengths: quizRank?.strengths || [],
+  };
+
+  // 3. 获取可用的咨询商品
+  const consultationItems = await getConsultationItems(db);
+
+  // ===== 触发规则检测 =====
+
+  // 规则 1: 排名连续上升
+  if (consecutiveRisingDays >= TRIGGER_RULES.RANK_RISING.minConsecutiveDays) {
+    isHighConversionZone = true;
+    conversionZoneReason = `排名连续 ${consecutiveRisingDays} 天上升`;
+
+    const targetItem = consultationItems.find(i => i.consultationType === 'COURSE_PLANNING');
+    if (targetItem) {
+      offers.push(createTriggeredOffer(
+        'RANK_RISING',
+        `你的排名连续 ${consecutiveRisingDays} 天上升！`,
+        '势头正好，一次专业规划可能让你更快突破瓶颈',
+        `排名从第 ${rankHistory[rankHistory.length - 1]?.rank || '?'} 上升到第 ${quizRank?.rank || '?'}`,
+        targetItem,
+        TRIGGER_RULES.RANK_RISING.discountPercent,
+        TRIGGER_RULES.RANK_RISING.urgency,
+        {
+          metric: '排名变化',
+          currentValue: quizRank?.rank || 0,
+          trend: 'up',
+        }
+      ));
+    }
+  }
+
+  // 规则 2: 接近前列
+  if (quizRank?.rank) {
+    for (const threshold of TRIGGER_RULES.CLOSE_TO_TOP.thresholds) {
+      if (quizRank.rank <= threshold.rank + 5 && quizRank.rank > threshold.rank) {
+        isHighConversionZone = true;
+        conversionZoneReason = conversionZoneReason || `距离前 ${threshold.rank} 名仅差 ${quizRank.rank - threshold.rank} 名`;
+
+        const targetItem = consultationItems.find(i => i.consultationType === 'CAREER_ADVICE');
+        if (targetItem) {
+          offers.push(createTriggeredOffer(
+            'CLOSE_TO_TOP',
+            `你距离前 ${threshold.rank} 名仅差 ${quizRank.rank - threshold.rank} 名！`,
+            '专业顾问帮你分析如何突破最后几名',
+            '现在是冲刺的最佳时机',
+            targetItem,
+            threshold.discountPercent,
+            threshold.urgency,
+            {
+              metric: '当前排名',
+              currentValue: quizRank.rank,
+              targetValue: threshold.rank,
+              trend: rankTrend,
+            }
+          ));
+        }
+        break; // 只推送最接近的一个
+      }
+    }
+  }
+
+  // 规则 3: 科目风险
+  if (weakSubjects.length > 0) {
+    const criticalSubject = weakSubjects[0];
+    if (criticalSubject.accuracy < TRIGGER_RULES.SUBJECT_RISK.accuracyThreshold) {
+      const targetItem = consultationItems.find(i => i.consultationType === 'STUDY_PLAN');
+      if (targetItem) {
+        offers.push(createTriggeredOffer(
+          'SUBJECT_RISK',
+          `你的${criticalSubject.name}正处在关键分水岭`,
+          '一次针对性规划可能直接改变升学结果',
+          `当前正确率仅 ${criticalSubject.accuracy}%，需要重点关注`,
+          targetItem,
+          TRIGGER_RULES.SUBJECT_RISK.discountPercent,
+          TRIGGER_RULES.SUBJECT_RISK.urgency,
+          {
+            metric: `${criticalSubject.name}正确率`,
+            currentValue: `${criticalSubject.accuracy}%`,
+            targetValue: '80%',
+            trend: 'down',
+          }
+        ));
+      }
+    }
+  }
+
+  // 规则 4: 连续学习里程碑
+  for (const milestone of TRIGGER_RULES.STREAK_MILESTONE.milestones) {
+    if (streakInfo.currentStreak === milestone) {
+      const targetItem = consultationItems.find(i => i.consultationType === 'COURSE_PLANNING');
+      if (targetItem) {
+        offers.push(createTriggeredOffer(
+          'STREAK_MILESTONE',
+          `恭喜！你已连续学习 ${milestone} 天 🎉`,
+          '坚持就是胜利，让专家帮你制定下一阶段计划',
+          `连续学习 ${milestone} 天是一个重要里程碑`,
+          targetItem,
+          TRIGGER_RULES.STREAK_MILESTONE.discountPercent,
+          TRIGGER_RULES.STREAK_MILESTONE.urgency,
+          {
+            metric: '连续学习天数',
+            currentValue: milestone,
+            trend: 'up',
+          }
+        ));
+      }
+      break;
+    }
+  }
+
+  // 规则 5: 弱项关键期（基于 weaknesses 分析）
+  if (userSummary.weaknesses.length > 0 && quizRank?.gapToNext && quizRank.gapToNext.value <= 5) {
+    const weakness = userSummary.weaknesses[0];
+    const targetItem = consultationItems.find(i => i.consultationType === 'STUDY_PLAN');
+    if (targetItem && !offers.some(o => o.triggerType === 'SUBJECT_RISK')) {
+      offers.push(createTriggeredOffer(
+        'WEAKNESS_CRITICAL',
+        `「${weakness}」正在拖累你的排名`,
+        '精准补强可能让你立即超越前面的人',
+        `系统分析显示：${weakness}`,
+        targetItem,
+        20,
+        'high',
+        {
+          metric: '弱项分析',
+          currentValue: weakness,
+          trend: 'stable',
+        }
+      ));
+    }
+  }
+
+  // 4. 按紧急程度和折扣力度排序
+  offers.sort((a, b) => {
+    const urgencyOrder = { high: 0, medium: 1, low: 2 };
+    if (urgencyOrder[a.urgencyLevel] !== urgencyOrder[b.urgencyLevel]) {
+      return urgencyOrder[a.urgencyLevel] - urgencyOrder[b.urgencyLevel];
+    }
+    return b.offer.discountPercent - a.offer.discountPercent;
+  });
+
+  // 最多返回 3 个推荐
+  return {
+    offers: offers.slice(0, 3),
+    isHighConversionZone,
+    conversionZoneReason,
+    userSummary,
+  };
+}
+
+// ===== 辅助函数 =====
+
+function createTriggeredOffer(
+  triggerType: TriggerType,
+  title: string,
+  description: string,
+  reason: string,
+  item: { id: string; nameZh: string; requiredPoints: number },
+  discountPercent: number,
+  urgencyLevel: 'high' | 'medium' | 'low',
+  dataInsight: TriggeredOffer['dataInsight']
+): TriggeredOffer {
+  const discountedPoints = Math.round(item.requiredPoints * (1 - discountPercent / 100));
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 3); // 3天有效期
+
+  return {
+    id: `${triggerType}_${Date.now()}`,
+    triggerType,
+    title,
+    description,
+    reason,
+    urgencyLevel,
+    offer: {
+      itemId: item.id,
+      itemName: item.nameZh,
+      originalPoints: item.requiredPoints,
+      discountedPoints,
+      discountPercent,
+      expiresAt: expiresAt.toISOString(),
+    },
+    dataInsight,
+  };
+}
+
+async function getRankHistory(
+  db: D1Database,
+  userId: string,
+  days: number
+): Promise<{ date: string; rank: number }[]> {
+  // 简化实现：从 quiz_sessions 推算历史排名变化
+  // 实际生产中应有专门的排名快照表
+  const history = await db.prepare(`
+    SELECT 
+      DATE(created_at) as date,
+      COUNT(*) as quiz_count
+    FROM quiz_sessions
+    WHERE user_id = ?
+    AND status = 'completed'
+    AND created_at >= DATE('now', '-' || ? || ' days')
+    GROUP BY DATE(created_at)
+    ORDER BY date ASC
+  `).bind(userId, days).all<{ date: string; quiz_count: number }>();
+
+  // 模拟排名计算（实际应从快照获取）
+  let baseRank = 50;
+  return (history.results || []).map((h, idx) => {
+    // 假设每做一道题排名提升一点
+    baseRank = Math.max(1, baseRank - Math.min(h.quiz_count, 5));
+    return { date: h.date, rank: baseRank + idx };
+  });
+}
+
+function calculateRankTrend(history: { date: string; rank: number }[]): 'up' | 'down' | 'stable' {
+  if (history.length < 2) return 'stable';
+  
+  const recent = history.slice(-3);
+  const first = recent[0]?.rank || 0;
+  const last = recent[recent.length - 1]?.rank || 0;
+
+  if (last < first) return 'up'; // 排名数字越小越好
+  if (last > first) return 'down';
+  return 'stable';
+}
+
+function countConsecutiveRisingDays(history: { date: string; rank: number }[]): number {
+  if (history.length < 2) return 0;
+  
+  let count = 0;
+  for (let i = history.length - 1; i > 0; i--) {
+    if (history[i].rank < history[i - 1].rank) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
+async function getUserStreakInfo(
+  db: D1Database,
+  userId: string
+): Promise<{ currentStreak: number; longestStreak: number }> {
+  const streakQuery = `
+    SELECT DATE(created_at) as quiz_date
+    FROM quiz_sessions
+    WHERE user_id = ?
+    AND status = 'completed'
+    GROUP BY DATE(created_at)
+    ORDER BY quiz_date DESC
+    LIMIT 30
+  `;
+  const streakResults = await db.prepare(streakQuery).bind(userId).all<{ quiz_date: string }>();
+  
+  let currentStreak = 0;
+  let longestStreak = 0;
+  const today = new Date().toISOString().split('T')[0];
+  
+  if (streakResults.results) {
+    for (let i = 0; i < streakResults.results.length; i++) {
+      const date = streakResults.results[i].quiz_date;
+      const expectedDate = new Date();
+      expectedDate.setDate(expectedDate.getDate() - i);
+      const expected = expectedDate.toISOString().split('T')[0];
+      
+      if (date === expected || (i === 0 && date === today)) {
+        currentStreak++;
+      } else {
+        break;
+      }
+    }
+    longestStreak = Math.max(longestStreak, currentStreak);
+  }
+
+  return { currentStreak, longestStreak };
+}
+
+async function getWeakSubjects(
+  db: D1Database,
+  userId: string
+): Promise<{ name: string; accuracy: number }[]> {
+  const result = await db.prepare(`
+    SELECT 
+      subject as name,
+      ROUND(AVG(accuracy) * 100, 1) as accuracy
+    FROM quiz_sessions
+    WHERE user_id = ?
+    AND status = 'completed'
+    AND subject IS NOT NULL
+    GROUP BY subject
+    HAVING COUNT(*) >= 3
+    ORDER BY accuracy ASC
+    LIMIT 3
+  `).bind(userId).all<{ name: string; accuracy: number }>();
+
+  return result.results || [];
+}
+
+async function getConsultationItems(
+  db: D1Database
+): Promise<{ id: string; nameZh: string; requiredPoints: number; consultationType: string }[]> {
+  const items = await db.prepare(`
+    SELECT id, name_zh as nameZh, required_points as requiredPoints, consultation_type as consultationType
+    FROM point_mall_items
+    WHERE item_type = 'CONSULTATION'
+    AND is_active = 1
+  `).all<{ id: string; nameZh: string; requiredPoints: number; consultationType: string }>();
+
+  return items.results || [];
+}
+
+/**
+ * 检查用户是否在高转化区间
+ */
+export async function isInHighConversionZone(
+  db: D1Database,
+  userId: string
+): Promise<{ isHigh: boolean; reason?: string }> {
+  const { isHighConversionZone, conversionZoneReason } = await getTriggeredOffers(db, userId);
+  return { isHigh: isHighConversionZone, reason: conversionZoneReason };
 }

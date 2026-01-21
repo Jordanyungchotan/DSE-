@@ -1,0 +1,262 @@
+/* 转化触发推荐组件样式 */
+
+.offersContainer {
+  margin-bottom: 24px;
+}
+
+.offersCard {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 加载状态 */
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 32px;
+}
+
+/* 高转化区间横幅 */
+.conversionZoneBanner {
+  background: linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%);
+  border: 1px solid #ffd591;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #ad6800;
+}
+
+.bannerIcon {
+  font-size: 18px;
+  color: #fa8c16;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* 用户摘要 */
+.userSummary {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #f6f8fc;
+  border-radius: 8px;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.summaryValue {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 推荐头部 */
+.offersHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.offersHeader h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+}
+
+/* 推荐列表 */
+.offersList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 推荐卡片 */
+.offerCard {
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.offerCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.urgencyHigh {
+  border-left-color: #ff4d4f;
+  background: linear-gradient(135deg, #fff1f0 0%, white 30%);
+}
+
+.urgencyMedium {
+  border-left-color: #faad14;
+  background: linear-gradient(135deg, #fffbe6 0%, white 30%);
+}
+
+.urgencyLow {
+  border-left-color: #52c41a;
+  background: linear-gradient(135deg, #f6ffed 0%, white 30%);
+}
+
+/* 卡片头部 */
+.offerHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.offerIcon {
+  font-size: 24px;
+  color: #1890ff;
+}
+
+.offerTitle {
+  flex: 1;
+}
+
+.offerTitle h4 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #262626;
+  line-height: 1.4;
+}
+
+.offerReason {
+  margin: 0;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.offerDescription {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #595959;
+  line-height: 1.5;
+}
+
+/* 数据洞察 */
+.dataInsight {
+  background: #f5f5f5;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.insightLabel {
+  color: #8c8c8c;
+}
+
+.insightValue {
+  font-weight: 600;
+  color: #262626;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.insightTarget {
+  color: #1890ff;
+  margin-left: 8px;
+}
+
+/* 优惠信息 */
+.offerInfo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.priceSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.originalPrice {
+  font-size: 12px;
+  color: #bfbfbf;
+  text-decoration: line-through;
+}
+
+.discountedPrice {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ff4d4f;
+}
+
+.discountTag {
+  font-weight: 600;
+}
+
+.countdown {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+/* 兑换按钮 */
+.redeemBtn {
+  height: 40px;
+  font-weight: 600;
+  border-radius: 8px;
+}
+
+.urgencyHigh .redeemBtn {
+  background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%);
+  border-color: #ff4d4f;
+}
+
+.urgencyHigh .redeemBtn:hover {
+  background: linear-gradient(135deg, #ff7875 0%, #ff4d4f 100%);
+}
+
+/* 响应式 */
+@media (max-width: 576px) {
+  .userSummary {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .offerInfo {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .countdown {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

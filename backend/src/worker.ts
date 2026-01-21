@@ -61,6 +61,8 @@ import {
   getUserConsultations,
   updateConsultationStatus,
   getConversionFunnelStats,
+  getTriggeredOffers,
+  isInHighConversionZone,
 } from './services/pointsMallService.js'
 import {
   getDailyMissions,
@@ -7064,6 +7066,64 @@ export default {
             code: -1,
             data: null,
             message: error instanceof Error ? error.message : '获取商品列表失败'
+          }, 500, origin)
+        }
+      }
+
+      // 获取个性化转化触发推荐
+      if (path === '/api/points/mall/offers' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const offersData = await getTriggeredOffers(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: offersData,
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get triggered offers error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取推荐失败'
+          }, 500, origin)
+        }
+      }
+
+      // 检查是否在高转化区间
+      if (path === '/api/points/mall/conversion-zone' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const zoneInfo = await isInHighConversionZone(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: zoneInfo,
+            message: 'success'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Check conversion zone error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '检查转化区间失败'
           }, 500, origin)
         }
       }

@@ -470,6 +470,39 @@
   color: #1a1a2e;
 }
 
+/* 转化提示卡片 */
+.conversionCard {
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: 1px solid #b7eb8f;
+  margin-bottom: 16px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.conversionCard :global(.ant-alert) {
+  background: transparent;
+  border: none;
+}
+
+.conversionCard :global(.ant-alert-message) {
+  font-weight: 600;
+  color: #389e0d;
+}
+
+.conversionCard :global(.ant-alert-description) {
+  color: #52c41a;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 4px 20px rgba(82, 196, 26, 0.2);
+  }
+  50% {
+    box-shadow: 0 4px 30px rgba(82, 196, 26, 0.4);
+  }
+}
+
 /* 提示卡片 */
 .tipsCard {
   background: rgba(255, 255, 255, 0.95);

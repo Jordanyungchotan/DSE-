@@ -11,6 +11,7 @@ import {
 import { ragFetch, apiFetch } from '../config/api'
 import { useAuthStore } from '../stores/authStore'
 import { useLanguageStore } from '../stores/languageStore'
+import { TriggeredOffers } from '../components/TriggeredOffers'
 import styles from './PointsMallPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -212,6 +213,19 @@ export default function PointsMallPage() {
           )}
         </Button>
       </div>
+
+      {/* 为你推荐 - 转化触发推荐 */}
+      {activeTab === 'items' && (
+        <TriggeredOffers 
+          showSummary={true}
+          onRedeem={(itemId) => {
+            const item = items.find(i => i.id.toString() === itemId)
+            if (item) {
+              setExchangeModal({ visible: true, item })
+            }
+          }}
+        />
+      )}
 
       {/* 商品列表 */}
       {activeTab === 'items' && (

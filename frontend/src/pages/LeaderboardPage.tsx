@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { 
   Card, 
@@ -16,6 +16,7 @@ import {
   Tooltip,
   Badge,
   Typography,
+  Alert,
 } from 'antd'
 import {
   TrophyOutlined,
@@ -28,7 +29,9 @@ import {
   CrownOutlined,
   RiseOutlined,
   StarOutlined,
+  GiftOutlined,
 } from '@ant-design/icons'
+import { apiFetch } from '../config/api'
 import { 
   useLeaderboardStore,
   METRIC_OPTIONS,
@@ -315,7 +318,28 @@ const LeaderboardPage: React.FC = () => {
     updateIncentiveFilters,
   } = useLeaderboardStore()
   
-  const { user: currentUser, isAuthenticated } = useAuthStore()
+  const { user: currentUser, isAuthenticated, token } = useAuthStore()
+
+  // 转化区间状态
+  const [conversionZone, setConversionZone] = useState<{ isHigh: boolean; reason?: string } | null>(null)
+
+  // 获取转化区间
+  const fetchConversionZone = useCallback(async () => {
+    if (!token) return
+    try {
+      const response = await apiFetch('/api/points/mall/conversion-zone', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        if (result.code === 0) {
+          setConversionZone(result.data)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch conversion zone:', err)
+    }
+  }, [token])
 
   // 初始加载
   useEffect(() => {
@@ -326,6 +350,7 @@ const LeaderboardPage: React.FC = () => {
     }
     if (isAuthenticated) {
       fetchUserStats()
+      fetchConversionZone()
     }
   }, [])
 
@@ -743,6 +768,30 @@ const LeaderboardPage: React.FC = () => {
                   </ul>
                 </div>
               ))}
+            </Card>
+          )}
+
+          {/* 转化提示 - 高转化区间 */}
+          {conversionZone?.isHigh && (
+            <Card className={styles.conversionCard}>
+              <Alert
+                type="success"
+                showIcon
+                icon={<GiftOutlined />}
+                message="你已进入咨询高转化区间 🎯"
+                description={
+                  <div>
+                    <p style={{ margin: '8px 0' }}>{conversionZone.reason}</p>
+                    <Button 
+                      type="primary" 
+                      size="small"
+                      onClick={() => navigate('/points/mall')}
+                    >
+                      查看专属优惠
+                    </Button>
+                  </div>
+                }
+              />
             </Card>
           )}
 
