@@ -3070,7 +3070,7 @@ export default {
       // 获取支持的科目列表（三语支持）
       if (path === '/api/analysis/subjects' && request.method === 'GET') {
         // 支持语言参数
-        const lang = (url.searchParams.get('lang') || 'zh-TW') as LanguageCode
+        const lang = (url.searchParams.get('lang') || 'zh-HK') as LanguageCode
         
         const subjects = ALL_SUBJECTS.map((subject) => ({
           key: subject.key,

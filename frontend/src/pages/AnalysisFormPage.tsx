@@ -47,9 +47,7 @@ import {
   isCoreSubject,
   hasPassFailGrading,
   getSubjectDisplayName,
-  getSubjectOptions,
   getCivicsOptions,
-  LanguageCode,
 } from '@/shared/domain'
 import { useLanguageStore } from '../stores/languageStore'
 import {

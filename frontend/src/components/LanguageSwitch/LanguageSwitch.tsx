@@ -7,13 +7,13 @@ import styles from './LanguageSwitch.module.css'
 
 const languageLabels: Record<Locale, string> = {
   'zh-CN': '简体中文',
-  'zh-TW': '繁體中文',
+  'zh-HK': '繁體中文',
   'en': 'English',
 }
 
 const languageFlags: Record<Locale, string> = {
   'zh-CN': '🇨🇳',
-  'zh-TW': '🇭🇰',
+  'zh-HK': '🇭🇰',
   'en': '🇬🇧',
 }
 
@@ -22,10 +22,10 @@ const LanguageSwitch = () => {
 
   const menuItems: MenuProps['items'] = [
     {
-      key: 'zh-TW',
+      key: 'zh-HK',
       label: (
         <span className={styles.menuItem}>
-          <span className={styles.flag}>{languageFlags['zh-TW']}</span>
+          <span className={styles.flag}>{languageFlags['zh-HK']}</span>
           <span>繁體中文</span>
         </span>
       ),
@@ -79,4 +79,3 @@ const LanguageSwitch = () => {
 }
 
 export default LanguageSwitch
-

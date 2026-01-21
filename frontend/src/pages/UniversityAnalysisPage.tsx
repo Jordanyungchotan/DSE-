@@ -47,9 +47,7 @@ import {
   ALL_SUBJECTS,
   DSE_GRADE_OPTIONS,
   hasPassFailGrading,
-  getSubjectDisplayName,
   getCivicsOptions,
-  LanguageCode,
 } from '@/shared/domain'
 import styles from './UniversityAnalysisPage.module.css'
 
@@ -158,9 +156,6 @@ const UniversityAnalysisPage = () => {
   const isEnglish = locale === 'en'
   const isPassFailSubject = (subjectKey: string) =>
     hasPassFailGrading(subjectKey)
-  
-  // 获取科目显示名称
-  const getSubjectLabel = (subjectKey: string) => getSubjectDisplayName(subjectKey, currentLang)
 
   // 获取院校可用专业领域
   const fetchAvailableFields = useCallback(async (universities: string[]) => {
