@@ -5,9 +5,9 @@
  */
 
 import { SCHOOLS_BY_DISTRICT } from './data/schoolsData'
-import { SUBJECTS, SubjectGrade } from '@/shared/domain'
-import { AnalysisInputError, validateSubjectGrades } from './validators/analysisInput.validator.js'
-import { analyzeSubjectGrade } from './analysis/analyzeByRules.js'
+import { SUBJECTS, CORE_SUBJECTS, ELECTIVE_SUBJECTS, SubjectGrade, isElectiveSubject, isCoreSubject } from '@/shared/domain'
+import { AnalysisInputError, validateSubjectGrades, validateElectives } from './validators/analysisInput.validator.js'
+import { analyzeSubjectGrade, analyzeElectiveCombination, analyzeAllSubjects } from './analysis/analyzeByRules.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -2591,6 +2591,24 @@ function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
   const gradeName = GRADE_NAME_MAP[grade] || grade || '中四'
   const overallLevel = calculateFeasibilityLevel(baseScore)
 
+  // 构建规则分析映射
+  const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects)
+
+  // 收集选修科目并生成 notes
+  const electiveSubjects = studentInfo.subjects
+    .map(s => s.subject)
+    .filter(s => isElectiveSubject(s))
+  const electiveNotes = analyzeElectiveCombination(electiveSubjects)
+
+  // 生成建议（包含选修科目 notes）
+  const additionalAdvice = [
+    '保持规律作息',
+    '定期与老师沟通',
+    '适当体育锻炼',
+    '保持积极心态',
+    ...electiveNotes,
+  ]
+
   return {
     overallAssessment: {
       feasibilityScore: baseScore,
@@ -2639,7 +2657,7 @@ function generateMockResult(studentInfo: StudentInfo): AnalysisResult {
       monthlyGoals: ['第1个月：夯实基础', '第2个月：针对性提升', '第3个月：模拟训练'],
       resources: ['DSE历年真题集', '各科知识点总结', '在线模拟平台'],
     },
-    additionalAdvice: ['保持规律作息', '定期与老师沟通', '适当体育锻炼', '保持积极心态'],
+    additionalAdvice,
   }
 }
 
@@ -2820,6 +2838,20 @@ function buildUniversityAnalysisPrompt(input: UniversityApplicationInput, bestFi
 function generateMockUniversityResult(input: UniversityApplicationInput, bestFive: number): UniversityAnalysisResult {
   const chanceLevel = bestFive >= 30 ? 'high' : bestFive >= 24 ? 'medium' : 'low'
   
+  // 收集选修科目并生成 notes
+  const electiveSubjects = input.dseResults
+    .map(r => r.subject)
+    .filter(s => isElectiveSubject(s))
+  const electiveNotes = analyzeElectiveCombination(electiveSubjects)
+
+  // 合并选修科目 notes 到备选方案建议
+  const backupPlans = [
+    '考虑副学士课程',
+    '海外升学选项',
+    '重读提升成绩',
+    ...electiveNotes,
+  ]
+
   return {
     admissionAnalysis: {
       overallScore: Math.min(95, bestFive * 3),
@@ -2849,7 +2881,7 @@ function generateMockUniversityResult(input: UniversityApplicationInput, bestFiv
       interviewTips: ['了解专业课程内容', '准备个人经历分享', '展示学习热情'],
       personalStatementAdvice: ['突出个人特色', '结合实际经历', '展示对专业的理解'],
     },
-    backupPlans: ['考虑副学士课程', '海外升学选项', '重读提升成绩'],
+    backupPlans,
     subjectAnalyses: input.dseResults.map((result) => ({
       subject: result.subject,
       grade: result.grade,
@@ -3024,13 +3056,17 @@ export default {
 
       // 获取支持的科目列表
       if (path === '/api/analysis/subjects' && request.method === 'GET') {
-        const subjects = SUBJECTS.map((subject, index) => ({
+        const subjects = SUBJECTS.map((subject) => ({
           id: subject,
           name: subject,
           nameEn: subject,
-          category: index < 4 ? 'core' : 'elective',
+          category: isCoreSubject(subject) ? 'core' : 'elective',
         }))
-        return jsonResponse({ subjects }, 200, origin)
+        return jsonResponse({ 
+          subjects,
+          coreSubjects: [...CORE_SUBJECTS],
+          electiveSubjects: [...ELECTIVE_SUBJECTS],
+        }, 200, origin)
       }
 
       // 获取成绩等级列表
