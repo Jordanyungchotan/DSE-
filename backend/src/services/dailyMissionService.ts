@@ -1,10 +1,18 @@
 /**
  * 每日学习任务服务
  * 
+ * ⚠️ 数据唯一来源：learning_events / question_attempts
+ * ⚠️ 禁止从其他表读取刷题或积分依据
+ * 
  * 职责：
  * - 基于用户当前状态，动态生成【今日学习任务】
  * - 行为引导，而非仅仅发分
  * - 让用户知道"今天做什么最划算"
+ * 
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results / quiz_answers 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
  */
 
 import { 
@@ -374,19 +382,32 @@ async function getUserStreak(
 }
 
 async function getMistakeCount(db: D1Database, userId: string): Promise<number> {
+  // 【关键】从 question_attempts 事实表读取
+  // 统计该用户所有做错的题目（去重）
   const result = await db.prepare(`
-    SELECT COUNT(*) as count
-    FROM quiz_answers
+    SELECT COUNT(DISTINCT question_id) as count
+    FROM question_attempts
     WHERE user_id = ? AND is_correct = 0
   `).bind(userId).first<{ count: number }>();
   return result?.count || 0;
 }
 
 async function getReviewedMistakesToday(db: D1Database, userId: string): Promise<number> {
+  // 【关键】从 question_attempts 事实表读取
+  // 复习 = 今天重新做了之前做错的题目且答对了
   const result = await db.prepare(`
-    SELECT COUNT(*) as count
-    FROM mistake_reviews
-    WHERE user_id = ? AND DATE(reviewed_at) = DATE('now')
+    SELECT COUNT(DISTINCT qa_today.question_id) as count
+    FROM question_attempts qa_today
+    WHERE qa_today.user_id = ?
+    AND DATE(qa_today.created_at) = DATE('now')
+    AND qa_today.is_correct = 1
+    AND EXISTS (
+      SELECT 1 FROM question_attempts qa_old
+      WHERE qa_old.user_id = qa_today.user_id
+      AND qa_old.question_id = qa_today.question_id
+      AND qa_old.is_correct = 0
+      AND qa_old.created_at < qa_today.created_at
+    )
   `).bind(userId).first<{ count: number }>();
   return result?.count || 0;
 }

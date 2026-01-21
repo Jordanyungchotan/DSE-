@@ -1,10 +1,19 @@
 /**
  * 激励排行榜服务（积分相关排行榜）
  * 
+ * ⚠️ 数据唯一来源：point_events / user_point_summary（积分表）
+ * ⚠️ 学习数据必须从 learning_events / question_attempts 读取
+ * ⚠️ 禁止从 quiz 表直接读取
+ * 
  * 职责：
  * - 处理积分排行榜
  * - 与学习排行榜分离，数据源不同
  * - 仅用于激励展示，不参与学习能力评估
+ * 
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
  */
 
 // ===== 类型定义 =====

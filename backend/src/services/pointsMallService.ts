@@ -1,10 +1,18 @@
 /**
  * 积分商城服务（升级版）
  * 
+ * ⚠️ 数据唯一来源：learning_events / question_attempts
+ * ⚠️ 禁止从其他表读取刷题或积分依据
+ * 
  * 新增功能：
  * - 咨询类商品兑换
  * - 排名解锁商品
  * - 转化追踪
+ * 
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
  */
 
 import { checkUserPrivileges } from './incentiveLeaderboardService.js';

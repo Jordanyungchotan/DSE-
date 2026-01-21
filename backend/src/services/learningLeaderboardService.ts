@@ -1,12 +1,20 @@
 /**
  * 学习排行榜服务（与积分系统完全解耦）
  * 
+ * ⚠️ 数据唯一来源：learning_events / question_attempts
+ * ⚠️ 禁止从其他表读取刷题或积分依据
+ * 
  * 职责：
  * - 处理学习行为排行榜
  * - 【重要】所有数据必须从 learning_events 表读取
  * - learning_events 是排行榜的唯一事实来源
  * - 支持多维度排行（刷题数、正确率、速度）
  * - 包含轻量级抗刷机制
+ * 
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
  */
 
 // ===== 类型定义 =====

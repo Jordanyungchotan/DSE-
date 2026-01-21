@@ -1,13 +1,20 @@
 /**
  * 学习行为事件记录器
  * 
+ * ⚠️ learning_events 是排行榜、积分、学习分析的【唯一事实来源】
+ * ⚠️ 禁止从 quiz 表读取数据进行统计
+ * 
  * 统一记录所有学习行为到 learning_events 表
- * 该表是排行榜、积分、学习分析的【唯一事实来源】
  * 
  * 规则：
  * - append-only：只增不改
  * - 所有统计必须从 learning_events 读取
  * - 禁止直接读取 quiz_sessions / level_tests 表进行统计
+ * 
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
  */
 
 // ===== 类型定义 =====

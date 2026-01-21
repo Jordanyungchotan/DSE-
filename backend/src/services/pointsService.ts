@@ -1,11 +1,19 @@
 /**
  * 积分服务（后端唯一积分逻辑）
  * 
+ * ⚠️ 数据唯一来源：learning_events / question_attempts
+ * ⚠️ 禁止从其他表读取刷题或积分依据
+ * 
  * 规则：
  * - 所有积分操作必须通过此服务
  * - 前端不做任何积分计算
  * - 使用 shared/domain/points.ts 作为唯一规则来源
  * - 【关键】积分触发基于 learning_events 事实表，而非前端行为
+ * 
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
  */
 
 import {

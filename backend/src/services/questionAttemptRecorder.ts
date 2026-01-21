@@ -1,14 +1,22 @@
 /**
  * 题目级别事实记录服务
  * 
+ * ⚠️ question_attempts 是错题本 & 学习档案的唯一数据来源
+ * ⚠️ 所有查询必须从此表读取，禁止读取 quiz 表
+ * 
  * 规则：
  * 1. 一道题一次作答 = 一条记录
- * 2. 永远 INSERT，不允许 UPDATE
+ * 2. 永远 INSERT，不允许 UPDATE（append-only）
  * 3. 这是错题本 & 学习档案的唯一"原始事实"
  * 
  * 用途：
  * - 错题本：统计错误次数、错误答案、解析
  * - 学习档案：科目掌握度、知识点掌握度、学习趋势
+ * 
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results / quiz_answers 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
  */
 
 export type QuestionSourceType = 'QUIZ' | 'LEVEL_TEST' | 'WRONG_REVIEW';
