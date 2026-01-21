@@ -5545,47 +5545,66 @@ export default {
           
           console.log(`Quiz session saved: ${body.sessionId}, operation: ${operation}, user: ${tokenData.userId}`)
 
-          // 【关键】写入 learning_events 事实表
-          // 这是排行榜、积分、学习分析的唯一数据来源
-          const correctCount = body.questions.filter(q => q.isCorrect).length
-          const learningEventResult = await recordLearningEvent(env.DB, {
-            userId: tokenData.userId,
-            eventType: 'QUIZ',
-            subject: body.config.subject,
-            questionCount: body.config.questionCount,
-            correctCount,
-            durationSeconds: body.timeSpent,
-            accuracy: body.accuracy / 100,
-            sourceId: body.sessionId,
-            metadata: {
-              grade: body.config.grade,
-              difficulty: body.config.difficulty,
-              operation,
-            },
-          })
-          console.log(`Learning event recorded for quiz: ${body.sessionId}`)
+          // ========================================
+          // 【关键】写入两个统一事实表
+          // ========================================
+          
+          // 1️⃣ 计算实际数据（不依赖前端传的 score/accuracy）
+          const actualQuestionCount = body.questions.length
+          const correctCount = body.questions.filter(q => q.isCorrect === true).length
+          const actualAccuracy = actualQuestionCount > 0 ? correctCount / actualQuestionCount : 0
+          
+          console.log(`Quiz stats: questions=${actualQuestionCount}, correct=${correctCount}, accuracy=${actualAccuracy.toFixed(2)}`)
 
-          // 【关键】写入 question_attempts 事实表
-          // 这是错题本 & 学习档案的唯一"原始事实"
-          // 规则：一道题一次作答 = 一条记录，永远 INSERT，不允许 UPDATE
-          const questionAttempts = body.questions.map((q: any) => ({
+          // 2️⃣ 写入 learning_events 事实表（排行榜、积分数据来源）
+          let learningEventResult: { success: boolean; eventId?: number; error?: string } = { success: false }
+          try {
+            learningEventResult = await recordLearningEvent(env.DB, {
+              userId: tokenData.userId,
+              eventType: 'QUIZ',
+              subject: body.config.subject,
+              questionCount: actualQuestionCount,  // 用实际题目数
+              correctCount,
+              durationSeconds: body.timeSpent || 0,
+              accuracy: actualAccuracy,  // 用计算的正确率
+              sourceId: body.sessionId,
+              metadata: {
+                grade: body.config.grade,
+                difficulty: body.config.difficulty,
+                operation,
+                frontendAccuracy: body.accuracy,  // 保留前端传的，用于对比
+              },
+            })
+            console.log(`Learning event recorded: success=${learningEventResult.success}, eventId=${learningEventResult.eventId}`)
+          } catch (leError) {
+            console.error('Failed to record learning event:', leError)
+          }
+
+          // 3️⃣ 写入 question_attempts 事实表（错题本、学习档案数据来源）
+          // 规则：一道题一次作答 = 一条记录，永远 INSERT
+          const questionAttempts = body.questions.map((q: any, index: number) => ({
             userId: tokenData.userId,
-            questionId: q.id || crypto.randomUUID(),
-            questionText: q.question,
-            questionType: q.type || 'multiple_choice',
+            questionId: q.id || `${body.sessionId}_q${index}`,
+            questionText: q.question || '',
+            questionType: q.questionType || q.type || 'multiple_choice',
             subject: body.config.subject,
-            topic: q.topic || null,
-            selectedAnswer: q.selectedAnswer || q.userAnswer,
-            correctAnswer: q.correctAnswer,
-            isCorrect: q.isCorrect,
-            explanation: q.explanation,
+            topic: q.topicTags?.[0] || q.topic || null,
+            selectedAnswer: String(q.userAnswer ?? q.selectedAnswer ?? ''),
+            correctAnswer: String(q.correctAnswer ?? ''),
+            isCorrect: q.isCorrect === true,  // 确保是 boolean
+            explanation: q.explanation || '',
             durationSeconds: q.timeSpent || 0,
             sourceType: 'QUIZ' as const,
             sourceId: body.sessionId,
           }))
           
-          const attemptResult = await recordQuestionAttemptsBatch(env.DB, questionAttempts)
-          console.log(`Question attempts recorded: ${attemptResult.count}/${body.questions.length}`)
+          let attemptResult = { success: false, count: 0, errors: [] as string[] }
+          try {
+            attemptResult = await recordQuestionAttemptsBatch(env.DB, questionAttempts)
+            console.log(`Question attempts recorded: ${attemptResult.count}/${actualQuestionCount}, errors=${attemptResult.errors.length}`)
+          } catch (qaError) {
+            console.error('Failed to record question attempts:', qaError)
+          }
 
           // 【关键】基于 learning_events 检查并发放积分
           // 积分触发条件：题目数 >= 5，正确率 >= 50%
@@ -7965,26 +7984,65 @@ export default {
             now
           ).run()
 
-          // 【关键】写入 learning_events 事实表
-          // 水平测试完成也记录到统一事实表
+          // ========================================
+          // 【关键】写入两个统一事实表
+          // ========================================
+          
           const correctCount = gradingResults.filter(r => r.isCorrect).length
-          const learningEventResult = await recordLearningEvent(env.DB, {
-            userId: tokenData.userId,
-            eventType: 'LEVEL_TEST',
-            subject: test.subject as string,
-            questionCount: questions.length,
-            correctCount,
-            durationSeconds: body.totalTimeSpent,
-            accuracy: correctCount / questions.length,
-            sourceId: testId,
-            metadata: {
-              grade: test.grade,
-              level,
-              finalScore,
-              reportId,
-            },
+          const actualAccuracy = questions.length > 0 ? correctCount / questions.length : 0
+          
+          console.log(`Level test stats: questions=${questions.length}, correct=${correctCount}, accuracy=${actualAccuracy.toFixed(2)}`)
+
+          // 1️⃣ 写入 learning_events 事实表（排行榜、积分数据来源）
+          let learningEventResult: { success: boolean; eventId?: number; error?: string } = { success: false }
+          try {
+            learningEventResult = await recordLearningEvent(env.DB, {
+              userId: tokenData.userId,
+              eventType: 'LEVEL_TEST',
+              subject: test.subject as string,
+              questionCount: questions.length,
+              correctCount,
+              durationSeconds: body.totalTimeSpent || 0,
+              accuracy: actualAccuracy,
+              sourceId: testId,
+              metadata: {
+                grade: test.grade,
+                level,
+                finalScore,
+                reportId,
+              },
+            })
+            console.log(`Learning event recorded: success=${learningEventResult.success}, eventId=${learningEventResult.eventId}`)
+          } catch (leError) {
+            console.error('Failed to record learning event for level test:', leError)
+          }
+
+          // 2️⃣ 写入 question_attempts 事实表（错题本、学习档案数据来源）
+          const questionAttempts = questions.map((q: any, index: number) => {
+            const gradeResult = gradingResults[index]
+            return {
+              userId: tokenData.userId,
+              questionId: q.id || `${testId}_q${index}`,
+              questionText: q.question_text || q.questionText || '',
+              questionType: q.question_type || q.questionType || 'multiple_choice',
+              subject: test.subject as string,
+              topic: q.topic || q.knowledge_points?.[0] || null,
+              selectedAnswer: String(gradeResult?.userAnswer ?? ''),
+              correctAnswer: String(q.correct_answer || q.correctAnswer || ''),
+              isCorrect: gradeResult?.isCorrect === true,
+              explanation: q.explanation || '',
+              durationSeconds: gradeResult?.timeSpent || 0,
+              sourceType: 'LEVEL_TEST' as const,
+              sourceId: testId,
+            }
           })
-          console.log(`Learning event recorded for level test: ${testId}`)
+          
+          try {
+            const attemptResult = await recordQuestionAttemptsBatch(env.DB, questionAttempts)
+            console.log(`Question attempts recorded for level test: ${attemptResult.count}/${questions.length}`)
+          } catch (qaError) {
+            console.error('Failed to record question attempts for level test:', qaError)
+          }
 
           // 【关键】基于 learning_events 检查并发放积分
           // 积分触发条件：正确率 >= 40%
