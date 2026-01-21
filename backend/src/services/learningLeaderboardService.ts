@@ -3,7 +3,8 @@
  * 
  * 职责：
  * - 处理学习行为排行榜
- * - 基于 quiz_sessions / quiz_results 表计算
+ * - 【重要】所有数据必须从 learning_events 表读取
+ * - learning_events 是排行榜的唯一事实来源
  * - 支持多维度排行（刷题数、正确率、速度）
  * - 包含轻量级抗刷机制
  */
@@ -72,13 +73,14 @@ export interface LearningLeaderboardResponse {
 
 /**
  * 获取时间范围的 SQL WHERE 条件
+ * 注意：使用 learning_events 表别名 (le)
  */
 function getTimeRangeCondition(range: LeaderboardRange): string {
   switch (range) {
     case 'DAY':
-      return `AND DATE(qs.created_at) = DATE('now')`;
+      return `AND DATE(le.created_at) = DATE('now')`;
     case 'WEEK':
-      return `AND qs.created_at >= DATE('now', '-7 days')`;
+      return `AND le.created_at >= DATE('now', '-7 days')`;
     case 'ALL':
     default:
       return '';
@@ -87,6 +89,7 @@ function getTimeRangeCondition(range: LeaderboardRange): string {
 
 /**
  * 获取科目过滤条件
+ * 注意：使用 learning_events 表别名 (le)
  */
 function getSubjectCondition(subject: LeaderboardSubject): string {
   if (subject === 'ALL') return '';
@@ -105,7 +108,7 @@ function getSubjectCondition(subject: LeaderboardSubject): string {
   
   const subjectValue = subjectMap[subject];
   if (subjectValue) {
-    return `AND LOWER(qs.subject) = '${subjectValue}'`;
+    return `AND LOWER(le.subject) = '${subjectValue}'`;
   }
   return '';
 }
@@ -201,8 +204,9 @@ export async function getLearningLeaderboard(
   const subjectCondition = getSubjectCondition(subject);
   
   // 抗刷：过滤低正确率的刷题
-  const antiCheatCondition = `AND qs.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}`;
-  const minTimeCondition = `AND qs.avg_time_per_question >= ${ANTI_CHEAT_CONFIG.MIN_TIME_PER_QUESTION}`;
+  const antiCheatCondition = `AND le.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}`;
+  // 计算平均答题时间：duration_seconds / question_count
+  const minTimeCondition = `AND (le.question_count = 0 OR le.duration_seconds * 1.0 / le.question_count >= ${ANTI_CHEAT_CONFIG.MIN_TIME_PER_QUESTION})`;
 
   // 根据不同指标构建不同的查询
   let orderBy: string;
@@ -220,24 +224,31 @@ export async function getLearningLeaderboard(
       break;
   }
 
-  // 主查询：获取排行榜数据（带抗刷过滤）
+  // 主查询：从 learning_events 事实表获取排行榜数据（带抗刷过滤）
+  // 【关键】learning_events 是排行榜唯一数据来源
   const query = `
     SELECT 
-      qs.user_id,
-      COUNT(DISTINCT qs.id) as quiz_count,
-      ROUND(AVG(qs.accuracy) * 100, 1) as accuracy,
-      ROUND(AVG(qs.avg_time_per_question), 1) as avg_time,
+      le.user_id,
+      COUNT(DISTINCT le.id) as quiz_count,
+      ROUND(AVG(le.accuracy) * 100, 1) as accuracy,
+      ROUND(
+        CASE 
+          WHEN SUM(le.question_count) > 0 
+          THEN SUM(le.duration_seconds) * 1.0 / SUM(le.question_count)
+          ELSE 0 
+        END, 1
+      ) as avg_time,
       u.nickname as name,
       u.avatar as avatar_url,
       u.created_at as user_created_at
-    FROM quiz_sessions qs
-    JOIN users u ON u.id = qs.user_id
-    WHERE qs.status = 'completed'
+    FROM learning_events le
+    JOIN users u ON u.id = le.user_id
+    WHERE le.event_type = 'QUIZ'
     ${timeCondition}
     ${subjectCondition}
     ${antiCheatCondition}
     ${minTimeCondition}
-    GROUP BY qs.user_id
+    GROUP BY le.user_id
     HAVING quiz_count > 0
     ORDER BY ${orderBy}, user_created_at ASC
     LIMIT ?
@@ -257,10 +268,11 @@ export async function getLearningLeaderboard(
     }>();
 
   // 获取总参与人数（有效参与）
+  // 【关键】从 learning_events 读取
   const totalQuery = `
-    SELECT COUNT(DISTINCT qs.user_id) as total
-    FROM quiz_sessions qs
-    WHERE qs.status = 'completed'
+    SELECT COUNT(DISTINCT le.user_id) as total
+    FROM learning_events le
+    WHERE le.event_type = 'QUIZ'
     ${timeCondition}
     ${subjectCondition}
     ${antiCheatCondition}
@@ -269,6 +281,7 @@ export async function getLearningLeaderboard(
   const totalParticipants = totalResult?.total || 0;
 
   // 获取平均统计（用于分析优劣势）
+  // 【关键】从 learning_events 读取
   const avgStatsQuery = `
     SELECT 
       AVG(sub.accuracy) as avg_accuracy,
@@ -276,15 +289,21 @@ export async function getLearningLeaderboard(
       AVG(sub.quiz_count) as avg_quiz_count
     FROM (
       SELECT 
-        ROUND(AVG(qs.accuracy) * 100, 1) as accuracy,
-        ROUND(AVG(qs.avg_time_per_question), 1) as avg_time,
-        COUNT(DISTINCT qs.id) as quiz_count
-      FROM quiz_sessions qs
-      WHERE qs.status = 'completed'
+        ROUND(AVG(le.accuracy) * 100, 1) as accuracy,
+        ROUND(
+          CASE 
+            WHEN SUM(le.question_count) > 0 
+            THEN SUM(le.duration_seconds) * 1.0 / SUM(le.question_count)
+            ELSE 0 
+          END, 1
+        ) as avg_time,
+        COUNT(DISTINCT le.id) as quiz_count
+      FROM learning_events le
+      WHERE le.event_type = 'QUIZ'
       ${timeCondition}
       ${subjectCondition}
       ${antiCheatCondition}
-      GROUP BY qs.user_id
+      GROUP BY le.user_id
     ) sub
   `;
   const avgStatsResult = await db.prepare(avgStatsQuery).first<{
@@ -458,25 +477,31 @@ export async function getUserLearningRankWithAnalysis(
 
   const timeCondition = getTimeRangeCondition(range);
   const subjectCondition = getSubjectCondition(subject);
-  const antiCheatCondition = `AND qs.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}`;
+  const antiCheatCondition = `AND le.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}`;
 
-  // 获取用户的学习数据
+  // 获取用户的学习数据（从 learning_events 读取）
   const userQuery = `
     SELECT 
-      qs.user_id,
-      COUNT(DISTINCT qs.id) as quiz_count,
-      ROUND(AVG(qs.accuracy) * 100, 1) as accuracy,
-      ROUND(AVG(qs.avg_time_per_question), 1) as avg_time,
+      le.user_id,
+      COUNT(DISTINCT le.id) as quiz_count,
+      ROUND(AVG(le.accuracy) * 100, 1) as accuracy,
+      ROUND(
+        CASE 
+          WHEN SUM(le.question_count) > 0 
+          THEN SUM(le.duration_seconds) * 1.0 / SUM(le.question_count)
+          ELSE 0 
+        END, 1
+      ) as avg_time,
       u.nickname as name,
       u.avatar as avatar_url
-    FROM quiz_sessions qs
-    JOIN users u ON u.id = qs.user_id
-    WHERE qs.user_id = ?
-    AND qs.status = 'completed'
+    FROM learning_events le
+    JOIN users u ON u.id = le.user_id
+    WHERE le.user_id = ?
+    AND le.event_type = 'QUIZ'
     ${timeCondition}
     ${subjectCondition}
     ${antiCheatCondition}
-    GROUP BY qs.user_id
+    GROUP BY le.user_id
   `;
 
   const userResult = await db
@@ -495,26 +520,26 @@ export async function getUserLearningRankWithAnalysis(
     return null;
   }
 
-  // 计算排名
+  // 计算排名（从 learning_events 读取）
   let rankCondition: string;
   switch (metric) {
     case 'ACCURACY':
       rankCondition = `
-        (ROUND(AVG(qs2.accuracy) * 100, 1) > ${userResult.accuracy || 0})
-        OR (ROUND(AVG(qs2.accuracy) * 100, 1) = ${userResult.accuracy || 0} AND COUNT(DISTINCT qs2.id) > ${userResult.quiz_count})
+        (ROUND(AVG(le2.accuracy) * 100, 1) > ${userResult.accuracy || 0})
+        OR (ROUND(AVG(le2.accuracy) * 100, 1) = ${userResult.accuracy || 0} AND COUNT(DISTINCT le2.id) > ${userResult.quiz_count})
       `;
       break;
     case 'SPEED':
       rankCondition = `
-        (ROUND(AVG(qs2.avg_time_per_question), 1) < ${userResult.avg_time || 999999})
-        OR (ROUND(AVG(qs2.avg_time_per_question), 1) = ${userResult.avg_time || 999999} AND COUNT(DISTINCT qs2.id) > ${userResult.quiz_count})
+        (ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.duration_seconds) * 1.0 / SUM(le2.question_count) ELSE 999999 END, 1) < ${userResult.avg_time || 999999})
+        OR (ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.duration_seconds) * 1.0 / SUM(le2.question_count) ELSE 999999 END, 1) = ${userResult.avg_time || 999999} AND COUNT(DISTINCT le2.id) > ${userResult.quiz_count})
       `;
       break;
     case 'QUIZ_COUNT':
     default:
       rankCondition = `
-        (COUNT(DISTINCT qs2.id) > ${userResult.quiz_count})
-        OR (COUNT(DISTINCT qs2.id) = ${userResult.quiz_count} AND ROUND(AVG(qs2.accuracy) * 100, 1) > ${userResult.accuracy || 0})
+        (COUNT(DISTINCT le2.id) > ${userResult.quiz_count})
+        OR (COUNT(DISTINCT le2.id) = ${userResult.quiz_count} AND ROUND(AVG(le2.accuracy) * 100, 1) > ${userResult.accuracy || 0})
       `;
       break;
   }
@@ -522,13 +547,13 @@ export async function getUserLearningRankWithAnalysis(
   const rankQuery = `
     SELECT COUNT(*) as higher_count
     FROM (
-      SELECT qs2.user_id
-      FROM quiz_sessions qs2
-      WHERE qs2.status = 'completed'
-      ${timeCondition.replace(/qs\./g, 'qs2.')}
-      ${subjectCondition.replace(/qs\./g, 'qs2.')}
-      AND qs2.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
-      GROUP BY qs2.user_id
+      SELECT le2.user_id
+      FROM learning_events le2
+      WHERE le2.event_type = 'QUIZ'
+      ${timeCondition.replace(/le\./g, 'le2.')}
+      ${subjectCondition.replace(/le\./g, 'le2.')}
+      AND le2.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
+      GROUP BY le2.user_id
       HAVING ${rankCondition}
     )
   `;
@@ -611,29 +636,35 @@ export async function getUserLearningStats(
   // 新增：被过滤的低质量刷题数
   filteredQuizzes: number;
 } | null> {
-  // 基础统计（所有刷题）
+  // 基础统计（所有刷题）- 从 learning_events 读取
   const allStatsQuery = `
     SELECT 
-      COUNT(DISTINCT qs.id) as total_quizzes
-    FROM quiz_sessions qs
-    WHERE qs.user_id = ?
-    AND qs.status = 'completed'
+      COUNT(DISTINCT le.id) as total_quizzes
+    FROM learning_events le
+    WHERE le.user_id = ?
+    AND le.event_type = 'QUIZ'
   `;
   const allStats = await db.prepare(allStatsQuery).bind(userId).first<{ total_quizzes: number }>();
 
-  // 有效统计（抗刷过滤后）
+  // 有效统计（抗刷过滤后）- 从 learning_events 读取
   const statsQuery = `
     SELECT 
-      COUNT(DISTINCT qs.id) as effective_quizzes,
-      SUM(qs.total_questions) as total_questions,
-      SUM(qs.correct_answers) as correct_answers,
-      ROUND(AVG(qs.accuracy) * 100, 1) as avg_accuracy,
-      ROUND(AVG(qs.avg_time_per_question), 1) as avg_time,
-      SUM(CASE WHEN qs.accuracy = 1.0 THEN 1 ELSE 0 END) as perfect_sessions
-    FROM quiz_sessions qs
-    WHERE qs.user_id = ?
-    AND qs.status = 'completed'
-    AND qs.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
+      COUNT(DISTINCT le.id) as effective_quizzes,
+      SUM(le.question_count) as total_questions,
+      SUM(le.correct_count) as correct_answers,
+      ROUND(AVG(le.accuracy) * 100, 1) as avg_accuracy,
+      ROUND(
+        CASE 
+          WHEN SUM(le.question_count) > 0 
+          THEN SUM(le.duration_seconds) * 1.0 / SUM(le.question_count)
+          ELSE 0 
+        END, 1
+      ) as avg_time,
+      SUM(CASE WHEN le.accuracy = 1.0 THEN 1 ELSE 0 END) as perfect_sessions
+    FROM learning_events le
+    WHERE le.user_id = ?
+    AND le.event_type = 'QUIZ'
+    AND le.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
   `;
 
   const stats = await db.prepare(statsQuery).bind(userId).first<{
@@ -649,12 +680,12 @@ export async function getUserLearningStats(
     return null;
   }
 
-  // 最近 5 次有效得分
+  // 最近 5 次有效得分 - 从 learning_events 读取
   const recentQuery = `
     SELECT ROUND(accuracy * 100) as score
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     AND accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
     ORDER BY created_at DESC
     LIMIT 5
@@ -662,12 +693,12 @@ export async function getUserLearningStats(
   const recentResults = await db.prepare(recentQuery).bind(userId).all<{ score: number }>();
   const recentScores = recentResults.results?.map(r => r.score) || [];
 
-  // 连续学习天数
+  // 连续学习天数 - 从 learning_events 读取
   const streakQuery = `
     SELECT DATE(created_at) as quiz_date
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     GROUP BY DATE(created_at)
     ORDER BY quiz_date DESC
     LIMIT 30

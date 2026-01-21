@@ -738,15 +738,15 @@ async function getRankHistory(
   userId: string,
   days: number
 ): Promise<{ date: string; rank: number }[]> {
-  // 简化实现：从 quiz_sessions 推算历史排名变化
+  // 【关键】从 learning_events 事实表读取
   // 实际生产中应有专门的排名快照表
   const history = await db.prepare(`
     SELECT 
       DATE(created_at) as date,
       COUNT(*) as quiz_count
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     AND created_at >= DATE('now', '-' || ? || ' days')
     GROUP BY DATE(created_at)
     ORDER BY date ASC
@@ -791,11 +791,12 @@ async function getUserStreakInfo(
   db: D1Database,
   userId: string
 ): Promise<{ currentStreak: number; longestStreak: number }> {
+  // 【关键】从 learning_events 事实表读取
   const streakQuery = `
     SELECT DATE(created_at) as quiz_date
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     GROUP BY DATE(created_at)
     ORDER BY quiz_date DESC
     LIMIT 30
@@ -829,13 +830,14 @@ async function getWeakSubjects(
   db: D1Database,
   userId: string
 ): Promise<{ name: string; accuracy: number }[]> {
+  // 【关键】从 learning_events 事实表读取
   const result = await db.prepare(`
     SELECT 
       subject as name,
       ROUND(AVG(accuracy) * 100, 1) as accuracy
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     AND subject IS NOT NULL
     GROUP BY subject
     HAVING COUNT(*) >= 3

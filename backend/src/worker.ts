@@ -68,6 +68,9 @@ import {
   getDailyMissions,
   checkMissionProgress,
 } from './services/dailyMissionService.js'
+import {
+  recordLearningEvent,
+} from './services/learningEventRecorder.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -5532,6 +5535,26 @@ export default {
           
           console.log(`Quiz session saved: ${body.sessionId}, operation: ${operation}, user: ${tokenData.userId}`)
 
+          // 【关键】写入 learning_events 事实表
+          // 这是排行榜、积分、学习分析的唯一数据来源
+          const correctCount = body.questions.filter(q => q.isCorrect).length
+          await recordLearningEvent(env.DB, {
+            userId: tokenData.userId,
+            eventType: 'QUIZ',
+            subject: body.config.subject,
+            questionCount: body.config.questionCount,
+            correctCount,
+            durationSeconds: body.timeSpent,
+            accuracy: body.accuracy / 100,
+            sourceId: body.sessionId,
+            metadata: {
+              grade: body.config.grade,
+              difficulty: body.config.difficulty,
+              operation,
+            },
+          })
+          console.log(`Learning event recorded for quiz: ${body.sessionId}`)
+
           // 同时更新排行榜统计
           const existingStats = await env.DB.prepare(
             'SELECT * FROM user_ranking_stats WHERE user_id = ?'
@@ -7993,6 +8016,27 @@ export default {
             JSON.stringify({ encouragement: aiReport.encouragement }),
             now
           ).run()
+
+          // 【关键】写入 learning_events 事实表
+          // 水平测试完成也记录到统一事实表
+          const correctCount = gradingResults.filter(r => r.isCorrect).length
+          await recordLearningEvent(env.DB, {
+            userId: tokenData.userId,
+            eventType: 'LEVEL_TEST',
+            subject: test.subject as string,
+            questionCount: questions.length,
+            correctCount,
+            durationSeconds: body.totalTimeSpent,
+            accuracy: correctCount / questions.length,
+            sourceId: testId,
+            metadata: {
+              grade: test.grade,
+              level,
+              finalScore,
+              reportId,
+            },
+          })
+          console.log(`Learning event recorded for level test: ${testId}`)
 
           return jsonResponse({
             success: true,

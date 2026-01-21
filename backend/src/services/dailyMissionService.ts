@@ -293,14 +293,21 @@ async function getTodayQuizStats(
   todayAccuracy: number;
   todayAvgTime: number;
 }> {
+  // 【关键】从 learning_events 事实表读取
   const result = await db.prepare(`
     SELECT 
       COUNT(DISTINCT id) as quiz_count,
       ROUND(AVG(accuracy) * 100, 1) as accuracy,
-      ROUND(AVG(avg_time_per_question), 1) as avg_time
-    FROM quiz_sessions
+      ROUND(
+        CASE 
+          WHEN SUM(question_count) > 0 
+          THEN SUM(duration_seconds) * 1.0 / SUM(question_count)
+          ELSE 0 
+        END, 1
+      ) as avg_time
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     AND DATE(created_at) = DATE('now')
     AND accuracy >= ?
   `).bind(userId, ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD).first<{
@@ -320,11 +327,12 @@ async function getUserStreak(
   db: D1Database,
   userId: string
 ): Promise<{ currentStreak: number; longestStreak: number }> {
+  // 【关键】从 learning_events 事实表读取
   const streakQuery = `
     SELECT DATE(created_at) as quiz_date
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     GROUP BY DATE(created_at)
     ORDER BY quiz_date DESC
     LIMIT 30
@@ -387,14 +395,15 @@ async function findWeakestSubject(
   db: D1Database,
   userId: string
 ): Promise<{ key: string; name: string } | null> {
+  // 【关键】从 learning_events 事实表读取
   const result = await db.prepare(`
     SELECT 
       subject,
       AVG(accuracy) as avg_accuracy,
       COUNT(*) as quiz_count
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     AND subject IS NOT NULL
     GROUP BY subject
     HAVING quiz_count >= 3
@@ -423,11 +432,12 @@ async function getSubjectProgressToday(
   const subjectName = SUBJECT_NAMES[subjectKey];
   if (!subjectName) return 0;
 
+  // 【关键】从 learning_events 事实表读取
   const result = await db.prepare(`
     SELECT COUNT(*) as count
-    FROM quiz_sessions
+    FROM learning_events
     WHERE user_id = ?
-    AND status = 'completed'
+    AND event_type = 'QUIZ'
     AND DATE(created_at) = DATE('now')
     AND (subject = ? OR subject LIKE ?)
   `).bind(userId, subjectName, `%${subjectName}%`).first<{ count: number }>();

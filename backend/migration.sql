@@ -384,7 +384,6 @@ CREATE INDEX IF NOT EXISTS idx_autosave_user ON test_autosave(user_id);
 
 CREATE INDEX IF NOT EXISTS idx_review_queue_status ON question_review_queue(status);
 
-
 -- =====================
 -- 积分系统表迁移
 -- =====================
@@ -459,3 +458,32 @@ CREATE INDEX IF NOT EXISTS idx_point_summary_points ON user_point_summary(total_
 CREATE INDEX IF NOT EXISTS idx_daily_task_user_date ON user_daily_task_counts(user_id, count_date);
 CREATE INDEX IF NOT EXISTS idx_redemptions_user ON point_redemptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_mall_items_category ON point_mall_items(category);
+
+-- =====================
+-- 学习行为事实表（唯一数据来源）
+-- =====================
+-- 排行榜、积分、学习分析的统一事实来源
+-- append-only，只增不改
+
+CREATE TABLE IF NOT EXISTS learning_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,          -- QUIZ | LEVEL_TEST | ANALYSIS
+  subject TEXT,                       -- 科目（可选）
+  question_count INTEGER DEFAULT 0,   -- 题目数量
+  correct_count INTEGER DEFAULT 0,    -- 正确数量
+  duration_seconds INTEGER DEFAULT 0, -- 用时（秒）
+  accuracy REAL DEFAULT 0,            -- 正确率 (0-1)
+  source_id TEXT,                     -- 来源 ID（如 quiz_session_id, level_test_id）
+  metadata TEXT,                      -- 额外元数据（JSON）
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 学习行为事实表索引
+CREATE INDEX IF NOT EXISTS idx_learning_events_user ON learning_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_learning_events_type ON learning_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_learning_events_subject ON learning_events(subject);
+CREATE INDEX IF NOT EXISTS idx_learning_events_created ON learning_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_learning_events_user_type ON learning_events(user_id, event_type);
+CREATE INDEX IF NOT EXISTS idx_learning_events_user_date ON learning_events(user_id, DATE(created_at));
