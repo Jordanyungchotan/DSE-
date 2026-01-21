@@ -108,7 +108,14 @@ const LearningProfilePage = () => {
     ...SUPPORTED_SUBJECTS.ARTS_ELECTIVES,
   ]
 
-  // 加载学习档案
+  /**
+   * 加载学习档案
+   * 
+   * 【数据主干对齐】
+   * - 数据来源：后端 /api/quiz/learning-profile
+   * - 前端职责：只渲染，不计算
+   * - 若无数据：显示空状态，不使用 mock 数据
+   */
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login')
@@ -131,65 +138,29 @@ const LearningProfilePage = () => {
       }
 
       const data = await response.json()
-      setProfile(data)
+      
+      // 后端返回结构：{ overview, subjectMastery, topicMastery, recentActivity }
+      // 映射到前端 LearningProfile 接口
+      setProfile({
+        totalQuizzes: data.overview?.totalQuizzes || 0,
+        totalQuestions: data.overview?.totalQuestions || 0,
+        correctAnswers: data.overview?.correctAnswers || 0,
+        totalTimeSpent: data.overview?.totalTimeSpent || 0,
+        currentStreak: data.overview?.currentStreak || 0,
+        longestStreak: data.overview?.longestStreak || 0,
+        lastStudyDate: data.overview?.lastStudyDate || new Date().toISOString().split('T')[0],
+        subjectMastery: data.subjectMastery || [],
+        topicMastery: data.topicMastery || [],
+        achievements: data.achievements || [],
+        goals: data.goals || [],
+        recentActivity: data.recentActivity || [],
+      })
     } catch (error) {
       console.error('加载学习档案失败:', error)
-      // 使用模拟数据
-      setProfile(generateMockProfile())
+      // ⚠️ 【数据主干对齐】不使用 mock 数据，显示空状态
+      setProfile(null)
     } finally {
       setLoading(false)
-    }
-  }
-
-  // 生成模拟数据
-  const generateMockProfile = (): LearningProfile => {
-    return {
-      totalQuizzes: 47,
-      totalQuestions: 523,
-      correctAnswers: 389,
-      totalTimeSpent: 1250, // 分钟
-      currentStreak: 5,
-      longestStreak: 12,
-      lastStudyDate: new Date().toISOString().split('T')[0],
-      subjectMastery: [
-        { subjectId: 'math', subjectName: '数学', totalQuestions: 180, correctAnswers: 142, accuracy: 78.9, recentTrend: 'up', lastPracticed: '2024-12-23' },
-        { subjectId: 'physics', subjectName: '物理', totalQuestions: 120, correctAnswers: 89, accuracy: 74.2, recentTrend: 'stable', lastPracticed: '2024-12-22' },
-        { subjectId: 'chemistry', subjectName: '化学', totalQuestions: 95, correctAnswers: 71, accuracy: 74.7, recentTrend: 'up', lastPracticed: '2024-12-21' },
-        { subjectId: 'english', subjectName: '英国语文', totalQuestions: 68, correctAnswers: 52, accuracy: 76.5, recentTrend: 'down', lastPracticed: '2024-12-20' },
-        { subjectId: 'chinese', subjectName: '中国语文', totalQuestions: 60, correctAnswers: 35, accuracy: 58.3, recentTrend: 'stable', lastPracticed: '2024-12-19' },
-      ],
-      topicMastery: [
-        { topic: '二次方程', subject: 'math', mastery: 85, questionsAttempted: 32, lastAttempted: '2024-12-23' },
-        { topic: '三角函数', subject: 'math', mastery: 72, questionsAttempted: 28, lastAttempted: '2024-12-22' },
-        { topic: '牛顿力学', subject: 'physics', mastery: 78, questionsAttempted: 25, lastAttempted: '2024-12-21' },
-        { topic: '化学平衡', subject: 'chemistry', mastery: 65, questionsAttempted: 20, lastAttempted: '2024-12-20' },
-        { topic: '有机化学', subject: 'chemistry', mastery: 58, questionsAttempted: 18, lastAttempted: '2024-12-19' },
-        { topic: '电磁感应', subject: 'physics', mastery: 45, questionsAttempted: 15, lastAttempted: '2024-12-18' },
-      ],
-      achievements: [
-        { id: '1', name: '初露锋芒', description: '完成第一次刷题', icon: '🌟', unlockedAt: '2024-12-15', progress: 100 },
-        { id: '2', name: '勤学不倦', description: '连续学习7天', icon: '🔥', unlockedAt: null, progress: 71 },
-        { id: '3', name: '百题斩', description: '完成100道题目', icon: '💯', unlockedAt: '2024-12-18', progress: 100 },
-        { id: '4', name: '千题王', description: '完成1000道题目', icon: '👑', unlockedAt: null, progress: 52 },
-        { id: '5', name: '精准狙击', description: '单次练习正确率100%', icon: '🎯', unlockedAt: '2024-12-20', progress: 100 },
-        { id: '6', name: '全科达人', description: '所有科目正确率达到80%', icon: '📚', unlockedAt: null, progress: 40 },
-        { id: '7', name: '速度之星', description: '平均答题时间低于1分钟', icon: '⚡', unlockedAt: null, progress: 65 },
-        { id: '8', name: '挑战者', description: '完成50道考试难度题目', icon: '🏆', unlockedAt: null, progress: 28 },
-      ],
-      goals: [
-        { id: '1', title: '每日刷题', target: 20, current: 15, deadline: new Date().toISOString(), type: 'daily' },
-        { id: '2', title: '本周目标', target: 100, current: 67, deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), type: 'weekly' },
-        { id: '3', title: '月度挑战', target: 500, current: 312, deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), type: 'monthly' },
-      ],
-      recentActivity: [
-        { date: '2024-12-23', quizCount: 3, questionsAnswered: 35, accuracy: 82.9 },
-        { date: '2024-12-22', quizCount: 2, questionsAnswered: 25, accuracy: 76.0 },
-        { date: '2024-12-21', quizCount: 4, questionsAnswered: 42, accuracy: 78.6 },
-        { date: '2024-12-20', quizCount: 2, questionsAnswered: 20, accuracy: 85.0 },
-        { date: '2024-12-19', quizCount: 3, questionsAnswered: 30, accuracy: 73.3 },
-        { date: '2024-12-18', quizCount: 1, questionsAnswered: 15, accuracy: 80.0 },
-        { date: '2024-12-17', quizCount: 2, questionsAnswered: 22, accuracy: 68.2 },
-      ],
     }
   }
 
@@ -246,9 +217,10 @@ const LearningProfilePage = () => {
     )
   }
 
+  // 【数据主干对齐】正确率由后端计算，前端只负责显示
   const overallAccuracy = profile.totalQuestions > 0
     ? ((profile.correctAnswers / profile.totalQuestions) * 100).toFixed(1)
-    : 0
+    : '0'
 
   return (
     <div className={styles.profilePage}>

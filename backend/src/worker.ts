@@ -5692,69 +5692,108 @@ export default {
       }
 
       // 获取刷题历史记录
+      // 【数据主干对齐】数据来源：learning_events + question_attempts
+      // ⚠️ 禁止从 quiz_sessions 读取
       if (path === '/api/quiz/history' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
-          return jsonResponse({ history: [], debug: 'no auth header' }, 200, origin)
+          return jsonResponse({ 
+            stats: { totalSessions: 0, totalQuestions: 0, averageAccuracy: 0, totalTime: 0 },
+            history: [] 
+          }, 200, origin)
         }
 
         const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
         if (!tokenData) {
-          return jsonResponse({ history: [], debug: 'invalid token' }, 200, origin)
+          return jsonResponse({ 
+            stats: { totalSessions: 0, totalQuestions: 0, averageAccuracy: 0, totalTime: 0 },
+            history: [] 
+          }, 200, origin)
         }
 
         try {
-          const query = `
+          // 1️⃣ 从 learning_events 获取刷题历史
+          const historyQuery = `
             SELECT 
-              id,
-              config,
-              questions,
-              status,
-              score,
-              accuracy,
-              total_time as timeSpent,
-              created_at as completedAt
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed'
-            ORDER BY created_at DESC
+              le.id,
+              le.subject,
+              le.question_count as totalQuestions,
+              le.correct_count as score,
+              ROUND(le.accuracy * 100, 1) as accuracy,
+              le.duration_seconds as timeSpent,
+              le.created_at as completedAt,
+              le.source_id,
+              le.metadata
+            FROM learning_events le
+            WHERE le.user_id = ? AND le.event_type = 'QUIZ'
+            ORDER BY le.created_at DESC
             LIMIT 50
           `
           
-          const results = await env.DB.prepare(query).bind(tokenData.userId).all()
+          const historyResults = await env.DB.prepare(historyQuery).bind(tokenData.userId).all()
 
-          const history = (results.results || []).map((row: Record<string, unknown>) => {
-            let config = { subject: 'math', grade: 'f5', difficulty: 'standard', questionCount: 10 }
-            let questionsArray: unknown[] = []
-            
-            try {
-              config = JSON.parse(row.config as string || '{}')
-            } catch {}
-            
-            try {
-              questionsArray = JSON.parse(row.questions as string || '[]')
-            } catch {}
+          // 2️⃣ 统计数据由后端计算（不依赖前端）
+          const statsQuery = `
+            SELECT 
+              COUNT(*) as totalSessions,
+              COALESCE(SUM(question_count), 0) as totalQuestions,
+              COALESCE(SUM(correct_count), 0) as totalCorrect,
+              COALESCE(SUM(duration_seconds), 0) as totalTime
+            FROM learning_events
+            WHERE user_id = ? AND event_type = 'QUIZ'
+          `
+          const statsResult = await env.DB.prepare(statsQuery).bind(tokenData.userId).first<{
+            totalSessions: number
+            totalQuestions: number
+            totalCorrect: number
+            totalTime: number
+          }>()
 
-            // totalQuestions 优先从题目数组长度获取，其次从config获取
-            const totalQuestions = questionsArray.length || config.questionCount || 10
+          const totalSessions = statsResult?.totalSessions || 0
+          const totalQuestions = statsResult?.totalQuestions || 0
+          const totalCorrect = statsResult?.totalCorrect || 0
+          const totalTime = statsResult?.totalTime || 0
+          const averageAccuracy = totalQuestions > 0 
+            ? Math.round((totalCorrect / totalQuestions) * 1000) / 10
+            : 0
+
+          // 3️⃣ 映射历史数据
+          const history = (historyResults.results || []).map((row: Record<string, unknown>) => {
+            let metadata: { grade?: string; difficulty?: string } = {}
+            try {
+              metadata = JSON.parse(row.metadata as string || '{}')
+            } catch {}
 
             return {
               id: row.id,
-              subject: config.subject || 'math',
-              grade: config.grade || 'f5',
-              difficulty: config.difficulty || 'standard',
+              subject: row.subject || 'math',
+              grade: metadata.grade || 'f5',
+              difficulty: metadata.difficulty || 'standard',
               score: row.score || 0,
-              totalQuestions,
-              accuracy: Math.round((row.accuracy as number || 0) * 100),
+              totalQuestions: row.totalQuestions || 0,
+              accuracy: row.accuracy || 0,
               timeSpent: row.timeSpent || 0,
               completedAt: row.completedAt,
-              questions: questionsArray // 添加题目数组
             }
           })
 
-          return jsonResponse({ history, count: history.length }, 200, origin)
+          return jsonResponse({ 
+            stats: {
+              totalSessions,
+              totalQuestions,
+              averageAccuracy,
+              totalTime,
+            },
+            history, 
+            count: history.length 
+          }, 200, origin)
         } catch (dbError) {
           console.error('Load quiz history error:', dbError)
-          return jsonResponse({ history: [], error: String(dbError) }, 200, origin)
+          return jsonResponse({ 
+            stats: { totalSessions: 0, totalQuestions: 0, averageAccuracy: 0, totalTime: 0 },
+            history: [], 
+            error: String(dbError) 
+          }, 200, origin)
         }
       }
 
@@ -8036,6 +8075,8 @@ export default {
       }
 
       // 获取测试历史
+      // 获取水平测试历史
+      // 【数据主干对齐】progressData 由后端计算
       if (path === '/api/level-test/history' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
@@ -8107,11 +8148,123 @@ export default {
 
           const countResult = await env.DB.prepare(countQuery).bind(...countParams).first() as { count: number }
 
+          // 【数据主干对齐】后端计算 progressData
+          let progressData = null
+          if (tests.length > 0) {
+            // 1️⃣ 计算科目进步
+            const subjectProgressQuery = `
+              SELECT 
+                subject,
+                MAX(CASE WHEN rn = 1 THEN level END) as currentLevel,
+                MAX(CASE WHEN rn = 2 THEN level END) as previousLevel,
+                ROUND(AVG(final_score), 0) as avgScore,
+                COUNT(*) as testCount
+              FROM (
+                SELECT 
+                  subject, level, final_score,
+                  ROW_NUMBER() OVER (PARTITION BY subject ORDER BY completed_at DESC) as rn
+                FROM level_tests
+                WHERE user_id = ? AND status = 'graded'
+              )
+              GROUP BY subject
+            `
+            const subjectProgressResult = await env.DB.prepare(subjectProgressQuery)
+              .bind(tokenData.userId).all()
+            
+            const levelOrder = ['U', '1', '2', '3', '4', '5', '5*', '5**']
+            
+            const subjectProgress = (subjectProgressResult.results || []).map((row: Record<string, unknown>) => {
+              const currentLevel = row.currentLevel as string || 'U'
+              const previousLevel = row.previousLevel as string || currentLevel
+              const currentIdx = levelOrder.indexOf(currentLevel)
+              const previousIdx = levelOrder.indexOf(previousLevel)
+              
+              let trend: 'up' | 'down' | 'stable' = 'stable'
+              if (currentIdx > previousIdx) trend = 'up'
+              else if (currentIdx < previousIdx) trend = 'down'
+              
+              return {
+                subject: row.subject as string,
+                currentLevel,
+                previousLevel,
+                trend,
+                avgScore: row.avgScore as number || 0,
+                testCount: row.testCount as number || 0
+              }
+            })
+
+            // 2️⃣ 计算总体趋势
+            const recentScoresQuery = `
+              SELECT final_score
+              FROM level_tests
+              WHERE user_id = ? AND status = 'graded'
+              ORDER BY completed_at DESC
+              LIMIT 10
+            `
+            const recentScoresResult = await env.DB.prepare(recentScoresQuery)
+              .bind(tokenData.userId).all()
+            const recentScores = (recentScoresResult.results || [])
+              .map((r: Record<string, unknown>) => r.final_score as number)
+              .reverse()
+            
+            let overallTrend: 'up' | 'down' | 'stable' = 'stable'
+            let scoreChange = 0
+            if (recentScores.length >= 2) {
+              scoreChange = recentScores[recentScores.length - 1] - recentScores[recentScores.length - 2]
+              if (scoreChange > 5) overallTrend = 'up'
+              else if (scoreChange < -5) overallTrend = 'down'
+            }
+
+            // 3️⃣ 找出最好和最差的科目
+            const sortedSubjects = [...subjectProgress].sort((a, b) => b.avgScore - a.avgScore)
+            const bestSubject = sortedSubjects[0]?.subject || '-'
+            const worstSubject = sortedSubjects[sortedSubjects.length - 1]?.subject || '-'
+
+            // 4️⃣ 计算连续天数（从 learning_events）
+            const streakQuery = `
+              SELECT DISTINCT DATE(created_at) as test_date
+              FROM learning_events
+              WHERE user_id = ? AND event_type = 'LEVEL_TEST'
+              ORDER BY test_date DESC
+              LIMIT 31
+            `
+            const streakResult = await env.DB.prepare(streakQuery)
+              .bind(tokenData.userId).all()
+            
+            let streakDays = 0
+            const today = new Date().toISOString().split('T')[0]
+            const dates = (streakResult.results || []).map((r: Record<string, unknown>) => r.test_date as string)
+            
+            for (let i = 0; i < dates.length; i++) {
+              const expectedDate = new Date()
+              expectedDate.setDate(expectedDate.getDate() - i)
+              const expected = expectedDate.toISOString().split('T')[0]
+              
+              if (dates[i] === expected || (i === 0 && dates[i] === today)) {
+                streakDays++
+              } else {
+                break
+              }
+            }
+
+            progressData = {
+              overallTrend,
+              scoreChange,
+              levelChange: 0,
+              bestSubject,
+              worstSubject,
+              streakDays,
+              subjectProgress,
+              recentScores
+            }
+          }
+
           return jsonResponse({
             tests,
             total: countResult?.count || 0,
             limit,
-            offset
+            offset,
+            progressData  // 【数据主干对齐】后端返回进步数据
           }, 200, origin)
 
         } catch (error) {

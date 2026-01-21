@@ -98,7 +98,14 @@ const QuizHistoryPage = () => {
     ...SUPPORTED_SUBJECTS.ARTS_ELECTIVES,
   ]
 
-  // 加载历史记录
+  /**
+   * 加载历史记录
+   * 
+   * 【数据主干对齐】
+   * - 数据来源：后端 /api/quiz/history（从 learning_events 聚合）
+   * - 前端职责：只渲染，不计算统计数据
+   * - 统计数据由后端返回：stats.totalSessions / totalQuestions / averageAccuracy / totalTime
+   */
   useEffect(() => {
     if (!isAuthenticated) {
       message.warning('请先登录查看刷题历史')
@@ -125,95 +132,36 @@ const QuizHistoryPage = () => {
       const historyData = data.history || []
       setHistory(historyData)
 
-      // 计算统计数据
-      if (historyData.length > 0) {
-        const totalSessions = historyData.length
-        const totalQuestions = historyData.reduce((sum: number, h: QuizHistoryItem) => sum + (h.totalQuestions || h.score), 0)
-        const totalAccuracy = historyData.reduce((sum: number, h: QuizHistoryItem) => sum + h.accuracy, 0)
-        const totalTime = historyData.reduce((sum: number, h: QuizHistoryItem) => sum + (h.timeSpent || 0), 0)
-
+      // 【数据主干对齐】统计数据由后端计算并返回
+      if (data.stats) {
         setStats({
-          totalSessions,
-          totalQuestions,
-          averageAccuracy: Math.round(totalAccuracy / totalSessions * 10) / 10,
-          totalTime,
+          totalSessions: data.stats.totalSessions || 0,
+          totalQuestions: data.stats.totalQuestions || 0,
+          averageAccuracy: data.stats.averageAccuracy || 0,
+          totalTime: data.stats.totalTime || 0,
+        })
+      } else {
+        // 兼容旧 API：若后端未返回 stats，则置为 0
+        setStats({
+          totalSessions: historyData.length,
+          totalQuestions: 0,
+          averageAccuracy: 0,
+          totalTime: 0,
         })
       }
     } catch (error) {
       console.error('加载历史失败:', error)
-      // 使用模拟数据
-      const mockHistory = generateMockHistory()
-      setHistory(mockHistory)
-      calculateStats(mockHistory)
+      // ⚠️ 【数据主干对齐】不使用 mock 数据，显示空状态
+      setHistory([])
+      setStats({
+        totalSessions: 0,
+        totalQuestions: 0,
+        averageAccuracy: 0,
+        totalTime: 0,
+      })
     } finally {
       setLoading(false)
     }
-  }
-
-  // 生成模拟历史数据
-  const generateMockHistory = (): QuizHistoryItem[] => {
-    return [
-      {
-        id: '1',
-        subject: 'math',
-        grade: 'f5',
-        difficulty: 'standard',
-        score: 8,
-        accuracy: 80,
-        totalQuestions: 10,
-        timeSpent: 900,
-        completedAt: '2024-12-23T10:30:00',
-      },
-      {
-        id: '2',
-        subject: 'physics',
-        grade: 'f5',
-        difficulty: 'challenging',
-        score: 6,
-        accuracy: 60,
-        totalQuestions: 10,
-        timeSpent: 1200,
-        completedAt: '2024-12-22T15:20:00',
-      },
-      {
-        id: '3',
-        subject: 'chemistry',
-        grade: 'f4',
-        difficulty: 'basic',
-        score: 9,
-        accuracy: 90,
-        totalQuestions: 10,
-        timeSpent: 600,
-        completedAt: '2024-12-21T09:15:00',
-      },
-      {
-        id: '4',
-        subject: 'english',
-        grade: 'f6',
-        difficulty: 'exam',
-        score: 5,
-        accuracy: 50,
-        totalQuestions: 10,
-        timeSpent: 1500,
-        completedAt: '2024-12-20T14:00:00',
-      },
-    ]
-  }
-
-  const calculateStats = (data: QuizHistoryItem[]) => {
-    if (data.length === 0) return
-
-    const totalSessions = data.length
-    const totalQuestions = data.reduce((sum, h) => sum + h.totalQuestions, 0)
-    const totalAccuracy = data.reduce((sum, h) => sum + h.accuracy, 0)
-    const totalTime = data.reduce((sum, h) => sum + h.timeSpent, 0)
-
-    setStats({
-      totalSessions,
-      totalQuestions,
-      averageAccuracy: Math.round(totalAccuracy / totalSessions * 10) / 10,
-      totalTime,
-    })
   }
 
   // 获取年级名称

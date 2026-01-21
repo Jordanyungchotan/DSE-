@@ -73,6 +73,14 @@ export default function LevelTestHistoryPage() {
     loadHistory()
   }, [page, pageSize, filterSubject, filterGrade])
 
+  /**
+   * 加载历史记录
+   * 
+   * 【数据主干对齐】
+   * - 数据来源：后端 /api/level-test/history（从 learning_events 聚合）
+   * - 前端职责：只渲染，不计算进步数据
+   * - progressData 由后端返回
+   */
   const loadHistory = async () => {
     setLoading(true)
     try {
@@ -81,116 +89,36 @@ export default function LevelTestHistoryPage() {
       if (filterGrade) url += `&grade=${encodeURIComponent(filterGrade)}`
       
       const res = await apiFetch(url)
-      const response = await res.json() as { tests?: TestRecord[]; total?: number }
+      const response = await res.json() as { 
+        tests?: TestRecord[]
+        total?: number
+        progressData?: ProgressData  // 【数据主干对齐】后端计算的进步数据
+      }
       
       if (response.tests) {
         setTests(response.tests)
         setTotal(response.total || 0)
         
-        // 计算进步数据
-        calculateProgressData(response.tests)
+        // 【数据主干对齐】进步数据由后端计算并返回
+        if (response.progressData) {
+          setProgressData(response.progressData)
+        } else {
+          setProgressData(null)
+        }
       }
     } catch (error) {
       console.error('Load history error:', error)
+      // ⚠️ 【数据主干对齐】不在前端计算，显示空状态
+      setTests([])
+      setTotal(0)
+      setProgressData(null)
     } finally {
       setLoading(false)
     }
   }
 
-  // 计算进步追踪数据
-  const calculateProgressData = (testsData: TestRecord[]) => {
-    if (testsData.length === 0) {
-      setProgressData(null)
-      return
-    }
-
-    // 按科目分组
-    const bySubject: Record<string, TestRecord[]> = {}
-    testsData.forEach(test => {
-      if (!bySubject[test.subject]) {
-        bySubject[test.subject] = []
-      }
-      bySubject[test.subject].push(test)
-    })
-
-    // 计算科目进步
-    const subjectProgress = Object.entries(bySubject).map(([subject, subjectTests]) => {
-      const sortedTests = subjectTests.sort((a, b) => 
-        new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
-      )
-      
-      const currentLevel = sortedTests[0]?.level || 'U'
-      const previousLevel = sortedTests[1]?.level || currentLevel
-      const avgScore = sortedTests.reduce((sum, t) => sum + t.finalScore, 0) / sortedTests.length
-      
-      const levelOrder = ['U', '1', '2', '3', '4', '5', '5*', '5**']
-      const currentIdx = levelOrder.indexOf(currentLevel)
-      const previousIdx = levelOrder.indexOf(previousLevel)
-      
-      let trend: 'up' | 'down' | 'stable' = 'stable'
-      if (currentIdx > previousIdx) trend = 'up'
-      else if (currentIdx < previousIdx) trend = 'down'
-      
-      return {
-        subject,
-        currentLevel,
-        previousLevel,
-        trend,
-        avgScore: Math.round(avgScore),
-        testCount: sortedTests.length
-      }
-    })
-
-    // 计算总体趋势
-    const sortedAll = [...testsData].sort((a, b) => 
-      new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
-    )
-    
-    const recentScores = sortedAll.slice(0, 10).map(t => t.finalScore).reverse()
-    
-    let overallTrend: 'up' | 'down' | 'stable' = 'stable'
-    let scoreChange = 0
-    if (sortedAll.length >= 2) {
-      scoreChange = sortedAll[0].finalScore - sortedAll[1].finalScore
-      if (scoreChange > 5) overallTrend = 'up'
-      else if (scoreChange < -5) overallTrend = 'down'
-    }
-
-    // 找出最好和最差的科目
-    const sortedSubjects = [...subjectProgress].sort((a, b) => b.avgScore - a.avgScore)
-    const bestSubject = sortedSubjects[0]?.subject || '-'
-    const worstSubject = sortedSubjects[sortedSubjects.length - 1]?.subject || '-'
-
-    // 计算连续天数
-    let streakDays = 0
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const testDates = new Set(
-      testsData.map(t => new Date(t.completedAt).toDateString())
-    )
-    
-    for (let i = 0; i <= 30; i++) {
-      const checkDate = new Date(today)
-      checkDate.setDate(checkDate.getDate() - i)
-      if (testDates.has(checkDate.toDateString())) {
-        streakDays++
-      } else if (i > 0) {
-        break
-      }
-    }
-
-    setProgressData({
-      overallTrend,
-      scoreChange,
-      levelChange: 0,
-      bestSubject,
-      worstSubject,
-      streakDays,
-      subjectProgress,
-      recentScores
-    })
-  }
+  // ⚠️ 【数据主干对齐】calculateProgressData 已废弃
+  // 进步数据由后端 /api/level-test/history 返回 progressData 字段
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60)
