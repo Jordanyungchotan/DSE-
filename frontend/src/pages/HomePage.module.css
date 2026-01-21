@@ -1343,3 +1343,28 @@
     gap: 12px;
   }
 }
+
+/* ===== 每日学习任务区域 ===== */
+.dailyMissionSection {
+  padding: 0 0 40px;
+  margin-top: -40px;
+  position: relative;
+  z-index: 10;
+}
+
+.dailyMissionContainer {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+@media (max-width: 768px) {
+  .dailyMissionSection {
+    margin-top: -20px;
+    padding: 0 0 24px;
+  }
+
+  .dailyMissionContainer {
+    padding: 0 16px;
+  }
+}

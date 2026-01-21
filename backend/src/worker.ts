@@ -62,6 +62,10 @@ import {
   updateConsultationStatus,
   getConversionFunnelStats,
 } from './services/pointsMallService.js'
+import {
+  getDailyMissions,
+  checkMissionProgress,
+} from './services/dailyMissionService.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -6182,6 +6186,83 @@ export default {
       // 刷题健康检查
       if (path === '/api/quiz/health' && request.method === 'GET') {
         return jsonResponse({ status: 'ok', service: 'quiz' }, 200, origin)
+      }
+
+      // =====================
+      // 每日学习任务 API
+      // =====================
+
+      // 获取今日学习任务
+      if (path === '/api/learning/daily-mission' && request.method === 'GET') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        try {
+          const missions = await getDailyMissions(env.DB, tokenData.userId)
+          return jsonResponse({
+            code: 0,
+            data: missions,
+            message: 'ok'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Get daily missions error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '获取每日任务失败'
+          }, 500, origin)
+        }
+      }
+
+      // 检查任务进度（在刷题/复习后调用）
+      if (path === '/api/learning/mission-progress' && request.method === 'POST') {
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期', 401, origin)
+        }
+
+        const body = await request.json() as {
+          eventType: 'QUIZ_COMPLETE' | 'MISTAKE_REVIEW';
+          eventData: {
+            quizCount?: number;
+            accuracy?: number;
+            subject?: string;
+            reviewCount?: number;
+          };
+        }
+
+        try {
+          const result = await checkMissionProgress(
+            env.DB,
+            tokenData.userId,
+            body.eventType,
+            body.eventData
+          )
+          return jsonResponse({
+            code: 0,
+            data: result,
+            message: 'ok'
+          }, 200, origin)
+        } catch (error) {
+          console.error('Check mission progress error:', error)
+          return jsonResponse({
+            code: -1,
+            data: null,
+            message: error instanceof Error ? error.message : '检查任务进度失败'
+          }, 500, origin)
+        }
       }
 
       // =====================

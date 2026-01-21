@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Card, Row, Col, Typography, Collapse, Form, Input, Carousel, message, Modal } from 'antd'
+import { DailyMission } from '../components/DailyMission'
+import { useAuthStore } from '../stores/authStore'
 import {
   FormOutlined,
   RocketOutlined,
@@ -42,6 +44,7 @@ const { Panel } = Collapse
 const HomePage = () => {
   const navigate = useNavigate()
   const { t } = useLanguageStore()
+  const { isAuthenticated } = useAuthStore()
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
   const [wechatModalVisible, setWechatModalVisible] = useState(false)
@@ -355,6 +358,19 @@ const HomePage = () => {
           </div>
         </div>
       </section>
+
+      {/* ===== 今日学习任务 ===== */}
+      {isAuthenticated && (
+        <section className={styles.dailyMissionSection}>
+          <div className={styles.dailyMissionContainer}>
+            <DailyMission 
+              compact={true} 
+              maxItems={3} 
+              onMissionClick={(mission) => navigate(mission.actionPath)}
+            />
+          </div>
+        </section>
+      )}
 
       {/* ===== 核心功能 ===== */}
       <section className={styles.featuresSection}>

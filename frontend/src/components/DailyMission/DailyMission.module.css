@@ -1,0 +1,263 @@
+/* 每日学习任务组件样式 */
+
+.missionCard {
+  margin-bottom: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.missionCard.compact {
+  margin-bottom: 12px;
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+/* 登录提示 */
+.loginPrompt {
+  text-align: center;
+  padding: 24px;
+}
+
+.loginIcon {
+  font-size: 48px;
+  color: #d9d9d9;
+  margin-bottom: 16px;
+}
+
+.loginPrompt p {
+  color: #8c8c8c;
+  margin-bottom: 16px;
+}
+
+/* 加载状态 */
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 48px;
+}
+
+/* 整体进度 */
+.overallProgress {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: linear-gradient(135deg, #f6f8fc 0%, #f0f5ff 100%);
+  border-radius: 8px;
+}
+
+/* 任务列表 */
+.missionList {
+  margin: 0 -12px;
+}
+
+.missionItem {
+  padding: 12px !important;
+  margin: 4px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.missionItem:hover {
+  background: #f5f5f5;
+}
+
+.missionItem.completed {
+  opacity: 0.7;
+  background: #f6ffed;
+}
+
+.missionItem.completed:hover {
+  background: #f6ffed;
+}
+
+/* 任务内容 */
+.missionContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.missionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.missionIcon {
+  font-size: 18px;
+  color: #1890ff;
+}
+
+.missionTitle {
+  font-weight: 500;
+  color: #262626;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.completed .missionTitle {
+  color: #52c41a;
+  text-decoration: line-through;
+  text-decoration-color: #b7eb8f;
+}
+
+.missionReason {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+/* 任务进度和奖励 */
+.missionMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.missionProgress {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 150px;
+}
+
+.missionProgress :global(.ant-progress) {
+  flex: 1;
+  margin: 0;
+}
+
+.progressText {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+.missionReward {
+  font-size: 12px;
+  color: #faad14;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+/* 任务操作 */
+.missionAction {
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+/* 查看全部 */
+.viewAll {
+  text-align: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #f0f0f0;
+}
+
+/* 额外奖励提示 */
+.bonusTip {
+  text-align: center;
+  padding: 12px;
+  margin-top: 12px;
+  background: #fffbe6;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #ad8b00;
+}
+
+.bonusUnlocked {
+  text-align: center;
+  padding: 12px;
+  margin-top: 12px;
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #389e0d;
+  font-weight: 500;
+}
+
+/* 紧凑模式调整 */
+.compact .missionItem {
+  padding: 8px !important;
+}
+
+.compact .missionReason {
+  display: none;
+}
+
+.compact .missionMeta {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.compact .missionProgress {
+  max-width: 100%;
+}
+
+/* 优先级指示器 */
+.priorityHigh {
+  border-left: 3px solid #ff4d4f;
+}
+
+.priorityMedium {
+  border-left: 3px solid #faad14;
+}
+
+.priorityLow {
+  border-left: 3px solid #52c41a;
+}
+
+/* 动画效果 */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.missionItem:not(.completed):hover .missionIcon {
+  animation: pulse 0.5s ease-in-out;
+}
+
+/* 响应式适配 */
+@media (max-width: 576px) {
+  .missionMeta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .missionProgress {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .missionAction {
+    margin-left: 0;
+    margin-top: 8px;
+    width: 100%;
+  }
+
+  .missionAction button {
+    width: 100%;
+  }
+}
