@@ -35,25 +35,29 @@ export interface LearningLeaderboardEntry {
   name: string;
   avatarUrl?: string;
   rank: number;
-  quizCount: number;
-  accuracy?: number;
-  avgTime?: number;
+  // 有效刷题题目总数（核心指标）
+  totalQuestions: number;
+  // 正确率（百分比 0-100）
+  accuracy: number;
+  // 平均每题用时（秒）
+  avgTime: number;
+  // 是否当前用户
   isCurrentUser?: boolean;
-  // 新增：有效刷题数（抗刷后）
-  effectiveQuizCount?: number;
+  // 兼容旧字段
+  quizCount?: number;
 }
 
 export interface MyRankInfo extends LearningLeaderboardEntry {
-  // 新增：百分位（前 X%）
+  // 百分位（前 X%）
   percentile: number;
-  // 新增：与前一名的差距
+  // 与前一名的差距
   gapToNext?: {
     metric: string;
     value: number;
   };
-  // 新增：优势分析
+  // 优势分析
   strengths: string[];
-  // 新增：劣势分析
+  // 劣势分析
   weaknesses: string[];
 }
 
@@ -203,34 +207,52 @@ export async function getLearningLeaderboard(
   const timeCondition = getTimeRangeCondition(range);
   const subjectCondition = getSubjectCondition(subject);
   
-  // 抗刷：过滤低正确率的刷题
-  const antiCheatCondition = `AND le.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}`;
-  // 计算平均答题时间：duration_seconds / question_count
-  const minTimeCondition = `AND (le.question_count = 0 OR le.duration_seconds * 1.0 / le.question_count >= ${ANTI_CHEAT_CONFIG.MIN_TIME_PER_QUESTION})`;
+  // 抗刷条件：
+  // 1. 正确率 >= 40%
+  // 2. 每题用时 >= 2秒（duration_seconds >= question_count * 2）
+  const antiCheatCondition = `
+    AND le.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
+    AND le.duration_seconds >= le.question_count * ${ANTI_CHEAT_CONFIG.MIN_TIME_PER_QUESTION}
+  `;
 
-  // 根据不同指标构建不同的查询
+  // tie-break 排序规则：
+  // 1. 有效刷题数量 DESC
+  // 2. 正确率 DESC
+  // 3. 平均用时 ASC
+  // 4. 最早达到该成绩者优先（user_created_at ASC）
   let orderBy: string;
   
   switch (metric) {
     case 'ACCURACY':
-      orderBy = 'accuracy DESC, quiz_count DESC';
+      // 正确率榜：正确率优先，然后题目数，再平均用时
+      orderBy = 'accuracy DESC, total_questions DESC, avg_time ASC, first_activity ASC';
       break;
     case 'SPEED':
-      orderBy = 'avg_time ASC, quiz_count DESC';
+      // 速度榜：平均用时优先（越快越好），然后正确率，再题目数
+      orderBy = 'avg_time ASC, accuracy DESC, total_questions DESC, first_activity ASC';
       break;
     case 'QUIZ_COUNT':
     default:
-      orderBy = 'quiz_count DESC, accuracy DESC';
+      // 总榜：题目数优先，然后正确率，再平均用时
+      orderBy = 'total_questions DESC, accuracy DESC, avg_time ASC, first_activity ASC';
       break;
   }
 
-  // 主查询：从 learning_events 事实表获取排行榜数据（带抗刷过滤）
+  // 主查询：从 learning_events 事实表获取排行榜数据
   // 【关键】learning_events 是排行榜唯一数据来源
+  // 【关键】按题目总数（而非刷题次数）排序
   const query = `
     SELECT 
       le.user_id,
-      COUNT(DISTINCT le.id) as quiz_count,
-      ROUND(AVG(le.accuracy) * 100, 1) as accuracy,
+      SUM(le.question_count) as total_questions,
+      SUM(le.correct_count) as total_correct,
+      ROUND(
+        CASE 
+          WHEN SUM(le.question_count) > 0 
+          THEN SUM(le.correct_count) * 100.0 / SUM(le.question_count)
+          ELSE 0 
+        END, 1
+      ) as accuracy,
       ROUND(
         CASE 
           WHEN SUM(le.question_count) > 0 
@@ -238,19 +260,20 @@ export async function getLearningLeaderboard(
           ELSE 0 
         END, 1
       ) as avg_time,
+      COUNT(DISTINCT le.id) as quiz_count,
+      MIN(le.created_at) as first_activity,
       u.nickname as name,
-      u.avatar as avatar_url,
-      u.created_at as user_created_at
+      u.avatar as avatar_url
     FROM learning_events le
     JOIN users u ON u.id = le.user_id
     WHERE le.event_type = 'QUIZ'
+    AND le.question_count > 0
     ${timeCondition}
     ${subjectCondition}
     ${antiCheatCondition}
-    ${minTimeCondition}
     GROUP BY le.user_id
-    HAVING quiz_count > 0
-    ORDER BY ${orderBy}, user_created_at ASC
+    HAVING total_questions > 0
+    ORDER BY ${orderBy}
     LIMIT ?
   `;
 
@@ -259,12 +282,14 @@ export async function getLearningLeaderboard(
     .bind(limit)
     .all<{
       user_id: string;
+      total_questions: number;
+      total_correct: number;
+      accuracy: number;
+      avg_time: number;
       quiz_count: number;
-      accuracy: number | null;
-      avg_time: number | null;
+      first_activity: string;
       name: string | null;
       avatar_url: string | null;
-      user_created_at: string;
     }>();
 
   // 获取总参与人数（有效参与）
@@ -273,6 +298,7 @@ export async function getLearningLeaderboard(
     SELECT COUNT(DISTINCT le.user_id) as total
     FROM learning_events le
     WHERE le.event_type = 'QUIZ'
+    AND le.question_count > 0
     ${timeCondition}
     ${subjectCondition}
     ${antiCheatCondition}
@@ -286,10 +312,16 @@ export async function getLearningLeaderboard(
     SELECT 
       AVG(sub.accuracy) as avg_accuracy,
       AVG(sub.avg_time) as avg_time,
-      AVG(sub.quiz_count) as avg_quiz_count
+      AVG(sub.total_questions) as avg_quiz_count
     FROM (
       SELECT 
-        ROUND(AVG(le.accuracy) * 100, 1) as accuracy,
+        ROUND(
+          CASE 
+            WHEN SUM(le.question_count) > 0 
+            THEN SUM(le.correct_count) * 100.0 / SUM(le.question_count)
+            ELSE 0 
+          END, 1
+        ) as accuracy,
         ROUND(
           CASE 
             WHEN SUM(le.question_count) > 0 
@@ -297,9 +329,10 @@ export async function getLearningLeaderboard(
             ELSE 0 
           END, 1
         ) as avg_time,
-        COUNT(DISTINCT le.id) as quiz_count
+        SUM(le.question_count) as total_questions
       FROM learning_events le
       WHERE le.event_type = 'QUIZ'
+      AND le.question_count > 0
       ${timeCondition}
       ${subjectCondition}
       ${antiCheatCondition}
@@ -317,61 +350,35 @@ export async function getLearningLeaderboard(
     avgQuizCount: avgStatsResult?.avg_quiz_count || 10,
   };
 
-  // 处理排名（支持并列，tie-break 用 created_at）
+  // 处理排名
+  // 【关键】后端直接计算好排名，前端禁止二次计算
+  // 排名已由 SQL ORDER BY 保证，直接按顺序赋值
   const entries: LearningLeaderboardEntry[] = [];
-  let currentRank = 1;
-  let previousValue: number | null = null;
-  let skipCount = 0;
 
   if (results.results) {
     for (let i = 0; i < results.results.length; i++) {
       const row = results.results[i];
       
-      // 根据指标确定排名值
-      let rankValue: number;
-      switch (metric) {
-        case 'ACCURACY':
-          rankValue = row.accuracy || 0;
-          break;
-        case 'SPEED':
-          rankValue = row.avg_time || 999999;
-          break;
-        case 'QUIZ_COUNT':
-        default:
-          rankValue = row.quiz_count;
-          break;
-      }
-
-      // 计算排名（并列处理）
-      if (previousValue !== null) {
-        if (metric === 'SPEED') {
-          if (rankValue > previousValue) {
-            currentRank += skipCount + 1;
-            skipCount = 0;
-          } else if (rankValue === previousValue) {
-            skipCount++;
-          }
-        } else {
-          if (rankValue < previousValue) {
-            currentRank += skipCount + 1;
-            skipCount = 0;
-          } else if (rankValue === previousValue) {
-            skipCount++;
-          }
-        }
-      }
-      previousValue = rankValue;
+      // 排名直接使用索引 + 1（SQL 已保证排序正确）
+      // tie-break 规则由 SQL ORDER BY 处理：
+      // 1. 有效刷题数量 DESC
+      // 2. 正确率 DESC
+      // 3. 平均用时 ASC
+      // 4. 最早达到该成绩者优先
+      const rank = i + 1;
 
       entries.push({
         userId: row.user_id,
         name: row.name || 'Anonymous',
         avatarUrl: row.avatar_url || undefined,
-        rank: currentRank,
-        quizCount: row.quiz_count,
-        accuracy: row.accuracy || undefined,
-        avgTime: row.avg_time || undefined,
+        rank,
+        // 【关键】返回 totalQuestions（题目总数），而非 quizCount（刷题次数）
+        totalQuestions: row.total_questions || 0,
+        accuracy: row.accuracy || 0,
+        avgTime: row.avg_time || 0,
         isCurrentUser: currentUserId ? row.user_id === currentUserId : false,
-        effectiveQuizCount: row.quiz_count, // 简化：可后续加入每日衰减计算
+        // 兼容旧字段
+        quizCount: row.quiz_count || 0,
       });
     }
   }
@@ -405,8 +412,8 @@ export async function getLearningLeaderboard(
             case 'QUIZ_COUNT':
             default:
               gapToNext = {
-                metric: '刷题数',
-                value: prevEntry.quizCount - userInEntries.quizCount,
+                metric: '题目数',
+                value: (prevEntry.totalQuestions || 0) - (userInEntries.totalQuestions || 0),
               };
               break;
           }
@@ -415,7 +422,7 @@ export async function getLearningLeaderboard(
       
       // 分析优劣势
       const { strengths, weaknesses } = analyzeStrengthsWeaknesses(
-        { accuracy: userInEntries.accuracy, avgTime: userInEntries.avgTime, quizCount: userInEntries.quizCount },
+        { accuracy: userInEntries.accuracy, avgTime: userInEntries.avgTime, quizCount: userInEntries.totalQuestions || 0 },
         avgStats
       );
       
@@ -477,14 +484,26 @@ export async function getUserLearningRankWithAnalysis(
 
   const timeCondition = getTimeRangeCondition(range);
   const subjectCondition = getSubjectCondition(subject);
-  const antiCheatCondition = `AND le.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}`;
+  // 抗刷条件：正确率 >= 40% 且 每题用时 >= 2秒
+  const antiCheatCondition = `
+    AND le.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
+    AND le.duration_seconds >= le.question_count * ${ANTI_CHEAT_CONFIG.MIN_TIME_PER_QUESTION}
+  `;
 
   // 获取用户的学习数据（从 learning_events 读取）
   const userQuery = `
     SELECT 
       le.user_id,
+      SUM(le.question_count) as total_questions,
+      SUM(le.correct_count) as total_correct,
       COUNT(DISTINCT le.id) as quiz_count,
-      ROUND(AVG(le.accuracy) * 100, 1) as accuracy,
+      ROUND(
+        CASE 
+          WHEN SUM(le.question_count) > 0 
+          THEN SUM(le.correct_count) * 100.0 / SUM(le.question_count)
+          ELSE 0 
+        END, 1
+      ) as accuracy,
       ROUND(
         CASE 
           WHEN SUM(le.question_count) > 0 
@@ -509,37 +528,40 @@ export async function getUserLearningRankWithAnalysis(
     .bind(userId)
     .first<{
       user_id: string;
+      total_questions: number;
+      total_correct: number;
       quiz_count: number;
-      accuracy: number | null;
-      avg_time: number | null;
+      accuracy: number;
+      avg_time: number;
       name: string | null;
       avatar_url: string | null;
     }>();
 
-  if (!userResult || userResult.quiz_count === 0) {
+  if (!userResult || userResult.total_questions === 0) {
     return null;
   }
 
   // 计算排名（从 learning_events 读取）
+  // 【关键】按题目总数排名，而非刷题次数
   let rankCondition: string;
   switch (metric) {
     case 'ACCURACY':
       rankCondition = `
-        (ROUND(AVG(le2.accuracy) * 100, 1) > ${userResult.accuracy || 0})
-        OR (ROUND(AVG(le2.accuracy) * 100, 1) = ${userResult.accuracy || 0} AND COUNT(DISTINCT le2.id) > ${userResult.quiz_count})
+        (ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.correct_count) * 100.0 / SUM(le2.question_count) ELSE 0 END, 1) > ${userResult.accuracy || 0})
+        OR (ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.correct_count) * 100.0 / SUM(le2.question_count) ELSE 0 END, 1) = ${userResult.accuracy || 0} AND SUM(le2.question_count) > ${userResult.total_questions})
       `;
       break;
     case 'SPEED':
       rankCondition = `
         (ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.duration_seconds) * 1.0 / SUM(le2.question_count) ELSE 999999 END, 1) < ${userResult.avg_time || 999999})
-        OR (ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.duration_seconds) * 1.0 / SUM(le2.question_count) ELSE 999999 END, 1) = ${userResult.avg_time || 999999} AND COUNT(DISTINCT le2.id) > ${userResult.quiz_count})
+        OR (ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.duration_seconds) * 1.0 / SUM(le2.question_count) ELSE 999999 END, 1) = ${userResult.avg_time || 999999} AND ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.correct_count) * 100.0 / SUM(le2.question_count) ELSE 0 END, 1) > ${userResult.accuracy || 0})
       `;
       break;
     case 'QUIZ_COUNT':
     default:
       rankCondition = `
-        (COUNT(DISTINCT le2.id) > ${userResult.quiz_count})
-        OR (COUNT(DISTINCT le2.id) = ${userResult.quiz_count} AND ROUND(AVG(le2.accuracy) * 100, 1) > ${userResult.accuracy || 0})
+        (SUM(le2.question_count) > ${userResult.total_questions})
+        OR (SUM(le2.question_count) = ${userResult.total_questions} AND ROUND(CASE WHEN SUM(le2.question_count) > 0 THEN SUM(le2.correct_count) * 100.0 / SUM(le2.question_count) ELSE 0 END, 1) > ${userResult.accuracy || 0})
       `;
       break;
   }
@@ -550,9 +572,11 @@ export async function getUserLearningRankWithAnalysis(
       SELECT le2.user_id
       FROM learning_events le2
       WHERE le2.event_type = 'QUIZ'
+      AND le2.question_count > 0
       ${timeCondition.replace(/le\./g, 'le2.')}
       ${subjectCondition.replace(/le\./g, 'le2.')}
       AND le2.accuracy >= ${ANTI_CHEAT_CONFIG.MIN_ACCURACY_THRESHOLD}
+      AND le2.duration_seconds >= le2.question_count * ${ANTI_CHEAT_CONFIG.MIN_TIME_PER_QUESTION}
       GROUP BY le2.user_id
       HAVING ${rankCondition}
     )
@@ -568,7 +592,7 @@ export async function getUserLearningRankWithAnalysis(
   // 分析优劣势
   const defaultAvgStats = avgStats || { avgAccuracy: 50, avgTime: 30, avgQuizCount: 10 };
   const { strengths, weaknesses } = analyzeStrengthsWeaknesses(
-    { accuracy: userResult.accuracy || undefined, avgTime: userResult.avg_time || undefined, quizCount: userResult.quiz_count },
+    { accuracy: userResult.accuracy || 0, avgTime: userResult.avg_time || 0, quizCount: userResult.total_questions },
     defaultAvgStats
   );
 
@@ -577,13 +601,16 @@ export async function getUserLearningRankWithAnalysis(
     name: userResult.name || 'Anonymous',
     avatarUrl: userResult.avatar_url || undefined,
     rank,
-    quizCount: userResult.quiz_count,
-    accuracy: userResult.accuracy || undefined,
-    avgTime: userResult.avg_time || undefined,
+    // 【关键】返回 totalQuestions（题目总数）
+    totalQuestions: userResult.total_questions || 0,
+    accuracy: userResult.accuracy || 0,
+    avgTime: userResult.avg_time || 0,
     isCurrentUser: true,
     percentile,
     strengths,
     weaknesses,
+    // 兼容旧字段
+    quizCount: userResult.quiz_count || 0,
   };
 }
 
@@ -608,10 +635,11 @@ export async function getUserLearningRank(
     name: result.name,
     avatarUrl: result.avatarUrl,
     rank: result.rank,
-    quizCount: result.quizCount,
+    totalQuestions: result.totalQuestions,
     accuracy: result.accuracy,
     avgTime: result.avgTime,
     isCurrentUser: true,
+    quizCount: result.quizCount,
   };
 }
 
