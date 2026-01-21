@@ -1,11 +1,14 @@
 import { 
   CIVICS_STATUS,
-  SCIENCE_ELECTIVES,
-  BUSINESS_ELECTIVES,
-  ARTS_SPORTS_ELECTIVES,
+  SCIENCE_ELECTIVE_KEYS,
+  BUSINESS_ELECTIVE_KEYS,
+  ARTS_SPORTS_ELECTIVE_KEYS,
+  isScienceElective,
+  isBusinessElective,
+  isArtsSportsElective,
 } from "../../../shared/domain";
 
-// ===== 公民与社会发展特殊规则 =====
+// ===== CSD 特殊规则（基于 key: CITIZENSHIP_AND_SOCIAL_DEVELOPMENT） =====
 export const CSD_RULES = {
   [CIVICS_STATUS.PASS]: {
     riskLevel: "low",
@@ -42,30 +45,30 @@ export const ELECTIVE_DEFAULT_RULE = {
 } as const;
 
 /**
- * 获取选修科目类别
+ * 获取选修科目类别（基于 key）
  */
-export function getElectiveCategory(subject: string): keyof typeof ELECTIVE_CATEGORY_NOTES {
-  if ((SCIENCE_ELECTIVES as readonly string[]).includes(subject)) {
+export function getElectiveCategory(subjectKey: string): keyof typeof ELECTIVE_CATEGORY_NOTES {
+  if (isScienceElective(subjectKey)) {
     return "science";
   }
-  if ((BUSINESS_ELECTIVES as readonly string[]).includes(subject)) {
+  if (isBusinessElective(subjectKey)) {
     return "business";
   }
-  if ((ARTS_SPORTS_ELECTIVES as readonly string[]).includes(subject)) {
+  if (isArtsSportsElective(subjectKey)) {
     return "arts_sports";
   }
   return "other";
 }
 
 /**
- * 获取选修科目 notes
+ * 获取选修科目 notes（基于 key 列表）
  */
-export function getElectiveNotes(subjects: string[]): string[] {
+export function getElectiveNotes(subjectKeys: string[]): string[] {
   const notes: string[] = [];
   const categories = new Set<keyof typeof ELECTIVE_CATEGORY_NOTES>();
 
-  for (const subject of subjects) {
-    categories.add(getElectiveCategory(subject));
+  for (const key of subjectKeys) {
+    categories.add(getElectiveCategory(key));
   }
 
   // 按类别添加 notes

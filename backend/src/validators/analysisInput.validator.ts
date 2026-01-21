@@ -1,11 +1,10 @@
 import {
-  SUBJECTS,
-  ELECTIVE_SUBJECTS,
-  HAS_SPECIAL_GRADING,
+  ALL_SUBJECT_KEYS,
+  ELECTIVE_SUBJECT_KEYS,
   CIVICS_STATUS,
-  SubjectGrade,
-  isValidSubject,
+  isValidSubjectKey,
   isElectiveSubject,
+  hasPassFailGrading,
 } from "../../../shared/domain";
 
 export class AnalysisInputError extends Error {
@@ -13,28 +12,38 @@ export class AnalysisInputError extends Error {
 }
 
 /**
+ * 科目成绩接口（基于 key）
+ */
+export interface SubjectGradeInput {
+  /** 科目 key（英文标识符） */
+  subject: string;
+  /** 成绩值 */
+  value: string;
+}
+
+/**
  * 校验科目成绩数组
- * - 确保 subject 在 SUBJECTS 列表中
- * - 确保公民与社会发展只能是 pass/fail
+ * - 确保 subject key 在 ALL_SUBJECT_KEYS 列表中
+ * - 确保 CSD 只能是 pass/fail
  * - 确保普通科目不能提交 pass/fail
  */
-export function validateSubjectGrades(grades: SubjectGrade[]) {
+export function validateSubjectGrades(grades: SubjectGradeInput[]) {
   for (const { subject, value } of grades) {
-    // 1. subject 必须合法
-    if (!isValidSubject(subject)) {
+    // 1. subject key 必须合法
+    if (!isValidSubjectKey(subject)) {
       throw new AnalysisInputError(
-        `Invalid subject: ${subject}`
+        `Invalid subject key: ${subject}. Expected one of: ${ALL_SUBJECT_KEYS.join(', ')}`
       );
     }
 
-    // 2. 公民与社会发展特殊校验
-    if ((HAS_SPECIAL_GRADING as readonly string[]).includes(subject)) {
+    // 2. CSD 特殊校验
+    if (hasPassFailGrading(subject)) {
       if (
         value !== CIVICS_STATUS.PASS &&
         value !== CIVICS_STATUS.FAIL
       ) {
         throw new AnalysisInputError(
-          `Invalid civics status for ${subject}: expected "pass" or "fail", got "${value}"`
+          `Invalid grade for ${subject}: expected "pass" or "fail", got "${value}"`
         );
       }
     } else {
@@ -44,7 +53,7 @@ export function validateSubjectGrades(grades: SubjectGrade[]) {
         value === CIVICS_STATUS.FAIL
       ) {
         throw new AnalysisInputError(
-          `Invalid grade value for ${subject}: "pass"/"fail" only allowed for CSD`
+          `Invalid grade for ${subject}: "pass"/"fail" only allowed for CSD`
         );
       }
     }
@@ -53,13 +62,13 @@ export function validateSubjectGrades(grades: SubjectGrade[]) {
 
 /**
  * 校验选修科目数组
- * - 确保每个选修科目在 ELECTIVE_SUBJECTS 列表中
+ * - 确保每个选修科目 key 在 ELECTIVE_SUBJECT_KEYS 列表中
  */
 export function validateElectives(electives: string[]) {
-  for (const subject of electives) {
-    if (!isElectiveSubject(subject)) {
+  for (const subjectKey of electives) {
+    if (!isElectiveSubject(subjectKey)) {
       throw new AnalysisInputError(
-        `Invalid elective subject: ${subject}`
+        `Invalid elective subject key: ${subjectKey}. Expected one of: ${ELECTIVE_SUBJECT_KEYS.join(', ')}`
       );
     }
   }
@@ -72,7 +81,7 @@ export function validateTransferAnalysisInput(input: {
   targetSchools?: string[];
   targetGrade?: string;
   electives?: string[];
-  grades?: SubjectGrade[];
+  grades?: SubjectGradeInput[];
 }) {
   // 校验选修科目
   if (input.electives && input.electives.length > 0) {
@@ -91,14 +100,14 @@ export function validateTransferAnalysisInput(input: {
 export function validateUniversityAnalysisInput(input: {
   targetUniversities?: string[];
   subjects?: string[];
-  grades?: SubjectGrade[];
+  grades?: SubjectGradeInput[];
 }) {
-  // 校验科目
+  // 校验科目 key
   if (input.subjects) {
-    for (const subject of input.subjects) {
-      if (!isValidSubject(subject)) {
+    for (const subjectKey of input.subjects) {
+      if (!isValidSubjectKey(subjectKey)) {
         throw new AnalysisInputError(
-          `Invalid subject: ${subject}`
+          `Invalid subject key: ${subjectKey}`
         );
       }
     }

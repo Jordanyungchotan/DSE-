@@ -4,15 +4,23 @@ import {
   ELECTIVE_DEFAULT_RULE,
   getElectiveCategory,
   getElectiveNotes,
-  ELECTIVE_CATEGORY_NOTES,
 } from "./analysisRules";
 import { 
-  SubjectGrade, 
   isCoreSubject, 
   isElectiveSubject,
-  hasSpecialGrading,
+  hasPassFailGrading,
   CIVICS_STATUS,
 } from "../../../shared/domain";
+
+/**
+ * 科目成绩输入接口（基于 key）
+ */
+export interface SubjectGradeInput {
+  /** 科目 key（英文标识符） */
+  subjectKey: string;
+  /** 成绩值 */
+  value: string;
+}
 
 export interface SubjectAnalysisResult {
   riskLevel: string;
@@ -22,13 +30,13 @@ export interface SubjectAnalysisResult {
 }
 
 /**
- * 分析单个科目成绩
+ * 分析单个科目成绩（基于 key）
  */
-export function analyzeSubjectGrade(grade: SubjectGrade): SubjectAnalysisResult {
-  const { subject, value } = grade;
+export function analyzeSubjectGrade(input: SubjectGradeInput): SubjectAnalysisResult {
+  const { subjectKey, value } = input;
 
-  // 1. 公民与社会发展特殊处理
-  if (hasSpecialGrading(subject)) {
+  // 1. CSD 特殊处理
+  if (hasPassFailGrading(subjectKey)) {
     if (value === CIVICS_STATUS.PASS) {
       return { ...CSD_RULES[CIVICS_STATUS.PASS] };
     }
@@ -43,14 +51,14 @@ export function analyzeSubjectGrade(grade: SubjectGrade): SubjectAnalysisResult 
     };
   }
 
-  // 2. 核心科目（中文、英文、数学）
-  if (isCoreSubject(subject)) {
+  // 2. 核心科目（CHINESE_LANGUAGE, ENGLISH_LANGUAGE, MATHEMATICS）
+  if (isCoreSubject(subjectKey)) {
     return { ...CORE_SUBJECT_DEFAULT_RULE };
   }
 
   // 3. 选修科目
-  if (isElectiveSubject(subject)) {
-    const category = getElectiveCategory(subject);
+  if (isElectiveSubject(subjectKey)) {
+    const category = getElectiveCategory(subjectKey);
     return {
       ...ELECTIVE_DEFAULT_RULE,
       category,
@@ -66,31 +74,31 @@ export function analyzeSubjectGrade(grade: SubjectGrade): SubjectAnalysisResult 
 }
 
 /**
- * 分析选修科目组合，生成综合 notes
+ * 分析选修科目组合，生成综合 notes（基于 key 列表）
  */
-export function analyzeElectiveCombination(electives: string[]): string[] {
-  return getElectiveNotes(electives);
+export function analyzeElectiveCombination(electiveKeys: string[]): string[] {
+  return getElectiveNotes(electiveKeys);
 }
 
 /**
- * 批量分析科目成绩
+ * 批量分析科目成绩（基于 key）
  */
-export function analyzeAllSubjects(grades: SubjectGrade[]): {
-  subjectAnalyses: Array<SubjectAnalysisResult & { subject: string; grade: string }>;
+export function analyzeAllSubjects(grades: SubjectGradeInput[]): {
+  subjectAnalyses: Array<SubjectAnalysisResult & { subjectKey: string; grade: string }>;
   electiveNotes: string[];
 } {
   const subjectAnalyses = grades.map((g) => ({
-    subject: g.subject,
+    subjectKey: g.subjectKey,
     grade: String(g.value),
     ...analyzeSubjectGrade(g),
   }));
 
-  // 收集选修科目
-  const electives = grades
-    .filter((g) => isElectiveSubject(g.subject))
-    .map((g) => g.subject);
+  // 收集选修科目 key
+  const electiveKeys = grades
+    .filter((g) => isElectiveSubject(g.subjectKey))
+    .map((g) => g.subjectKey);
 
-  const electiveNotes = analyzeElectiveCombination(electives);
+  const electiveNotes = analyzeElectiveCombination(electiveKeys);
 
   return {
     subjectAnalyses,

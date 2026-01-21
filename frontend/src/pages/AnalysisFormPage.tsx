@@ -42,11 +42,14 @@ import { useAnalysisStore, SubjectScore } from '../stores/analysisStore'
 import {
   CORE_SUBJECTS,
   ELECTIVE_SUBJECTS,
-  CIVICS_OPTIONS,
   DSE_GRADE_OPTIONS,
   GRADE_LEVEL_SELECT_OPTIONS,
   isCoreSubject,
-  hasSpecialGrading,
+  hasPassFailGrading,
+  getSubjectDisplayName,
+  getSubjectOptions,
+  getCivicsOptions,
+  LanguageCode,
 } from '@/shared/domain'
 import { useLanguageStore } from '../stores/languageStore'
 import {
@@ -147,10 +150,10 @@ const AnalysisFormPage = () => {
   const [showSelector, setShowSelector] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
   const [subjects, setSubjects] = useState<SubjectScore[]>([
-    { subject: CORE_SUBJECTS[0], currentScore: '', targetScore: '' },
-    { subject: CORE_SUBJECTS[1], currentScore: '', targetScore: '' },
-    { subject: CORE_SUBJECTS[2], currentScore: '', targetScore: '' },
-    { subject: CORE_SUBJECTS[3], currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[0].key, currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[1].key, currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[2].key, currentScore: '', targetScore: '' },
+    { subject: CORE_SUBJECTS[3].key, currentScore: '', targetScore: '' },
   ])
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
   const { updateFormData, submitAnalysis, loading } = useAnalysisStore()
@@ -688,16 +691,20 @@ const AnalysisFormPage = () => {
     </div>
   )
 
-  // 获取科目显示名称
-  const getSubjectLabel = (subjectValue: string) => subjectValue
+  // 获取当前语言（映射到 LanguageCode）
+  const { locale } = useLanguageStore()
+  const currentLang = locale as LanguageCode
 
-  const isPassFailSubject = (subjectValue: string) =>
-    hasSpecialGrading(subjectValue)
+  // 获取科目显示名称
+  const getSubjectLabel = (subjectKey: string) => getSubjectDisplayName(subjectKey, currentLang)
+
+  const isPassFailSubject = (subjectKey: string) =>
+    hasPassFailGrading(subjectKey)
 
   // 获取可选的选修科目（排除已选的）
   const getAvailableElectives = () => {
-    const selectedSubjects = subjects.map(s => s.subject)
-    return ELECTIVE_SUBJECTS.filter((subject) => !selectedSubjects.includes(subject))
+    const selectedSubjectKeys = subjects.map(s => s.subject)
+    return ELECTIVE_SUBJECTS.filter((subject) => !selectedSubjectKeys.includes(subject.key))
   }
 
   /**
@@ -762,9 +769,9 @@ const AnalysisFormPage = () => {
                             value: subject.subject,
                             label: getSubjectLabel(subject.subject)
                           }] : []),
-                          ...getAvailableElectives().map((subjectName) => ({
-                            value: subjectName,
-                            label: subjectName,
+                          ...getAvailableElectives().map((subjectDef) => ({
+                            value: subjectDef.key,
+                            label: subjectDef.displayName[currentLang],
                           }))
                         ]}
                       />
@@ -778,7 +785,7 @@ const AnalysisFormPage = () => {
                         placeholder="选择成绩"
                         value={subject.currentScore || undefined}
                         onChange={(value) => handleSubjectChange(index, 'currentScore', value)}
-                        options={CIVICS_OPTIONS}
+                        options={getCivicsOptions(currentLang)}
                       />
                     ) : (
                       <Select
@@ -797,7 +804,7 @@ const AnalysisFormPage = () => {
                         placeholder="选择目标"
                         value={subject.targetScore || undefined}
                         onChange={(value) => handleSubjectChange(index, 'targetScore', value)}
-                        options={CIVICS_OPTIONS}
+                        options={getCivicsOptions(currentLang)}
                       />
                     ) : (
                       <Select

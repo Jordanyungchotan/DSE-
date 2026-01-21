@@ -5,9 +5,22 @@
  */
 
 import { SCHOOLS_BY_DISTRICT } from './data/schoolsData'
-import { SUBJECTS, CORE_SUBJECTS, ELECTIVE_SUBJECTS, SubjectGrade, isElectiveSubject, isCoreSubject } from '@/shared/domain'
-import { AnalysisInputError, validateSubjectGrades, validateElectives } from './validators/analysisInput.validator.js'
-import { analyzeSubjectGrade, analyzeElectiveCombination, analyzeAllSubjects } from './analysis/analyzeByRules.js'
+import { 
+  ALL_SUBJECTS, 
+  ALL_SUBJECT_KEYS,
+  CORE_SUBJECTS, 
+  CORE_SUBJECT_KEYS,
+  ELECTIVE_SUBJECTS, 
+  ELECTIVE_SUBJECT_KEYS,
+  isElectiveSubject, 
+  isCoreSubject,
+  isValidSubjectKey,
+  hasPassFailGrading,
+  getSubjectDisplayName,
+  LanguageCode,
+} from '@/shared/domain'
+import { AnalysisInputError, validateSubjectGrades, validateElectives, SubjectGradeInput } from './validators/analysisInput.validator.js'
+import { analyzeSubjectGrade, analyzeElectiveCombination, SubjectGradeInput as AnalysisGradeInput } from './analysis/analyzeByRules.js'
 
 export interface Env {
   // D1 数据库绑定
@@ -3054,18 +3067,28 @@ export default {
       // 配置数据 API
       // =====================
 
-      // 获取支持的科目列表
+      // 获取支持的科目列表（三语支持）
       if (path === '/api/analysis/subjects' && request.method === 'GET') {
-        const subjects = SUBJECTS.map((subject) => ({
-          id: subject,
-          name: subject,
-          nameEn: subject,
-          category: isCoreSubject(subject) ? 'core' : 'elective',
+        // 支持语言参数
+        const lang = (url.searchParams.get('lang') || 'zh-TW') as LanguageCode
+        
+        const subjects = ALL_SUBJECTS.map((subject) => ({
+          key: subject.key,
+          category: subject.category,
+          grading: subject.grading,
+          displayName: subject.displayName,
+          // 向后兼容
+          id: subject.key,
+          name: subject.displayName[lang],
+          nameEn: subject.displayName.en,
         }))
         return jsonResponse({ 
           subjects,
-          coreSubjects: [...CORE_SUBJECTS],
-          electiveSubjects: [...ELECTIVE_SUBJECTS],
+          coreSubjects: CORE_SUBJECTS.map(s => ({ key: s.key, displayName: s.displayName })),
+          electiveSubjects: ELECTIVE_SUBJECTS.map(s => ({ key: s.key, displayName: s.displayName })),
+          // 向后兼容：key 列表
+          coreSubjectKeys: CORE_SUBJECT_KEYS,
+          electiveSubjectKeys: ELECTIVE_SUBJECT_KEYS,
         }, 200, origin)
       }
 

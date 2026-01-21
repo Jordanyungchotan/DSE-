@@ -44,10 +44,12 @@ import {
   AIAnalysisResponse,
 } from '../services/jupasApi'
 import {
-  SUBJECTS,
-  CIVICS_OPTIONS,
+  ALL_SUBJECTS,
   DSE_GRADE_OPTIONS,
-  hasSpecialGrading,
+  hasPassFailGrading,
+  getSubjectDisplayName,
+  getCivicsOptions,
+  LanguageCode,
 } from '@/shared/domain'
 import styles from './UniversityAnalysisPage.module.css'
 
@@ -128,13 +130,14 @@ const ANALYSIS_STAGES = [
 const UniversityAnalysisPage = () => {
   const navigate = useNavigate()
   const { t, locale } = useLanguageStore()
+  const currentLang = locale as LanguageCode
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [dseResults, setDseResults] = useState<DseResult[]>([
-    { subject: SUBJECTS[0], grade: '' },
-    { subject: SUBJECTS[1], grade: '' },
-    { subject: SUBJECTS[2], grade: '' },
-    { subject: SUBJECTS[3], grade: '' },
+    { subject: ALL_SUBJECTS[0].key, grade: '' },
+    { subject: ALL_SUBJECTS[1].key, grade: '' },
+    { subject: ALL_SUBJECTS[2].key, grade: '' },
+    { subject: ALL_SUBJECTS[3].key, grade: '' },
   ])
 
   // 分析进度状态
@@ -153,8 +156,11 @@ const UniversityAnalysisPage = () => {
   const resultRef = useRef<HTMLDivElement>(null)
 
   const isEnglish = locale === 'en'
-  const isPassFailSubject = (subjectValue: string) =>
-    hasSpecialGrading(subjectValue)
+  const isPassFailSubject = (subjectKey: string) =>
+    hasPassFailGrading(subjectKey)
+  
+  // 获取科目显示名称
+  const getSubjectLabel = (subjectKey: string) => getSubjectDisplayName(subjectKey, currentLang)
 
   // 获取院校可用专业领域
   const fetchAvailableFields = useCallback(async (universities: string[]) => {
@@ -370,9 +376,9 @@ const UniversityAnalysisPage = () => {
                     placeholder={isEnglish ? 'Select Subject' : '选择科目'}
                     value={result.subject || undefined}
                     onChange={(v) => updateDseResult(index, 'subject', v)}
-                    options={SUBJECTS.map((subject) => ({
-                      value: subject,
-                      label: subject,
+                    options={ALL_SUBJECTS.map((subject) => ({
+                      value: subject.key,
+                      label: subject.displayName[currentLang],
                     }))}
                     style={{ flex: 2 }}
                   />
@@ -381,7 +387,7 @@ const UniversityAnalysisPage = () => {
                       placeholder={isEnglish ? 'Grade' : '等级'}
                       value={result.grade || undefined}
                       onChange={(v) => updateDseResult(index, 'grade', v)}
-                      options={CIVICS_OPTIONS}
+                      options={getCivicsOptions(currentLang)}
                       style={{ flex: 1 }}
                     />
                   ) : (
