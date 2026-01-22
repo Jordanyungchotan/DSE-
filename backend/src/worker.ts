@@ -6054,6 +6054,7 @@ export default {
 
       // 获取今日学习任务
       if (path === '/api/learning/daily-mission' && request.method === 'GET') {
+        console.log('[WORKER VERSION] daily-mission v2026-01-22 - dse-analysis-api');
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
           return errorResponse('请先登录', 401, origin)

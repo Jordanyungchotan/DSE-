@@ -19,6 +19,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import { apiFetch } from '../config/api'
 import { useLanguageStore } from '../stores/languageStore'
+import { useAuthStore } from '../stores/authStore'
 import styles from './LevelTestHistoryPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -59,6 +60,7 @@ interface ProgressData {
 export default function LevelTestHistoryPage() {
   const navigate = useNavigate()
   const { t } = useLanguageStore()
+  const { token } = useAuthStore()
   
   const [loading, setLoading] = useState(true)
   const [tests, setTests] = useState<TestRecord[]>([])
@@ -80,6 +82,9 @@ export default function LevelTestHistoryPage() {
    * - 数据来源：后端 /api/level-test/history（从 learning_events 聚合）
    * - 前端职责：只渲染，不计算进步数据
    * - progressData 由后端返回
+   * 
+   * API 契约: GET /api/level-test/history
+   * 要求: Authorization header (Bearer token)
    */
   const loadHistory = async () => {
     setLoading(true)
@@ -88,7 +93,13 @@ export default function LevelTestHistoryPage() {
       if (filterSubject) url += `&subject=${encodeURIComponent(filterSubject)}`
       if (filterGrade) url += `&grade=${encodeURIComponent(filterGrade)}`
       
-      const res = await apiFetch(url)
+      // 必须携带 Authorization header
+      const headers: Record<string, string> = {}
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      
+      const res = await apiFetch(url, { headers })
       const response = await res.json() as { 
         tests?: TestRecord[]
         total?: number

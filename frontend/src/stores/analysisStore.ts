@@ -353,6 +353,9 @@ export const useAnalysisStore = create<AnalysisState>()(
 
       /**
        * 加载历史记录
+       * 
+       * API 契约: GET /api/analysis/history
+       * 响应格式: { code: number, data: { history: HistoryItem[] }, message: string }
        */
       loadHistory: async () => {
         set({ loading: true, error: null })
@@ -371,9 +374,18 @@ export const useAnalysisStore = create<AnalysisState>()(
             throw new Error('无法加载历史记录')
           }
           
-          const data = await response.json()
+          const result = await response.json() as {
+            code: number
+            data: { history: HistoryItem[] }
+            message: string
+          }
+          
+          if (result.code !== 0) {
+            throw new Error(result.message || '加载历史记录失败')
+          }
+          
           set({
-            history: data.history || [],
+            history: result.data.history,
             loading: false,
           })
         } catch (error) {
