@@ -6,19 +6,16 @@
  */
 
 // 获取 API 基础 URL
-// 生产环境直接使用后端 Worker URL
-// ⚠️ 2024-01: 统一使用 dse-rag-questions Worker，dse-analysis-api 已废弃
-const PRODUCTION_API_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
-
-// RAG 题库服务 URL（与主 API 同一个 Worker）
-const PRODUCTION_RAG_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
+// 生产环境区分分析 API 与 RAG API
+const PRODUCTION_ANALYSIS_API_URL = 'https://dse-analysis-api.jordanyungchotan.workers.dev'
+const PRODUCTION_RAG_API_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? PRODUCTION_API_URL : '')
+  (import.meta.env.PROD ? PRODUCTION_ANALYSIS_API_URL : '')
 
 // RAG 服务 URL (用于智能组卷和水平测试)
 export const RAG_API_URL = import.meta.env.VITE_RAG_API_URL || 
-  (import.meta.env.PROD ? PRODUCTION_RAG_URL : 'http://localhost:8787')
+  (import.meta.env.PROD ? PRODUCTION_RAG_API_URL : 'http://localhost:8787')
 
 /**
  * 构建完整的 API URL

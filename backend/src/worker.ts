@@ -3614,34 +3614,86 @@ export default {
         }, 200, origin)
       }
 
-      // 获取历史记录
+      /**
+       * 获取分析历史记录
+       * GET /api/analysis/history
+       * 
+       * 【API 契约】
+       * 返回格式必须是: { code: number, data: { history: HistoryItem[] }, message: string }
+       * ⚠️ 禁止返回裸对象
+       */
       if (path === '/api/analysis/history' && request.method === 'GET') {
         const authHeader = request.headers.get('Authorization')
         if (!authHeader?.startsWith('Bearer ')) {
-          return jsonResponse({ history: [] }, 200, origin)
+          // 未登录返回空数组，但格式必须统一
+          return jsonResponse({ 
+            code: 0, 
+            data: { history: [] }, 
+            message: 'ok' 
+          }, 200, origin)
         }
 
         const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
         if (!tokenData) {
-          return jsonResponse({ history: [] }, 200, origin)
+          return jsonResponse({ 
+            code: 0, 
+            data: { history: [] }, 
+            message: 'ok' 
+          }, 200, origin)
         }
 
         const records = await env.DB.prepare(
-          'SELECT id, student_info, result, created_at FROM analysis_records WHERE user_id = ? ORDER BY created_at DESC LIMIT 50'
+          'SELECT id, analysis_type, student_info, result, created_at FROM analysis_records WHERE user_id = ? ORDER BY created_at DESC LIMIT 50'
         ).bind(tokenData.userId).all()
 
         const history = (records.results || []).map((r: Record<string, unknown>) => {
-          const result = JSON.parse(r.result as string) as AnalysisResult
+          let result: Record<string, unknown> = {}
+          try {
+            result = JSON.parse(r.result as string) as Record<string, unknown>
+          } catch {
+            // 解析失败使用空对象
+          }
+
+          let studentInfo = null
+          try {
+            studentInfo = JSON.parse(r.student_info as string)
+          } catch {
+            // 解析失败使用 null
+          }
+
+          // 根据 analysis_type 提取不同字段
+          const analysisType = r.analysis_type as string || 'transfer'
+          let feasibilityScore = 0
+          let summary = ''
+
+          if (analysisType === 'university') {
+            // 大学分析的摘要来自 ai_report 或 student_profile
+            const profile = result.student_profile as Record<string, unknown> | undefined
+            feasibilityScore = (profile?.best5 as number) || 0
+            summary = (result.ai_report as string)?.slice(0, 100) || 
+                     `Best 5: ${feasibilityScore} 分`
+          } else {
+            // 插班分析
+            const overallAssessment = result.overallAssessment as Record<string, unknown> | undefined
+            feasibilityScore = (overallAssessment?.feasibilityScore as number) || 0
+            summary = (overallAssessment?.summary as string) || ''
+          }
+
           return {
             id: r.id,
             createdAt: r.created_at,
-            studentInfo: JSON.parse(r.student_info as string),
-            feasibilityScore: result.overallAssessment?.feasibilityScore || 0,
-            summary: result.overallAssessment?.summary || '',
+            studentInfo,
+            feasibilityScore,
+            summary,
+            analysisType, // 增加类型标识方便前端区分
           }
         })
 
-        return jsonResponse({ history }, 200, origin)
+        return jsonResponse({ 
+          code: 0, 
+          data: { history }, 
+          message: 'ok' 
+        }, 200, origin)
       }
 
       // 删除历史记录
@@ -4607,6 +4659,299 @@ export default {
       }
 
       // =====================
+      // JUPAS AI 分析 API（大学申请分析 - 前端实际调用的接口）
+      // ⚠️ 必须登录才能调用，分析结果必须保存到 analysis_records
+      // =====================
+
+      /**
+       * JUPAS AI 综合分析
+       * POST /api/jupas/analyze/ai
+       * 
+       * 【强制规则】
+       * 1. 必须登录（requireAuth）
+       * 2. 分析完成后必须写入 analysis_records
+       * 3. analysis_type = 'university'
+       */
+      if (path === '/api/jupas/analyze/ai' && request.method === 'POST') {
+        // 强制要求登录
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录后再进行分析', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期，请重新登录', 401, origin)
+        }
+
+        const userId = tokenData.userId
+
+        try {
+          const body = await request.json() as {
+            grades: { [subject: string]: string }
+            interests?: string[]
+            strengths?: string[]
+            target_universities?: string[]
+            target_fields?: string[]
+            career_aspirations?: string
+            extracurriculars?: string
+            limit?: number
+          }
+
+          // 计算 Best 5/6 分数
+          const gradeToScore: Record<string, number> = {
+            '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
+          }
+          const scores = Object.values(body.grades)
+            .map(g => gradeToScore[g] || 0)
+            .sort((a, b) => b - a)
+          const best5 = scores.slice(0, 5).reduce((a, b) => a + b, 0)
+          const best6 = scores.slice(0, 6).reduce((a, b) => a + b, 0)
+
+          // 构建学生档案
+          const studentProfile = {
+            best5,
+            best6,
+            interests: body.interests || [],
+            strengths: body.strengths || [],
+          }
+
+          // 模拟匹配课程（实际应查询数据库）
+          const matchedProgrammes: Array<{
+            code: string
+            title: string
+            university: string
+            field: string
+            match_score: number
+            academic_score: number
+            personal_score: number
+            recommendation: string
+            historical: {
+              median?: number
+              lower_quartile?: number
+              upper_quartile?: number
+            }
+          }> = []
+
+          // 查询匹配的课程（简化版本）
+          const targetUniversities = body.target_universities || []
+          const limit = body.limit || 15
+
+          // 根据 best5 分数生成推荐
+          const scoreLevel = best5 >= 28 ? 'high' : best5 >= 22 ? 'medium' : 'low'
+          
+          // 生成 AI 报告
+          let aiReport = ''
+          if (env.DEEPSEEK_API_KEY) {
+            try {
+              // 严格 system prompt：禁止继续对话/询问用户
+              const systemPrompt = `你是一位香港升学顾问，专门帮助学生分析 JUPAS 大学申请。请用中文回复。
+
+【重要】你正在生成【正式分析报告】。
+严格规则：
+1. 输出必须是完整、封闭的分析报告
+2. 不允许向用户提问
+3. 不允许出现"是否需要我…"、"请告诉我"、"我可以为你…"等引导继续对话的句式
+4. 不允许列出可选服务、下一步选项
+5. 报告必须在总结后自然结束
+6. 结尾不得包含任何疑问句或邀请性语句
+7. 禁止说"如果你需要"、"请随时告知"、"需要我为你"等`
+
+              const aiResponse = await fetch('https://api.deepseek.com/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${env.DEEPSEEK_API_KEY}`,
+                },
+                body: JSON.stringify({
+                  model: 'deepseek-chat',
+                  messages: [
+                    {
+                      role: 'system',
+                      content: systemPrompt
+                    },
+                    {
+                      role: 'user',
+                      content: `学生 DSE 成绩 Best 5: ${best5} 分，Best 6: ${best6} 分。
+兴趣：${(body.interests || []).join('、') || '未填写'}
+特长：${(body.strengths || []).join('、') || '未填写'}
+目标大学：${(body.target_universities || []).join('、') || '未指定'}
+职业方向：${body.career_aspirations || '未填写'}
+
+请提供简短的升学建议（100-200字），包括：
+1. 成绩定位分析
+2. 选校建议
+3. 需要注意的事项`
+                    }
+                  ],
+                  max_tokens: 500,
+                  temperature: 0.3,  // 降低温度
+                  top_p: 0.8,        // 限制采样范围
+                })
+              })
+
+              if (aiResponse.ok) {
+                const aiData = await aiResponse.json() as {
+                  choices: Array<{ message: { content: string } }>
+                }
+                let rawReport = aiData.choices?.[0]?.message?.content || ''
+                
+                // 后处理：裁剪禁止的引导性语句
+                const forbiddenPatterns = [
+                  /需要我为你/i, /是否需要我/i, /请随时告知/i, /我可以为你/i,
+                  /如果你需要/i, /如果您需要/i, /请告诉我/i, /有任何问题/i,
+                  /还有什么.*帮助/i, /希望.*帮助到你/i,
+                ]
+                for (const pattern of forbiddenPatterns) {
+                  const match = rawReport.match(pattern)
+                  if (match && match.index !== undefined) {
+                    const beforeMatch = rawReport.slice(0, match.index)
+                    const lastSentenceEnd = Math.max(
+                      beforeMatch.lastIndexOf('。'),
+                      beforeMatch.lastIndexOf('\n'),
+                      beforeMatch.lastIndexOf('！'),
+                      beforeMatch.lastIndexOf('？')
+                    )
+                    rawReport = rawReport.slice(0, lastSentenceEnd > 0 ? lastSentenceEnd + 1 : match.index).trim()
+                    console.log('[JUPAS AI] Trimmed forbidden continuation prompt')
+                    break
+                  }
+                }
+                aiReport = rawReport
+              }
+            } catch (e) {
+              console.error('[JUPAS AI] DeepSeek API error:', e)
+            }
+          }
+
+          // 如果没有 AI 报告，生成默认报告
+          if (!aiReport) {
+            aiReport = `根据您的 DSE 成绩（Best 5: ${best5} 分），您在 JUPAS 申请中具有${
+              scoreLevel === 'high' ? '较强' : scoreLevel === 'medium' ? '一定' : '有限'
+            }的竞争力。建议合理选择目标专业，同时准备备选方案。`
+          }
+
+          const now = new Date().toISOString()
+          const recordId = crypto.randomUUID()
+
+          // 构建分析结果
+          const analysisResult = {
+            student_profile: studentProfile,
+            matched_programmes: matchedProgrammes,
+            ai_report: aiReport,
+            generated_at: now,
+            disclaimer: '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。',
+          }
+
+          // 【强制】保存到 analysis_records 表
+          await env.DB.prepare(
+            `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+             VALUES (?, ?, 'university', ?, ?, ?)`
+          ).bind(
+            recordId,
+            userId,
+            JSON.stringify(body),
+            JSON.stringify(analysisResult),
+            now
+          ).run()
+
+          console.log(`[JUPAS AI] 分析记录已保存 - userId: ${userId}, recordId: ${recordId}`)
+
+          return jsonResponse({
+            success: true,
+            data: analysisResult,
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('[JUPAS AI] Error:', error)
+          return errorResponse('分析失败，请稍后重试', 500, origin)
+        }
+      }
+
+      // JUPAS 综合分析（与 AI 分析类似，但不调用 AI）
+      if (path === '/api/jupas/analyze/comprehensive' && request.method === 'POST') {
+        // 强制要求登录
+        const authHeader = request.headers.get('Authorization')
+        if (!authHeader?.startsWith('Bearer ')) {
+          return errorResponse('请先登录后再进行分析', 401, origin)
+        }
+
+        const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+        if (!tokenData) {
+          return errorResponse('登录已过期，请重新登录', 401, origin)
+        }
+
+        const userId = tokenData.userId
+
+        try {
+          const body = await request.json() as {
+            grades: { [subject: string]: string }
+            interests?: string[]
+            strengths?: string[]
+            target_universities?: string[]
+            target_fields?: string[]
+            limit?: number
+          }
+
+          // 计算分数
+          const gradeToScore: Record<string, number> = {
+            '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
+          }
+          const scores = Object.values(body.grades)
+            .map(g => gradeToScore[g] || 0)
+            .sort((a, b) => b - a)
+          const best5 = scores.slice(0, 5).reduce((a, b) => a + b, 0)
+          const best6 = scores.slice(0, 6).reduce((a, b) => a + b, 0)
+
+          const now = new Date().toISOString()
+          const recordId = crypto.randomUUID()
+
+          const analysisResult = {
+            student_profile: {
+              best5,
+              best6,
+              interests: body.interests || [],
+              strengths: body.strengths || [],
+              target_universities: body.target_universities || [],
+            },
+            summary: {
+              total_analysed: 0,
+              best_match_fields: [],
+              score_position: best5 >= 28 ? '高分段' : best5 >= 22 ? '中分段' : '基础段',
+            },
+            recommendations: {
+              safe: [],
+              match: [],
+              reach: [],
+            },
+            all_results: [],
+            disclaimer: '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。',
+          }
+
+          // 保存到数据库
+          await env.DB.prepare(
+            `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+             VALUES (?, ?, 'university', ?, ?, ?)`
+          ).bind(
+            recordId,
+            userId,
+            JSON.stringify(body),
+            JSON.stringify(analysisResult),
+            now
+          ).run()
+
+          return jsonResponse({
+            success: true,
+            data: analysisResult,
+          }, 200, origin)
+
+        } catch (error) {
+          console.error('[JUPAS Comprehensive] Error:', error)
+          return errorResponse('分析失败，请稍后重试', 500, origin)
+        }
+      }
+
+      // =====================
       // 就业趋势 API
       // =====================
 
@@ -4835,6 +5180,161 @@ export default {
           console.error('搜索用户失败:', error)
           return jsonResponse({ success: false, error: '搜索用户失败' }, 500, origin)
         }
+      }
+
+      // =====================
+      // 好友系统 API（占位实现）
+      // ⚠️ 目标：页面不报错，可正常渲染
+      // ⚠️ 返回格式统一为 { code, data, message }
+      // =====================
+
+      /**
+       * 获取好友列表
+       * GET /api/friends?user_id=xxx
+       */
+      if (path === '/api/friends' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const userId = url.searchParams.get('user_id')
+
+        if (!userId) {
+          return jsonResponse({ 
+            code: -1, 
+            data: [], 
+            message: '缺少 user_id 参数' 
+          }, 400, origin)
+        }
+
+        // TODO: 实现实际的好友列表查询
+        // 当前返回空数组，页面可正常渲染
+        return jsonResponse({ 
+          code: 0, 
+          success: true,
+          data: [], 
+          message: 'ok' 
+        }, 200, origin)
+      }
+
+      /**
+       * 获取好友请求列表
+       * GET /api/friends/requests?user_id=xxx
+       */
+      if (path === '/api/friends/requests' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const userId = url.searchParams.get('user_id')
+
+        if (!userId) {
+          return jsonResponse({ 
+            code: -1, 
+            data: { received: [], sent: [] }, 
+            message: '缺少 user_id 参数' 
+          }, 400, origin)
+        }
+
+        // TODO: 实现实际的好友请求查询
+        return jsonResponse({ 
+          code: 0, 
+          success: true,
+          data: { received: [], sent: [] }, 
+          message: 'ok' 
+        }, 200, origin)
+      }
+
+      /**
+       * 发送好友请求
+       * POST /api/friends/request
+       */
+      if (path === '/api/friends/request' && request.method === 'POST') {
+        try {
+          const body = await request.json() as {
+            requester_id: string
+            receiver_id: string
+            requester_name?: string
+            receiver_name?: string
+          }
+
+          if (!body.requester_id || !body.receiver_id) {
+            return jsonResponse({ 
+              code: -1, 
+              success: false,
+              message: '缺少必要参数' 
+            }, 400, origin)
+          }
+
+          // TODO: 实现实际的好友请求发送逻辑
+          // 当前返回成功，但不实际创建数据
+          return jsonResponse({ 
+            code: 0, 
+            success: true,
+            data: { id: crypto.randomUUID() },
+            message: '好友请求已发送（功能开发中）' 
+          }, 200, origin)
+        } catch (error) {
+          return jsonResponse({ 
+            code: -1, 
+            success: false,
+            message: '请求格式错误' 
+          }, 400, origin)
+        }
+      }
+
+      /**
+       * 响应好友请求
+       * PATCH /api/friends/respond
+       */
+      if (path === '/api/friends/respond' && request.method === 'PATCH') {
+        try {
+          const body = await request.json() as {
+            receiver_id: string
+            requester_id: string
+            status: 'accepted' | 'rejected'
+          }
+
+          if (!body.receiver_id || !body.requester_id || !body.status) {
+            return jsonResponse({ 
+              code: -1, 
+              success: false,
+              message: '缺少必要参数' 
+            }, 400, origin)
+          }
+
+          // TODO: 实现实际的好友请求响应逻辑
+          return jsonResponse({ 
+            code: 0, 
+            success: true,
+            message: body.status === 'accepted' ? '已接受好友请求（功能开发中）' : '已拒绝好友请求（功能开发中）'
+          }, 200, origin)
+        } catch (error) {
+          return jsonResponse({ 
+            code: -1, 
+            success: false,
+            message: '请求格式错误' 
+          }, 400, origin)
+        }
+      }
+
+      /**
+       * 删除好友
+       * DELETE /api/friends/:id?user_id=xxx
+       */
+      if (path.startsWith('/api/friends/') && request.method === 'DELETE') {
+        const friendId = path.replace('/api/friends/', '')
+        const url = new URL(request.url)
+        const userId = url.searchParams.get('user_id')
+
+        if (!friendId || !userId) {
+          return jsonResponse({ 
+            code: -1, 
+            success: false,
+            message: '缺少必要参数' 
+          }, 400, origin)
+        }
+
+        // TODO: 实现实际的删除好友逻辑
+        return jsonResponse({ 
+          code: 0, 
+          success: true,
+          message: '已删除好友（功能开发中）' 
+        }, 200, origin)
       }
 
       // =====================

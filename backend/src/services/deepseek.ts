@@ -82,7 +82,45 @@ const DEEPSEEK_CONFIG = {
   endpoint: process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions',
   model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
   maxTokens: 4000,
-  temperature: 0.7,
+  temperature: 0.3,  // 降低温度，确保稳定输出
+  top_p: 0.8,        // 限制采样范围
+}
+
+/**
+ * 后处理：裁剪禁止的引导性语句
+ */
+function trimForbiddenContinuationPrompts(text: string): string {
+  const forbiddenPatterns = [
+    /需要我为你/i,
+    /是否需要我/i,
+    /请随时告知/i,
+    /我可以为你/i,
+    /如果你需要/i,
+    /如果您需要/i,
+    /请告诉我/i,
+    /有任何问题/i,
+    /还有什么.*帮助/i,
+    /希望.*帮助到你/i,
+  ]
+  for (const pattern of forbiddenPatterns) {
+    const match = text.match(pattern)
+    if (match && match.index !== undefined) {
+      let cutIndex = match.index
+      const beforeMatch = text.slice(0, match.index)
+      const lastSentenceEnd = Math.max(
+        beforeMatch.lastIndexOf('。'),
+        beforeMatch.lastIndexOf('\n'),
+        beforeMatch.lastIndexOf('！'),
+        beforeMatch.lastIndexOf('？')
+      )
+      if (lastSentenceEnd > 0) {
+        cutIndex = lastSentenceEnd + 1
+      }
+      console.log('[DeepSeek] Trimmed forbidden continuation prompt')
+      return text.slice(0, cutIndex).trim()
+    }
+  }
+  return text
 }
 
 /**
@@ -247,7 +285,17 @@ export const analyzeWithDeepSeek = async (studentInfo: StudentInfo): Promise<Ana
 重要规则：
 1. 用户提供的学生信息（年级、年龄等）都是完整的，绝对不要说"信息未明确"、"信息不完整"、"年级信息未明确"等类似表述
 2. 直接使用用户提供的年级和年龄进行分析
-3. 只返回JSON格式的分析结果`,
+3. 只返回JSON格式的分析结果
+
+【重要】你正在生成【正式分析报告】。
+严格规则：
+- 输出必须是完整、封闭的分析报告
+- 不允许向用户提问
+- 不允许出现"是否需要我…"、"请告诉我"、"我可以为你…"等引导继续对话的句式
+- 不允许列出可选服务、下一步选项
+- 报告必须在总结后自然结束
+- 结尾不得包含任何疑问句或邀请性语句
+- 禁止说"如果你需要"、"请随时告知"、"需要我为你"等`,
           },
           {
             role: 'user',
@@ -256,6 +304,7 @@ export const analyzeWithDeepSeek = async (studentInfo: StudentInfo): Promise<Ana
         ],
         max_tokens: DEEPSEEK_CONFIG.maxTokens,
         temperature: DEEPSEEK_CONFIG.temperature,
+        top_p: DEEPSEEK_CONFIG.top_p,
       }),
     })
 
@@ -279,6 +328,12 @@ export const analyzeWithDeepSeek = async (studentInfo: StudentInfo): Promise<Ana
     }
 
     const result: AnalysisResult = JSON.parse(jsonMatch[0])
+    
+    // 后处理：裁剪 summary 中的禁止语句
+    if (result.overallAssessment?.summary) {
+      result.overallAssessment.summary = trimForbiddenContinuationPrompts(result.overallAssessment.summary)
+    }
+    
     return attachRuleAnalysis(studentInfo, result)
   } catch (error) {
     if (error instanceof ApiError) {
