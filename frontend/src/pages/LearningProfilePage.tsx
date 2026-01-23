@@ -137,15 +137,21 @@ const LearningProfilePage = () => {
         throw new Error('加载学习档案失败')
       }
 
-      const data = await response.json()
+      const result = await response.json()
       
-      // 后端返回结构：{ overview, subjectMastery, topicMastery, recentActivity }
+      // 【API 契约】响应格式：{ code, data: { overview, subjectMastery, ... }, message }
+      if (result.code !== 0) {
+        throw new Error(result.message || '加载学习档案失败')
+      }
+      
+      const data = result.data || {}
+      
       // 映射到前端 LearningProfile 接口
       setProfile({
-        totalQuizzes: data.overview?.totalQuizzes || 0,
+        totalQuizzes: data.overview?.totalSessions || data.overview?.totalQuizzes || 0,
         totalQuestions: data.overview?.totalQuestions || 0,
-        correctAnswers: data.overview?.correctAnswers || 0,
-        totalTimeSpent: data.overview?.totalTimeSpent || 0,
+        correctAnswers: data.overview?.correctQuestions || data.overview?.correctAnswers || 0,
+        totalTimeSpent: data.overview?.totalMinutes || data.overview?.totalTimeSpent || 0,
         currentStreak: data.overview?.currentStreak || 0,
         longestStreak: data.overview?.longestStreak || 0,
         lastStudyDate: data.overview?.lastStudyDate || new Date().toISOString().split('T')[0],

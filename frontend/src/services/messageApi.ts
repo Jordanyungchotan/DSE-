@@ -1,25 +1,21 @@
 /**
  * 通知和私信系统 API 封装
+ * 
+ * ⚠️ 2026-01: 使用统一 API 配置，禁止硬编码域名
  */
 
-const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || 'https://dse-rag-questions.jordanyungchotan.workers.dev'
+import { apiFetch } from '../config/api'
 
-async function ragFetch(endpoint: string, options?: RequestInit) {
+async function fetchApi(endpoint: string, options?: RequestInit) {
   try {
-    const response = await fetch(`${RAG_API_BASE}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    })
+    const response = await apiFetch(endpoint, options)
     if (!response.ok) {
-      console.warn(`RAG API 请求失败: ${endpoint} - ${response.status}`)
+      console.warn(`[MessageAPI] 请求失败: ${endpoint} - ${response.status}`)
       return { success: false, error: `HTTP ${response.status}` }
     }
     return response.json()
   } catch (error) {
-    console.warn(`RAG API 请求异常: ${endpoint}`, error)
+    console.warn(`[MessageAPI] 请求异常: ${endpoint}`, error)
     return { success: false, error: 'Network error' }
   }
 }
@@ -48,14 +44,14 @@ export async function getNotifications(userId: string): Promise<{
     unreadCount: number
   }
 }> {
-  return ragFetch(`/api/notifications?user_id=${userId}`)
+  return fetchApi(`/api/notifications?user_id=${userId}`)
 }
 
 /**
  * 标记通知为已读
  */
 export async function markNotificationRead(userId: string, notificationId?: number, all?: boolean) {
-  return ragFetch('/api/notifications/read', {
+  return fetchApi('/api/notifications/read', {
     method: 'POST',
     body: JSON.stringify({ user_id: userId, notification_id: notificationId, all }),
   })
@@ -87,7 +83,7 @@ export async function getConversations(userId: string): Promise<{
   success: boolean
   data: Conversation[]
 }> {
-  return ragFetch(`/api/messages/conversations?user_id=${userId}`)
+  return fetchApi(`/api/messages/conversations?user_id=${userId}`)
 }
 
 /**
@@ -97,14 +93,14 @@ export async function getMessages(userId: string, otherUserId: string): Promise<
   success: boolean
   data: Message[]
 }> {
-  return ragFetch(`/api/messages/${otherUserId}?user_id=${userId}`)
+  return fetchApi(`/api/messages/${otherUserId}?user_id=${userId}`)
 }
 
 /**
  * 发送私信
  */
 export async function sendMessage(senderId: string, receiverId: string, content: string, senderName?: string) {
-  return ragFetch('/api/messages', {
+  return fetchApi('/api/messages', {
     method: 'POST',
     body: JSON.stringify({ 
       sender_id: senderId, 
@@ -128,7 +124,7 @@ export async function getUnreadCount(userId: string): Promise<{
   }
 }> {
   try {
-    const result = await ragFetch(`/api/messages/unread/count?user_id=${userId}`)
+    const result = await fetchApi(`/api/messages/unread/count?user_id=${userId}`)
     // 确保返回正确的结构
     if (result && result.success !== undefined) {
       return result

@@ -128,17 +128,24 @@ const QuizHistoryPage = () => {
         throw new Error('加载历史失败')
       }
 
-      const data = await response.json()
-      const historyData = data.history || []
+      const result = await response.json()
+      
+      // 【API 契约】响应格式：{ code, data: { history, stats }, message }
+      if (result.code !== 0) {
+        throw new Error(result.message || '加载历史失败')
+      }
+      
+      const historyData = result.data?.history || []
       setHistory(historyData)
 
       // 【数据主干对齐】统计数据由后端计算并返回
-      if (data.stats) {
+      const stats = result.data?.stats
+      if (stats) {
         setStats({
-          totalSessions: data.stats.totalSessions || 0,
-          totalQuestions: data.stats.totalQuestions || 0,
-          averageAccuracy: data.stats.averageAccuracy || 0,
-          totalTime: data.stats.totalTime || 0,
+          totalSessions: stats.totalSessions || 0,
+          totalQuestions: stats.totalQuestions || 0,
+          averageAccuracy: stats.averageAccuracy || stats.accuracy || 0,
+          totalTime: stats.totalTime || 0,
         })
       } else {
         // 兼容旧 API：若后端未返回 stats，则置为 0

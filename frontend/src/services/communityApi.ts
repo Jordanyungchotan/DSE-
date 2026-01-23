@@ -1,17 +1,13 @@
 /**
  * 学习社区"量子纠缠" API 封装
+ * 
+ * ⚠️ 2026-01: 使用统一 API 配置，禁止硬编码域名
  */
 
-const RAG_API_BASE = import.meta.env.VITE_RAG_API_URL || 'https://dse-rag-questions.jordanyungchotan.workers.dev'
+import { apiFetch } from '../config/api'
 
-async function ragFetch(endpoint: string, options?: RequestInit) {
-  const response = await fetch(`${RAG_API_BASE}${endpoint}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  })
+async function fetchApi(endpoint: string, options?: RequestInit) {
+  const response = await apiFetch(endpoint, options)
   return response.json()
 }
 
@@ -27,22 +23,13 @@ export interface SearchUser {
 
 /**
  * 搜索用户（用于添加好友）
- * 注意：用户数据在 backend API 中，所以需要调用 backend
  */
 export async function searchUsers(query: string, excludeUserId?: string) {
   const params = new URLSearchParams({ q: query })
   if (excludeUserId) {
     params.append('exclude', excludeUserId)
   }
-  // 用户数据在 backend 的数据库中，需要调用 backend API
-  // ⚠️ 统一使用 dse-rag-questions Worker
-  const BACKEND_API_BASE = import.meta.env.VITE_API_URL || 'https://dse-rag-questions.jordanyungchotan.workers.dev'
-  const response = await fetch(`${BACKEND_API_BASE}/api/users/search?${params}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
-  return response.json()
+  return fetchApi(`/api/users/search?${params}`)
 }
 
 /**
@@ -55,16 +42,10 @@ export async function getUsersBatch(userIds: string[]): Promise<{
   if (userIds.length === 0) {
     return { success: true, data: [] }
   }
-  // ⚠️ 统一使用 dse-rag-questions Worker
-  const BACKEND_API_BASE = import.meta.env.VITE_API_URL || 'https://dse-rag-questions.jordanyungchotan.workers.dev'
-  const response = await fetch(`${BACKEND_API_BASE}/api/users/batch`, {
+  return fetchApi('/api/users/batch', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify({ user_ids: userIds }),
   })
-  return response.json()
 }
 
 // ==================== 好友系统 ====================
@@ -102,7 +83,7 @@ export async function sendFriendRequest(
   requesterName?: string,
   receiverName?: string
 ) {
-  return ragFetch('/api/friends/request', {
+  return fetchApi('/api/friends/request', {
     method: 'POST',
     body: JSON.stringify({ 
       requester_id: requesterId, 
@@ -121,7 +102,7 @@ export async function respondFriendRequest(
   requesterId: string,
   status: 'accepted' | 'rejected'
 ) {
-  return ragFetch('/api/friends/respond', {
+  return fetchApi('/api/friends/respond', {
     method: 'PATCH',
     body: JSON.stringify({ receiver_id: receiverId, requester_id: requesterId, status }),
   })
@@ -131,7 +112,7 @@ export async function respondFriendRequest(
  * 获取好友列表
  */
 export async function getFriendList(userId: string): Promise<{ success: boolean; data: Friend[] }> {
-  return ragFetch(`/api/friends?user_id=${userId}`)
+  return fetchApi(`/api/friends?user_id=${userId}`)
 }
 
 /**
@@ -141,14 +122,14 @@ export async function getFriendRequests(userId: string): Promise<{
   success: boolean
   data: { received: FriendRequest[]; sent: FriendRequest[] }
 }> {
-  return ragFetch(`/api/friends/requests?user_id=${userId}`)
+  return fetchApi(`/api/friends/requests?user_id=${userId}`)
 }
 
 /**
  * 删除好友
  */
 export async function deleteFriend(userId: string, friendId: string) {
-  return ragFetch(`/api/friends/${friendId}?user_id=${userId}`, {
+  return fetchApi(`/api/friends/${friendId}?user_id=${userId}`, {
     method: 'DELETE',
   })
 }
@@ -215,7 +196,7 @@ export async function getPosts(
   if (category && category !== 'all') params.set('category', category)
   params.set('page', String(page))
   params.set('limit', String(limit))
-  return ragFetch(`/api/posts?${params}`)
+  return fetchApi(`/api/posts?${params}`)
 }
 
 /**
@@ -226,7 +207,7 @@ export async function getPostDetail(
   userId?: string
 ): Promise<{ success: boolean; data: Post }> {
   const params = userId ? `?user_id=${userId}` : ''
-  return ragFetch(`/api/posts/${postId}${params}`)
+  return fetchApi(`/api/posts/${postId}${params}`)
 }
 
 /**
@@ -240,7 +221,7 @@ export async function createPost(data: {
   content: string
   category?: PostCategory
 }) {
-  return ragFetch('/api/posts', {
+  return fetchApi('/api/posts', {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -258,7 +239,7 @@ export async function updatePost(
     category?: string
   }
 ) {
-  return ragFetch(`/api/posts/${postId}`, {
+  return fetchApi(`/api/posts/${postId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
@@ -268,7 +249,7 @@ export async function updatePost(
  * 删除帖子
  */
 export async function deletePost(postId: number | string, userId: string) {
-  return ragFetch(`/api/posts/${postId}?user_id=${userId}`, {
+  return fetchApi(`/api/posts/${postId}?user_id=${userId}`, {
     method: 'DELETE',
   })
 }
@@ -277,7 +258,7 @@ export async function deletePost(postId: number | string, userId: string) {
  * 点赞/取消点赞帖子
  */
 export async function togglePostLike(postId: number | string, userId: string) {
-  return ragFetch(`/api/posts/${postId}/like`, {
+  return fetchApi(`/api/posts/${postId}/like`, {
     method: 'POST',
     body: JSON.stringify({ user_id: userId }),
   })
@@ -306,7 +287,7 @@ export async function getComments(
   page = 1,
   limit = 50
 ): Promise<{ success: boolean; data: Comment[] }> {
-  return ragFetch(`/api/posts/${postId}/comments?page=${page}&limit=${limit}`)
+  return fetchApi(`/api/posts/${postId}/comments?page=${page}&limit=${limit}`)
 }
 
 /**
@@ -322,7 +303,7 @@ export async function createComment(
     parent_id?: number
   }
 ) {
-  return ragFetch(`/api/posts/${postId}/comments`, {
+  return fetchApi(`/api/posts/${postId}/comments`, {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -332,7 +313,7 @@ export async function createComment(
  * 删除评论
  */
 export async function deleteComment(commentId: number | string, userId: string) {
-  return ragFetch(`/api/comments/${commentId}?user_id=${userId}`, {
+  return fetchApi(`/api/comments/${commentId}?user_id=${userId}`, {
     method: 'DELETE',
   })
 }
@@ -343,7 +324,7 @@ export async function deleteComment(commentId: number | string, userId: string) 
  * 管理员删除帖子
  */
 export async function adminDeletePost(postId: number | string, adminKey: string) {
-  return ragFetch(`/api/admin/community/posts/${postId}?admin_id=${adminKey}`, {
+  return fetchApi(`/api/admin/community/posts/${postId}?admin_id=${adminKey}`, {
     method: 'DELETE',
   })
 }
@@ -352,7 +333,7 @@ export async function adminDeletePost(postId: number | string, adminKey: string)
  * 管理员删除评论
  */
 export async function adminDeleteComment(commentId: number | string, adminKey: string) {
-  return ragFetch(`/api/admin/community/comments/${commentId}?admin_id=${adminKey}`, {
+  return fetchApi(`/api/admin/community/comments/${commentId}?admin_id=${adminKey}`, {
     method: 'DELETE',
   })
 }
@@ -361,7 +342,7 @@ export async function adminDeleteComment(commentId: number | string, adminKey: s
  * 管理员置顶帖子
  */
 export async function adminPinPost(postId: number | string, adminKey: string) {
-  return ragFetch(`/api/admin/community/posts/${postId}/pin`, {
+  return fetchApi(`/api/admin/community/posts/${postId}/pin`, {
     method: 'POST',
     headers: { 'X-Admin-Key': adminKey },
   })
@@ -379,5 +360,5 @@ export async function getCommunityStats(): Promise<{
     todayComments: number
   }
 }> {
-  return ragFetch('/api/admin/community/stats')
+  return fetchApi('/api/admin/community/stats')
 }

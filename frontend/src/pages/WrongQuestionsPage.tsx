@@ -85,12 +85,18 @@ const WrongQuestionsPage = () => {
         throw new Error('加载错题失败')
       }
 
-      const data = await response.json()
-      setWrongQuestions(data.questions || [])
+      const result = await response.json()
+      
+      // 【API 契约】响应格式：{ code, data: { wrongQuestions }, message }
+      if (result.code !== 0) {
+        throw new Error(result.message || '加载错题失败')
+      }
+      
+      setWrongQuestions(result.data?.wrongQuestions || [])
     } catch (error) {
       console.error('加载错题失败:', error)
-      // 使用模拟数据
-      setWrongQuestions(generateMockWrongQuestions())
+      // ⚠️ 【数据主干对齐】不使用 mock 数据，显示空状态
+      setWrongQuestions([])
     } finally {
       setLoading(false)
     }
