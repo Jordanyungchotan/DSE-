@@ -102,57 +102,6 @@ const WrongQuestionsPage = () => {
     }
   }
 
-  // 生成模拟错题数据
-  const generateMockWrongQuestions = (): WrongQuestion[] => {
-    return [
-      {
-        id: '1',
-        questionId: 'q1',
-        questionText: '若 x² - 5x + 6 = 0，求x的值。',
-        questionType: 'calculation',
-        subject: 'math',
-        topic: '二次方程',
-        userAnswer: 'x = 1 或 x = 6',
-        correctAnswer: 'x = 2 或 x = 3',
-        explanation: '【解题思路】\n将方程因式分解：x² - 5x + 6 = (x-2)(x-3) = 0\n所以 x = 2 或 x = 3\n\n【易错点】\n注意因式分解时两数之积为6，之和为-5',
-        wrongCount: 2,
-        status: 'unreviewed',
-        firstAttemptDate: '2024-12-20',
-        lastAttemptDate: '2024-12-22',
-      },
-      {
-        id: '2',
-        questionId: 'q2',
-        questionText: '下列哪项是光合作用的产物？\nA. 二氧化碳\nB. 水\nC. 葡萄糖\nD. 氮气',
-        questionType: 'multiple_choice',
-        subject: 'biology',
-        topic: '光合作用',
-        userAnswer: 'A',
-        correctAnswer: 'C',
-        explanation: '【解题思路】\n光合作用的化学方程式：6CO₂ + 6H₂O → C₆H₁₂O₆ + 6O₂\n产物是葡萄糖和氧气\n\n【关键知识点】\nCO₂和H₂O是反应物，不是产物',
-        wrongCount: 1,
-        status: 'reviewed',
-        firstAttemptDate: '2024-12-21',
-        lastAttemptDate: '2024-12-21',
-      },
-      {
-        id: '3',
-        questionId: 'q3',
-        questionText: '牛顿第一定律也称为什么定律？',
-        questionType: 'short_answer',
-        subject: 'physics',
-        topic: '牛顿定律',
-        userAnswer: '运动定律',
-        correctAnswer: '惯性定律',
-        explanation: '【解题思路】\n牛顿第一定律表述了物体在不受力时保持原有运动状态的性质，即惯性。\n因此也被称为惯性定律。',
-        wrongCount: 1,
-        status: 'mastered',
-        firstAttemptDate: '2024-12-19',
-        lastAttemptDate: '2024-12-19',
-      },
-    ]
-  }
-
   // 更新错题状态
   const updateQuestionStatus = async (id: string, status: 'reviewed' | 'mastered') => {
     try {
