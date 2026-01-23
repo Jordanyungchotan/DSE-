@@ -45,6 +45,8 @@ import {
 } from '../services/jupasApi'
 import {
   ALL_SUBJECTS,
+  CORE_SUBJECTS,
+  ELECTIVE_SUBJECTS,
   DSE_GRADE_OPTIONS,
   hasPassFailGrading,
   getCivicsOptions,
@@ -378,10 +380,18 @@ const UniversityAnalysisPage = () => {
                     placeholder={isEnglish ? 'Select Subject' : '选择科目'}
                     value={result.subject || undefined}
                     onChange={(v) => updateDseResult(index, 'subject', v)}
-                    options={ALL_SUBJECTS.map((subject) => ({
-                      value: subject.key,
-                      label: subject.displayName[currentLang],
-                    }))}
+                    disabled={index < 4}
+                    options={
+                      index < 4
+                        ? CORE_SUBJECTS.map((subject) => ({
+                            value: subject.key,
+                            label: subject.displayName[currentLang],
+                          }))
+                        : ELECTIVE_SUBJECTS.map((subject) => ({
+                            value: subject.key,
+                            label: subject.displayName[currentLang],
+                          }))
+                    }
                     style={{ flex: 2 }}
                   />
                   {isPassFailSubject(result.subject) ? (
