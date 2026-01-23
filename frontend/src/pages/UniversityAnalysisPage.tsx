@@ -45,11 +45,12 @@ import {
 } from '../services/jupasApi'
 import {
   ALL_SUBJECTS,
-  CORE_SUBJECTS,
   ELECTIVE_SUBJECTS,
   DSE_GRADE_OPTIONS,
   hasPassFailGrading,
   getCivicsOptions,
+  getSubjectDisplayName,
+  type LanguageCode,
 } from '@/shared/domain'
 import styles from './UniversityAnalysisPage.module.css'
 
@@ -376,24 +377,23 @@ const UniversityAnalysisPage = () => {
             <div className={styles.subjectsGrid}>
               {dseResults.map((result, index) => (
                 <div key={index} className={styles.subjectRow}>
-                  <Select
-                    placeholder={isEnglish ? 'Select Subject' : '选择科目'}
-                    value={result.subject || undefined}
-                    onChange={(v) => updateDseResult(index, 'subject', v)}
-                    disabled={index < 4}
-                    options={
-                      index < 4
-                        ? CORE_SUBJECTS.map((subject) => ({
-                            value: subject.key,
-                            label: subject.displayName[currentLang],
-                          }))
-                        : ELECTIVE_SUBJECTS.map((subject) => ({
-                            value: subject.key,
-                            label: subject.displayName[currentLang],
-                          }))
-                    }
-                    style={{ flex: 2 }}
-                  />
+                  {index < 4 ? (
+                    <div className={styles.coreSubjectLabel}>
+                      <span className={styles.requiredDot}>*</span>
+                      {getSubjectDisplayName(result.subject, currentLang as LanguageCode)}
+                    </div>
+                  ) : (
+                    <Select
+                      placeholder={isEnglish ? 'Select Subject' : '选择科目'}
+                      value={result.subject || undefined}
+                      onChange={(v) => updateDseResult(index, 'subject', v)}
+                      options={ELECTIVE_SUBJECTS.map((subject) => ({
+                        value: subject.key,
+                        label: subject.displayName[currentLang],
+                      }))}
+                      style={{ flex: 2 }}
+                    />
+                  )}
                   {isPassFailSubject(result.subject) ? (
                     <Select
                       placeholder={isEnglish ? 'Grade' : '等级'}

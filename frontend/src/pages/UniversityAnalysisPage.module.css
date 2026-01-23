@@ -43,6 +43,26 @@
   align-items: center;
 }
 
+.coreSubjectLabel {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%);
+  border: 1px solid #91caff;
+  border-radius: 8px;
+  font-weight: 500;
+  color: #1677ff;
+  font-size: 14px;
+  min-height: 32px;
+}
+
+.requiredDot {
+  color: #ff4d4f;
+  margin-right: 6px;
+  font-weight: bold;
+}
+
 .addButton {
   margin-top: 16px;
   width: 100%;
