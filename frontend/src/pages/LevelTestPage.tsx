@@ -336,14 +336,14 @@ export default function LevelTestPage() {
         // 清理测试缓存
         localStorage.removeItem(`level_test_${testId}`)
         
-        // 发放积分
-        const userId = useAuthStore.getState().user?.id
-        if (userId) {
+        // 发放积分 - 依赖 Authorization header，不传 user_id
+        const isAuthenticated = useAuthStore.getState().isAuthenticated
+        if (isAuthenticated) {
           try {
-            await ragFetch('/api/test/complete', {
+            // ⚠️ 不传 user_id，后端从 JWT 获取
+            const response = await ragFetch('/api/test/complete', {
               method: 'POST',
               body: JSON.stringify({
-                user_id: userId,
                 test_id: testId,
                 total_questions: testData.questions.length,
                 correct_count: correctCount,
@@ -351,10 +351,20 @@ export default function LevelTestPage() {
                 time_spent: totalTimeSpent
               })
             })
-            console.log('[LevelTest] Points awarded')
+            
+            if (response.status === 401) {
+              console.warn('[LevelTest] 401 - 用户未登录，无法记录积分')
+            } else {
+              const result = await response.json()
+              if (result.code === 0 || result.success) {
+                console.log('[LevelTest] ✅ Points awarded:', result)
+              }
+            }
           } catch (e) {
-            console.warn('Points award failed:', e)
+            console.warn('[LevelTest] Points award failed:', e)
           }
+        } else {
+          console.warn('[LevelTest] 未登录，跳过积分发放')
         }
         
         setGradingStatus(t('levelTest.submit.completed'))

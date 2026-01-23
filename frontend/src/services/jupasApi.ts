@@ -4,7 +4,7 @@
  * 提供课程搜索、详情查询、匹配度分析等功能
  */
 
-import { ragFetchJson } from '../config/api'
+import { ragFetchJson, apiFetch } from '../config/api'
 
 // ============================================================
 // 类型定义
@@ -635,18 +635,34 @@ export async function analyzeComprehensive(
 
 /**
  * AI 增强分析 - 生成详细升学规划报告
+ * 
+ * ⚠️ 需要登录才能使用，后端从 JWT 获取 userId
  */
 export async function analyzeWithAI(
   input: ComprehensiveAnalysisInput
 ): Promise<{
   success: boolean
+  code?: number
   data?: AIAnalysisResponse
   error?: string
+  message?: string
 }> {
-  return ragFetchJson('/api/jupas/analyze/ai', {
+  const response = await apiFetch('/api/jupas/analyze/ai', {
     method: 'POST',
     body: JSON.stringify(input)
   })
+  
+  // 处理 401 未授权
+  if (response.status === 401) {
+    return {
+      success: false,
+      code: -1,
+      error: '请先登录后再使用 AI 分析',
+      message: 'AUTH_REQUIRED'
+    }
+  }
+  
+  return response.json()
 }
 
 /** 专业领域颜色映射 */

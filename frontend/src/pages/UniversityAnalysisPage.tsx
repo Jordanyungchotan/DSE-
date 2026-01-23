@@ -310,6 +310,13 @@ const UniversityAnalysisPage = () => {
 
       const response = await analyzeWithAI(input)
 
+      // 处理 401 未授权 - 跳转登录
+      if (response.message === 'AUTH_REQUIRED') {
+        message.warning(isEnglish ? 'Please login to use AI analysis' : '请先登录后再使用 AI 分析')
+        navigate('/login')
+        return
+      }
+
       if (response.success && response.data) {
         setAnalysisResult(response.data)
       } else {

@@ -518,9 +518,9 @@ export const useQuizStore = create<QuizState>()(
             }
           }
 
-          // 发放积分
-          const userId = useAuthStore.getState().user?.id
-          if (userId) {
+          // 发放积分 - 依赖 Authorization header，不传 user_id
+          const isAuthenticated = useAuthStore.getState().isAuthenticated
+          if (isAuthenticated) {
             try {
               // 计算连续答对题数
               let maxStreak = 0
@@ -535,7 +535,6 @@ export const useQuizStore = create<QuizState>()(
               }
 
               console.log('[Quiz] 准备发放积分...', {
-                user_id: userId,
                 session_id: completedSession.id,
                 total_questions: totalQuestions,
                 correct_count: correctAnswers,
@@ -543,10 +542,10 @@ export const useQuizStore = create<QuizState>()(
                 streak: maxStreak
               })
 
+              // ⚠️ 不传 user_id，后端从 JWT 获取
               const response = await ragFetch('/api/quiz/complete', {
                 method: 'POST',
                 body: JSON.stringify({
-                  user_id: userId,
                   session_id: completedSession.id,
                   total_questions: totalQuestions,
                   correct_count: correctAnswers,
@@ -555,9 +554,15 @@ export const useQuizStore = create<QuizState>()(
                 })
               })
               
+              // 处理 401 错误
+              if (response.status === 401) {
+                console.warn('[Quiz] 401 - 用户未登录，无法记录积分')
+                return
+              }
+              
               const result = await response.json()
-              if (result.success) {
-                console.log('[Quiz] 积分发放成功:', result)
+              if (result.code === 0 || result.success) {
+                console.log('[Quiz] ✅ 积分发放成功:', result)
               } else {
                 console.error('[Quiz] 积分发放返回错误:', result)
               }
@@ -565,7 +570,7 @@ export const useQuizStore = create<QuizState>()(
               console.error('[Quiz] 积分发放请求失败:', e)
             }
           } else {
-            console.warn('[Quiz] 未找到用户ID，跳过积分发放')
+            console.warn('[Quiz] 未登录，跳过积分发放')
           }
 
           // 生成报告
