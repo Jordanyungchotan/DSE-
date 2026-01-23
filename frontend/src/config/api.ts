@@ -3,19 +3,20 @@
  * 
  * 在本地开发时使用 Vite 代理 (/api -> localhost:5000)
  * 在生产环境使用 Cloudflare Worker URL
+ * 
+ * ⚠️ 2026-01: 已完成 Worker 统一，所有 API 均指向 dse-rag-questions
+ * dse-analysis-api 已废弃，禁止使用
  */
 
-// 获取 API 基础 URL
-// 生产环境区分分析 API 与 RAG API
-const PRODUCTION_ANALYSIS_API_URL = 'https://dse-analysis-api.jordanyungchotan.workers.dev'
-const PRODUCTION_RAG_API_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
+// 统一 API URL - 所有请求均指向 dse-rag-questions
+const PRODUCTION_API_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (import.meta.env.PROD ? PRODUCTION_ANALYSIS_API_URL : '')
+  (import.meta.env.PROD ? PRODUCTION_API_URL : '')
 
-// RAG 服务 URL (用于智能组卷和水平测试)
+// RAG 服务 URL (与主 API 相同，已统一)
 export const RAG_API_URL = import.meta.env.VITE_RAG_API_URL || 
-  (import.meta.env.PROD ? PRODUCTION_RAG_API_URL : 'http://localhost:8787')
+  (import.meta.env.PROD ? PRODUCTION_API_URL : 'http://localhost:8787')
 
 /**
  * 构建完整的 API URL
