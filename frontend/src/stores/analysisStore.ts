@@ -328,14 +328,19 @@ export const useAnalysisStore = create<AnalysisState>()(
           
           const data = await response.json()
           
-          // 【修复】后端返回 { success, data: { results, summary } }
+          // 【修复】后端返回 { success, data: { analysis_id, results, summary } }
           // 需要转换为前端期望的格式
           if (!data.success) {
             throw new Error(data.error || '分析失败')
           }
 
-          // 构建前端期望的 result 结构
-          const analysisId = `transfer-${Date.now()}`
+          // 【核心修复】从后端获取真实的 analysis_id，禁止前端自行生成
+          const analysisId = data.data?.analysis_id
+          if (!analysisId) {
+            console.error('[Transfer] 后端未返回 analysis_id', data)
+            throw new Error('分析创建失败：后端未返回有效的分析记录 ID')
+          }
+          
           const createdAt = new Date().toISOString()
           const backendResults = data.data?.results || []
           const backendSummary = data.data?.summary || {}
