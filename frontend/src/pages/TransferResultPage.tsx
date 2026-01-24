@@ -1,0 +1,558 @@
+/**
+ * 插班分析结果页面 V2
+ * 
+ * 专用于展示 TransferAnalysisResultV2 结构
+ * ⚠️ 不复用 ResultPage（JUPAS）
+ * ⚠️ 所有 map() 前必须保证数组存在
+ */
+
+import React, { useEffect } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { 
+  Card, 
+  Typography, 
+  Tag, 
+  List, 
+  Spin, 
+  Button, 
+  Alert, 
+  Progress,
+  Row,
+  Col,
+  Empty,
+  Space,
+} from 'antd'
+import {
+  CheckCircleOutlined,
+  WarningOutlined,
+  ExclamationCircleOutlined,
+  ArrowLeftOutlined,
+  ReloadOutlined,
+  BookOutlined,
+  RocketOutlined,
+  SafetyOutlined,
+  StarOutlined,
+  BulbOutlined,
+  CalendarOutlined,
+  FileTextOutlined,
+  RobotOutlined,
+} from '@ant-design/icons'
+import { useAnalysisStore } from '../stores/analysisStore'
+import type { 
+  CapabilityAnalysis, 
+  SchoolAssessment, 
+  TransitionPlan,
+  TransferSummary,
+} from '../types/transferAnalysisV2'
+import styles from './TransferResultPage.module.css'
+
+const { Title, Text, Paragraph } = Typography
+
+// 可行性等级配置
+const LEVEL_CONFIG = {
+  '稳妥': {
+    color: '#52c41a',
+    bgColor: '#f6ffed',
+    borderColor: '#b7eb8f',
+    icon: <CheckCircleOutlined />,
+    emoji: '🌟',
+    progressColor: '#52c41a',
+  },
+  '可尝试': {
+    color: '#1890ff',
+    bgColor: '#e6f7ff',
+    borderColor: '#91d5ff',
+    icon: <ExclamationCircleOutlined />,
+    emoji: '💪',
+    progressColor: '#1890ff',
+  },
+  '高风险': {
+    color: '#ff4d4f',
+    bgColor: '#fff2f0',
+    borderColor: '#ffccc7',
+    icon: <WarningOutlined />,
+    emoji: '⚠️',
+    progressColor: '#ff4d4f',
+  },
+}
+
+// 能力等级配置
+const CAPABILITY_LEVEL_CONFIG = {
+  '强': { color: 'success', icon: <StarOutlined /> },
+  '中': { color: 'processing', icon: <CheckCircleOutlined /> },
+  '弱': { color: 'warning', icon: <ExclamationCircleOutlined /> },
+}
+
+// 风险等级配置
+const RISK_LEVEL_CONFIG = {
+  '低': { color: '#52c41a', tagColor: 'success' },
+  '中': { color: '#faad14', tagColor: 'warning' },
+  '高': { color: '#ff4d4f', tagColor: 'error' },
+}
+
+// 推荐类型配置
+const RECOMMENDATION_CONFIG = {
+  '保底': { color: 'success', text: '保底' },
+  '目标': { color: 'processing', text: '目标' },
+  '冲刺': { color: 'warning', text: '冲刺' },
+}
+
+// 能力维度中文名
+const DIMENSION_NAMES: Record<string, string> = {
+  'English': '英语能力',
+  'Math': '数学能力',
+  'AcademicFoundation': '学术基础',
+  'LearningAdaptability': '学习适应能力',
+  'DisciplineFit': '校风契合度',
+}
+
+const TransferResultPage: React.FC = () => {
+  const { analysisId } = useParams<{ analysisId: string }>()
+  const navigate = useNavigate()
+  
+  const { 
+    transferResultV2, 
+    loading, 
+    error, 
+    loadTransferResultV2 
+  } = useAnalysisStore()
+
+  useEffect(() => {
+    if (analysisId) {
+      loadTransferResultV2(analysisId).catch(console.error)
+    }
+  }, [analysisId, loadTransferResultV2])
+
+  // 加载中
+  if (loading) {
+    return (
+      <div className={styles.loadingContainer}>
+        <Spin size="large" tip="正在加载分析结果..." />
+      </div>
+    )
+  }
+
+  // 错误或无数据
+  if (error || !transferResultV2) {
+    return (
+      <div className={styles.errorContainer}>
+        <Alert
+          type="error"
+          message="加载失败"
+          description={error || '未找到分析记录'}
+          showIcon
+          action={
+            <Button onClick={() => navigate('/analysis')}>
+              返回重新分析
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
+
+  const { summary, capabilityAnalyses, schoolAssessments, transitionPlan, meta, aiEnabled } = transferResultV2
+  const levelConfig = LEVEL_CONFIG[summary.overallLevel] || LEVEL_CONFIG['可尝试']
+
+  // 渲染综合评估
+  const renderSummary = (summaryData: TransferSummary) => (
+    <Card className={styles.overviewCard}>
+      <Row gutter={[24, 24]} align="middle">
+        <Col xs={24} md={8}>
+          <div 
+            className={styles.levelBadge}
+            style={{ 
+              backgroundColor: levelConfig.bgColor,
+              borderColor: levelConfig.borderColor,
+            }}
+          >
+            <div className={styles.levelEmoji}>{levelConfig.emoji}</div>
+            <div 
+              className={styles.levelScore}
+              style={{ color: levelConfig.color }}
+            >
+              {summaryData.feasibilityScore}
+            </div>
+            <div className={styles.levelTitle}>{summaryData.overallLevel}</div>
+          </div>
+        </Col>
+        
+        <Col xs={24} md={16}>
+          <div className={styles.overviewInfo}>
+            <Title level={4}>
+              {aiEnabled ? '🤖 AI 增强分析' : '📊 规则分析'}
+            </Title>
+            
+            <Progress 
+              percent={summaryData.feasibilityScore} 
+              strokeColor={levelConfig.progressColor}
+              format={(percent) => `${percent}分`}
+            />
+            
+            <div className={styles.metaInfo}>
+              <Text type="secondary">
+                分析时间：{new Date(meta.generatedAt).toLocaleString('zh-CN')}
+              </Text>
+              <Tag color="blue">版本 {meta.version}</Tag>
+            </div>
+          </div>
+        </Col>
+      </Row>
+    </Card>
+  )
+
+  // 渲染优势与风险
+  const renderStrengthsAndRisks = (summaryData: TransferSummary) => (
+    <Row gutter={[16, 16]}>
+      <Col xs={24} md={12}>
+        <Card 
+          title={<><StarOutlined style={{ color: '#52c41a' }} /> 主要优势</>}
+          className={styles.sectionCard}
+        >
+          {summaryData.keyAdvantages && summaryData.keyAdvantages.length > 0 ? (
+            <List
+              dataSource={summaryData.keyAdvantages}
+              renderItem={(item) => (
+                <List.Item>
+                  <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+                  {item}
+                </List.Item>
+              )}
+            />
+          ) : (
+            <Empty description="暂无数据" />
+          )}
+        </Card>
+      </Col>
+      
+      <Col xs={24} md={12}>
+        <Card 
+          title={<><WarningOutlined style={{ color: '#faad14' }} /> 主要风险</>}
+          className={styles.sectionCard}
+        >
+          {summaryData.keyRisks && summaryData.keyRisks.length > 0 ? (
+            <List
+              dataSource={summaryData.keyRisks}
+              renderItem={(item) => (
+                <List.Item>
+                  <ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                  {item}
+                </List.Item>
+              )}
+            />
+          ) : (
+            <Empty description="暂无数据" />
+          )}
+        </Card>
+      </Col>
+    </Row>
+  )
+
+  // 渲染决策依据和 AI 贡献（Explainability）
+  const renderDecisionBasis = (summaryData: TransferSummary) => (
+    <Row gutter={[16, 16]}>
+      {/* 📌 决策依据（规则引擎解释） */}
+      <Col xs={24} md={aiEnabled && summaryData.aiContribution ? 12 : 24}>
+        <Card 
+          title={<><FileTextOutlined style={{ color: '#1890ff' }} /> 决策依据</>}
+          className={styles.sectionCard}
+        >
+          {summaryData.decisionBasis && summaryData.decisionBasis.length > 0 ? (
+            <List
+              dataSource={summaryData.decisionBasis}
+              renderItem={(item, index) => (
+                <List.Item>
+                  <Text type="secondary" style={{ marginRight: 8 }}>#{index + 1}</Text>
+                  {item}
+                </List.Item>
+              )}
+            />
+          ) : (
+            <Empty description="暂无决策依据数据" />
+          )}
+          <div style={{ marginTop: 12 }}>
+            <Tag color="blue">📊 纯规则生成</Tag>
+          </div>
+        </Card>
+      </Col>
+      
+      {/* 🤖 AI 增强说明（仅 aiEnabled === true 时显示） */}
+      {aiEnabled && summaryData.aiContribution && summaryData.aiContribution.length > 0 && (
+        <Col xs={24} md={12}>
+          <Card 
+            title={<><RobotOutlined style={{ color: '#722ed1' }} /> AI 增强说明</>}
+            className={styles.sectionCard}
+          >
+            <List
+              dataSource={summaryData.aiContribution}
+              renderItem={(item) => (
+                <List.Item>
+                  <CheckCircleOutlined style={{ color: '#722ed1', marginRight: 8 }} />
+                  {item}
+                </List.Item>
+              )}
+            />
+            <div style={{ marginTop: 12 }}>
+              <Tag color="purple">🤖 AI 实际贡献</Tag>
+            </div>
+          </Card>
+        </Col>
+      )}
+    </Row>
+  )
+
+  // 渲染能力分析
+  const renderCapabilityAnalyses = (analyses: CapabilityAnalysis[]) => (
+    <Card 
+      title={<><BookOutlined /> 能力维度分析</>}
+      className={styles.sectionCard}
+    >
+      {analyses && analyses.length > 0 ? (
+        <div className={styles.capabilityGrid}>
+          {analyses.map((analysis, index) => {
+            const levelCfg = CAPABILITY_LEVEL_CONFIG[analysis.level] || CAPABILITY_LEVEL_CONFIG['中']
+            return (
+              <Card 
+                key={index}
+                size="small"
+                className={styles.capabilityCard}
+              >
+                <div className={styles.capabilityHeader}>
+                  <Text strong>{DIMENSION_NAMES[analysis.dimension] || analysis.dimension}</Text>
+                  <Tag color={levelCfg.color}>
+                    {levelCfg.icon} {analysis.level}
+                  </Tag>
+                </div>
+                <Paragraph type="secondary" className={styles.capabilityDesc}>
+                  {analysis.description}
+                </Paragraph>
+                <div className={styles.capabilityImpact}>
+                  <Text type="secondary">影响：</Text>
+                  <Text>{analysis.impact}</Text>
+                </div>
+                <div className={styles.capabilitySuggestion}>
+                  <BulbOutlined style={{ color: '#1890ff', marginRight: 4 }} />
+                  {analysis.suggestion}
+                </div>
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <Empty description="暂无能力分析数据" />
+      )}
+    </Card>
+  )
+
+  // 渲染学校评估
+  const renderSchoolAssessments = (assessments: SchoolAssessment[]) => (
+    <Card 
+      title={<><SafetyOutlined /> 目标学校评估</>}
+      className={styles.sectionCard}
+    >
+      {assessments && assessments.length > 0 ? (
+        <div className={styles.schoolGrid}>
+          {assessments.map((school, index) => {
+            const riskCfg = RISK_LEVEL_CONFIG[school.riskLevel] || RISK_LEVEL_CONFIG['中']
+            const recCfg = RECOMMENDATION_CONFIG[school.recommendation] || RECOMMENDATION_CONFIG['目标']
+            return (
+              <Card 
+                key={index}
+                size="small"
+                className={styles.schoolCard}
+              >
+                <div className={styles.schoolHeader}>
+                  <Text strong>{school.schoolName}</Text>
+                  <Space>
+                    <Tag color={recCfg.color}>{recCfg.text}</Tag>
+                    <Tag color={riskCfg.tagColor}>风险: {school.riskLevel}</Tag>
+                  </Space>
+                </div>
+                
+                <div className={styles.schoolMeta}>
+                  <Text type="secondary">目标年级：{school.programme}</Text>
+                </div>
+                
+                <Progress 
+                  percent={school.matchScore} 
+                  size="small"
+                  strokeColor={riskCfg.color}
+                  format={(percent) => `匹配度 ${percent}%`}
+                />
+                
+                {school.requirements && school.requirements.length > 0 && (
+                  <div className={styles.schoolSection}>
+                    <Text type="secondary">申请要求：</Text>
+                    <ul className={styles.schoolList}>
+                      {school.requirements.map((req, i) => (
+                        <li key={i}>{req}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {school.gaps && school.gaps.length > 0 && (
+                  <div className={styles.schoolSection}>
+                    <Text type="secondary">差距分析：</Text>
+                    <ul className={styles.schoolList}>
+                      {school.gaps.map((gap, i) => (
+                        <li key={i}>{gap}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                {school.notes && school.notes.length > 0 && (
+                  <div className={styles.schoolNotes}>
+                    {school.notes.map((note, i) => (
+                      <Tag key={i} color="default">{note}</Tag>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <Empty description="暂无学校评估数据" />
+      )}
+    </Card>
+  )
+
+  // 渲染过渡计划
+  const renderTransitionPlan = (plan: TransitionPlan) => (
+    <Card 
+      title={<><CalendarOutlined /> 过渡计划</>}
+      className={styles.sectionCard}
+    >
+      <Row gutter={[16, 16]}>
+        <Col xs={24} md={8}>
+          <Card size="small" title="📅 短期计划（1-2个月）" className={styles.planCard}>
+            {plan.shortTerm && plan.shortTerm.length > 0 ? (
+              <List
+                size="small"
+                dataSource={plan.shortTerm}
+                renderItem={(item) => (
+                  <List.Item style={{ padding: '4px 0' }}>
+                    <Text>• {item}</Text>
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <Empty description="暂无数据" />
+            )}
+          </Card>
+        </Col>
+        
+        <Col xs={24} md={8}>
+          <Card size="small" title="🎯 中期计划（3-6个月）" className={styles.planCard}>
+            {plan.midTerm && plan.midTerm.length > 0 ? (
+              <List
+                size="small"
+                dataSource={plan.midTerm}
+                renderItem={(item) => (
+                  <List.Item style={{ padding: '4px 0' }}>
+                    <Text>• {item}</Text>
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <Empty description="暂无数据" />
+            )}
+          </Card>
+        </Col>
+        
+        <Col xs={24} md={8}>
+          <Card size="small" title="⚠️ 风险提示" className={styles.planCard}>
+            {plan.riskWarnings && plan.riskWarnings.length > 0 ? (
+              <List
+                size="small"
+                dataSource={plan.riskWarnings}
+                renderItem={(item) => (
+                  <List.Item style={{ padding: '4px 0' }}>
+                    <Text type="warning">• {item}</Text>
+                  </List.Item>
+                )}
+              />
+            ) : (
+              <Empty description="暂无数据" />
+            )}
+          </Card>
+        </Col>
+      </Row>
+    </Card>
+  )
+
+  return (
+    <div className={styles.resultPage}>
+      {/* 顶部导航 */}
+      <div className={styles.header}>
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={() => navigate(-1)}
+        >
+          返回
+        </Button>
+        <Button 
+          type="primary"
+          icon={<ReloadOutlined />}
+          onClick={() => navigate('/analysis')}
+        >
+          重新分析
+        </Button>
+      </div>
+
+      {/* 页面标题 */}
+      <div className={styles.pageTitle}>
+        <Title level={2}>
+          {aiEnabled ? '🤖 AI 增强分析报告' : '📊 规则分析报告'}
+        </Title>
+        <Text type="secondary">
+          分析编号：{transferResultV2.analysisId}
+        </Text>
+      </div>
+
+      {/* 1️⃣ 综合评估 */}
+      {renderSummary(summary)}
+
+      {/* 2️⃣ 优势与风险 */}
+      {renderStrengthsAndRisks(summary)}
+
+      {/* 2.5️⃣ 决策依据与 AI 贡献（Explainability） */}
+      {renderDecisionBasis(summary)}
+
+      {/* 3️⃣ 能力分析 */}
+      {renderCapabilityAnalyses(capabilityAnalyses)}
+
+      {/* 4️⃣ 学校评估 */}
+      {renderSchoolAssessments(schoolAssessments)}
+
+      {/* 5️⃣ 过渡计划 */}
+      {renderTransitionPlan(transitionPlan)}
+
+      {/* 免责声明 */}
+      <Alert
+        type="warning"
+        message="重要提示"
+        description="本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。实际录取结果取决于学校当年的具体政策和名额情况。"
+        showIcon
+        icon={<ExclamationCircleOutlined />}
+        className={styles.disclaimer}
+      />
+
+      {/* 底部操作 */}
+      <div className={styles.footer}>
+        <Button 
+          type="primary" 
+          size="large"
+          icon={<RocketOutlined />}
+          onClick={() => navigate('/analysis')}
+        >
+          开始新的分析
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+export default TransferResultPage

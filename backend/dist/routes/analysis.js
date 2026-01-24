@@ -10,6 +10,8 @@ import { optionalAuth, requireAuth } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { analyzeWithDeepSeek } from '../services/deepseek.js';
 import { evaluateFeasibility, enhanceWithAI } from '../services/feasibilityEngine.js';
+import { SUBJECTS } from '@/shared/domain';
+import { validateSubjectGrades } from '../validators/analysisInput.validator.js';
 export const analysisRouter = Router();
 // ===== 请求验证Schema =====
 const subjectSchema = z.object({
@@ -36,6 +38,12 @@ analysisRouter.post('/submit', optionalAuth, async (req, res, next) => {
     try {
         // 验证请求数据
         const studentInfo = analysisRequestSchema.parse(req.body);
+        const rawGrades = req.body.grades;
+        const grades = rawGrades ?? studentInfo.subjects.flatMap((item) => ([
+            { subject: item.subject, value: item.currentScore },
+            { subject: item.subject, value: item.targetScore },
+        ]));
+        validateSubjectGrades(grades);
         console.log('📊 收到分析请求:', {
             grade: studentInfo.grade,
             subjects: studentInfo.subjects.length,
@@ -170,29 +178,26 @@ analysisRouter.delete('/history/:id', requireAuth, async (req, res, next) => {
  * GET /api/analysis/subjects
  */
 analysisRouter.get('/subjects', (_req, res) => {
-    const subjects = [
-        { value: 'chinese', label: '中国语文', category: 'core' },
-        { value: 'english', label: '英国语文', category: 'core' },
-        { value: 'math', label: '数学', category: 'core' },
-        { value: 'liberal', label: '公民与社会发展', category: 'core' },
-        { value: 'physics', label: '物理', category: 'elective' },
-        { value: 'chemistry', label: '化学', category: 'elective' },
-        { value: 'biology', label: '生物', category: 'elective' },
-        { value: 'economics', label: '经济', category: 'elective' },
-        { value: 'bafs', label: '企业会计与财务概论', category: 'elective' },
-        { value: 'geography', label: '地理', category: 'elective' },
-        { value: 'history', label: '历史', category: 'elective' },
-        { value: 'ict', label: '资讯及通讯科技', category: 'elective' },
-        { value: 'm1', label: '数学延伸部分(M1)', category: 'elective' },
-        { value: 'm2', label: '数学延伸部分(M2)', category: 'elective' },
-    ];
+    const subjects = SUBJECTS.map((subject, index) => ({
+        value: subject,
+        label: subject,
+        category: index < 4 ? 'core' : 'elective',
+    }));
     res.json({ subjects });
 });
 /**
  * 获取成绩等级列表
  * GET /api/analysis/grades
+ *
+ * @deprecated points 字段使用固定的 7 分制换算，仅供参考。
+ * 不同大学/课程有不同的换算规则（如城大2025: 5**=8.5）。
+ *
+ * TODO: 禁止在大学分析 (JUPAS) 中依赖此 points 值。
+ * 前端应仅使用 value/label 用于下拉选择，
+ * 实际分数计算由后端根据课程规则完成。
  */
 analysisRouter.get('/grades', (_req, res) => {
+    // @deprecated - points 仅供参考，不同课程换算不同
     const grades = [
         { value: '5**', label: '5**', points: 7 },
         { value: '5*', label: '5*', points: 6 },

@@ -3,6 +3,7 @@
  * 集成DeepSeek AI进行DSE插班分析
  */
 import { ApiError } from '../middleware/errorHandler.js';
+import { analyzeSubjectGrade } from '../analysis/analyzeByRules.js';
 /**
  * DeepSeek API配置
  */
@@ -11,8 +12,40 @@ const DEEPSEEK_CONFIG = {
     endpoint: process.env.DEEPSEEK_API_ENDPOINT || 'https://api.deepseek.com/v1/chat/completions',
     model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
     maxTokens: 4000,
-    temperature: 0.7,
+    temperature: 0.3, // 降低温度，确保稳定输出
+    top_p: 0.8, // 限制采样范围
 };
+/**
+ * 后处理：裁剪禁止的引导性语句
+ */
+function trimForbiddenContinuationPrompts(text) {
+    const forbiddenPatterns = [
+        /需要我为你/i,
+        /是否需要我/i,
+        /请随时告知/i,
+        /我可以为你/i,
+        /如果你需要/i,
+        /如果您需要/i,
+        /请告诉我/i,
+        /有任何问题/i,
+        /还有什么.*帮助/i,
+        /希望.*帮助到你/i,
+    ];
+    for (const pattern of forbiddenPatterns) {
+        const match = text.match(pattern);
+        if (match && match.index !== undefined) {
+            let cutIndex = match.index;
+            const beforeMatch = text.slice(0, match.index);
+            const lastSentenceEnd = Math.max(beforeMatch.lastIndexOf('。'), beforeMatch.lastIndexOf('\n'), beforeMatch.lastIndexOf('！'), beforeMatch.lastIndexOf('？'));
+            if (lastSentenceEnd > 0) {
+                cutIndex = lastSentenceEnd + 1;
+            }
+            console.log('[DeepSeek] Trimmed forbidden continuation prompt');
+            return text.slice(0, cutIndex).trim();
+        }
+    }
+    return text;
+}
 /**
  * 科目名称映射
  */
@@ -167,7 +200,17 @@ export const analyzeWithDeepSeek = async (studentInfo) => {
 重要规则：
 1. 用户提供的学生信息（年级、年龄等）都是完整的，绝对不要说"信息未明确"、"信息不完整"、"年级信息未明确"等类似表述
 2. 直接使用用户提供的年级和年龄进行分析
-3. 只返回JSON格式的分析结果`,
+3. 只返回JSON格式的分析结果
+
+【重要】你正在生成【正式分析报告】。
+严格规则：
+- 输出必须是完整、封闭的分析报告
+- 不允许向用户提问
+- 不允许出现"是否需要我…"、"请告诉我"、"我可以为你…"等引导继续对话的句式
+- 不允许列出可选服务、下一步选项
+- 报告必须在总结后自然结束
+- 结尾不得包含任何疑问句或邀请性语句
+- 禁止说"如果你需要"、"请随时告知"、"需要我为你"等`,
                     },
                     {
                         role: 'user',
@@ -176,6 +219,7 @@ export const analyzeWithDeepSeek = async (studentInfo) => {
                 ],
                 max_tokens: DEEPSEEK_CONFIG.maxTokens,
                 temperature: DEEPSEEK_CONFIG.temperature,
+                top_p: DEEPSEEK_CONFIG.top_p,
             }),
         });
         if (!response.ok) {
@@ -194,7 +238,11 @@ export const analyzeWithDeepSeek = async (studentInfo) => {
             throw new ApiError('无法解析分析结果', 500);
         }
         const result = JSON.parse(jsonMatch[0]);
-        return result;
+        // 后处理：裁剪 summary 中的禁止语句
+        if (result.overallAssessment?.summary) {
+            result.overallAssessment.summary = trimForbiddenContinuationPrompts(result.overallAssessment.summary);
+        }
+        return attachRuleAnalysis(studentInfo, result);
     }
     catch (error) {
         if (error instanceof ApiError) {
@@ -205,6 +253,41 @@ export const analyzeWithDeepSeek = async (studentInfo) => {
         return generateMockResult(studentInfo);
     }
 };
+function buildRuleAnalysisBySubject(subjects) {
+    const map = new Map();
+    for (const subject of subjects) {
+        map.set(subject.subject, {
+            current: analyzeSubjectGrade({
+                subject: subject.subject,
+                value: subject.currentScore,
+            }),
+            target: analyzeSubjectGrade({
+                subject: subject.subject,
+                value: subject.targetScore,
+            }),
+        });
+    }
+    return map;
+}
+function attachRuleAnalysis(studentInfo, result) {
+    const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects);
+    return {
+        ...result,
+        subjectAnalyses: result.subjectAnalyses.map((analysis) => ({
+            ...analysis,
+            ruleAnalysis: ruleAnalysisBySubject.get(analysis.subject) || {
+                current: analyzeSubjectGrade({
+                    subject: analysis.subject,
+                    value: analysis.currentLevel,
+                }),
+                target: analyzeSubjectGrade({
+                    subject: analysis.subject,
+                    value: analysis.targetLevel,
+                }),
+            },
+        })),
+    };
+}
 /**
  * 生成模拟分析结果（用于开发测试或API不可用时）
  */
@@ -216,6 +299,7 @@ const generateMockResult = (studentInfo) => {
         baseScore -= 10;
     if (studentInfo.grade === 'form4')
         baseScore += 5;
+    const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects);
     // 生成科目分析
     const subjectAnalyses = studentInfo.subjects.map((s) => {
         const subjectName = SUBJECT_NAME_MAP[s.subject] || s.subject;
@@ -240,6 +324,16 @@ const generateMockResult = (studentInfo) => {
                 '定期进行模拟测试',
             ],
             estimatedTimeToImprove: diff > 1 ? '3-4个月' : diff > 0 ? '1-2个月' : '保持即可',
+            ruleAnalysis: ruleAnalysisBySubject.get(s.subject) || {
+                current: analyzeSubjectGrade({
+                    subject: s.subject,
+                    value: s.currentScore,
+                }),
+                target: analyzeSubjectGrade({
+                    subject: s.subject,
+                    value: s.targetScore,
+                }),
+            },
         };
     });
     // 生成学校评估

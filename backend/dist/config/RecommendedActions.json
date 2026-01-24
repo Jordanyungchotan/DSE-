@@ -1,0 +1,132 @@
+{
+    "A": {
+        "title": "可行性较高 - 建议把握机会",
+        "actions": [
+            {
+                "type": "consultation",
+                "title": "插班冲刺咨询",
+                "description": "您的孩子具备较好条件，建议预约专业顾问制定冲刺计划",
+                "ctaText": "预约免费咨询",
+                "priority": 1
+            },
+            {
+                "type": "course",
+                "title": "插班强化课程",
+                "description": "针对目标学校的强化训练，提升面试和笔试竞争力",
+                "ctaText": "了解课程详情",
+                "priority": 2
+            },
+            {
+                "type": "assessment",
+                "title": "模拟面试评估",
+                "description": "模拟目标学校面试流程，提前适应面试环境",
+                "ctaText": "预约模拟面试",
+                "priority": 3
+            }
+        ]
+    },
+    "B": {
+        "title": "可行性中等 - 建议重点提升",
+        "actions": [
+            {
+                "type": "consultation",
+                "title": "插班规划咨询",
+                "description": "具备插班机会，建议咨询顾问制定提升策略",
+                "ctaText": "预约免费咨询",
+                "priority": 1
+            },
+            {
+                "type": "course",
+                "title": "核心科目提升班",
+                "description": "重点提升英文/数学，增强竞争优势",
+                "ctaText": "了解提升方案",
+                "priority": 2
+            },
+            {
+                "type": "assessment",
+                "title": "学科能力诊断",
+                "description": "精准诊断薄弱环节，制定个性化提升计划",
+                "ctaText": "预约诊断",
+                "priority": 3
+            }
+        ]
+    },
+    "C": {
+        "title": "可行性一般 - 建议先提升再尝试",
+        "actions": [
+            {
+                "type": "consultation",
+                "title": "能力提升咨询",
+                "description": "建议先进行系统评估，制定3-6个月提升计划",
+                "ctaText": "预约免费咨询",
+                "priority": 1
+            },
+            {
+                "type": "course",
+                "title": "基础强化课程",
+                "description": "夯实基础，逐步提升各科成绩",
+                "ctaText": "了解课程详情",
+                "priority": 2
+            },
+            {
+                "type": "assessment",
+                "title": "全面学科评估",
+                "description": "全面评估各科水平，找出提升空间",
+                "ctaText": "预约评估",
+                "priority": 3
+            }
+        ]
+    },
+    "D": {
+        "title": "可行性较低 - 建议调整目标",
+        "actions": [
+            {
+                "type": "consultation",
+                "title": "升学策略咨询",
+                "description": "建议重新评估目标，制定切实可行的升学方案",
+                "ctaText": "预约策略咨询",
+                "priority": 1
+            },
+            {
+                "type": "course",
+                "title": "基础重建方案",
+                "description": "从基础开始，系统性提升学习能力",
+                "ctaText": "了解重建方案",
+                "priority": 2
+            },
+            {
+                "type": "assessment",
+                "title": "学习能力评估",
+                "description": "评估学习习惯和能力，找出根本问题",
+                "ctaText": "预约评估",
+                "priority": 3
+            }
+        ]
+    },
+    "E": {
+        "title": "可行性极低 - 建议从基础开始",
+        "actions": [
+            {
+                "type": "consultation",
+                "title": "学习规划咨询",
+                "description": "建议进行全面评估，制定长期学习计划",
+                "ctaText": "预约规划咨询",
+                "priority": 1
+            },
+            {
+                "type": "course",
+                "title": "基础能力培养班",
+                "description": "重建学习基础，培养良好学习习惯",
+                "ctaText": "了解培养方案",
+                "priority": 2
+            },
+            {
+                "type": "assessment",
+                "title": "学习问题诊断",
+                "description": "诊断学习障碍，制定针对性解决方案",
+                "ctaText": "预约诊断",
+                "priority": 3
+            }
+        ]
+    }
+}

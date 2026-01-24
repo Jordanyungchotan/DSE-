@@ -1,57 +1,166 @@
 /**
- * 插班可行性评估引擎
+ * 插班可行性评估引擎 v2.0
  *
  * 基于规则系统 + AI推理，提供可行性等级评估
  * 设计原则：
  * - 无真实插班数据，使用经验规则 + 相对匹配度
  * - 禁止输出具体成功百分比
  * - 强调"建议性、非保证"
+ * - 转化导向话术设计
  */
 // ============================================================
-// 学校规则画像（School Heuristic Profile）
+// 🏫 学校规则系统 (School Heuristic Rules)
 // ============================================================
-/** Band等级对应的基准分数要求 */
-const BAND_SCORE_THRESHOLDS = {
-    1: { chinese: 70, english: 75, math: 70, minAverage: 72 },
-    2: { chinese: 55, english: 60, math: 55, minAverage: 58 },
-    3: { chinese: 40, english: 45, math: 40, minAverage: 42 },
+/** Band等级规则配置 */
+const BAND_RULES = {
+    1: {
+        minEnglish: 75,
+        minMath: 70,
+        minChinese: 70,
+        minAverage: 72,
+        competitionLevel: 'very_high',
+        englishIntensity: 'high'
+    },
+    2: {
+        minEnglish: 65,
+        minMath: 60,
+        minChinese: 55,
+        minAverage: 58,
+        competitionLevel: 'high',
+        englishIntensity: 'medium'
+    },
+    3: {
+        minEnglish: 55,
+        minMath: 55,
+        minChinese: 50,
+        minAverage: 50,
+        competitionLevel: 'medium',
+        englishIntensity: 'low'
+    }
+};
+/** 年级敏感度系数 (越高=插班越难) */
+const GRADE_SENSITIVITY = {
+    'S1': 0.8, // 中一相对容易
+    'S2': 1.0,
+    'S3': 1.2,
+    'S4': 1.5, // DSE选科后难度增加
+    'S5': 1.7
 };
 /** 区域竞争强度系数 */
 const DISTRICT_COMPETITION = {
-    '中西區': 1.15,
-    '灣仔區': 1.12,
-    '東區': 1.05,
-    '南區': 1.02,
-    '九龍城區': 1.18,
-    '油尖旺區': 1.10,
-    '深水埗區': 1.05,
-    '黃大仙區': 1.00,
-    '觀塘區': 1.02,
-    '沙田區': 1.12,
-    '大埔區': 1.05,
-    '北區': 0.98,
-    '西貢區': 1.08,
-    '葵青區': 1.00,
-    '荃灣區': 1.02,
-    '屯門區': 1.00,
-    '元朗區': 0.98,
-    '離島區': 0.95,
+    '中西區': { level: '极高', factor: 1.15 },
+    '灣仔區': { level: '极高', factor: 1.12 },
+    '九龍城區': { level: '极高', factor: 1.18 },
+    '沙田區': { level: '高', factor: 1.12 },
+    '油尖旺區': { level: '高', factor: 1.10 },
+    '西貢區': { level: '高', factor: 1.08 },
+    '東區': { level: '中高', factor: 1.05 },
+    '南區': { level: '中', factor: 1.02 },
+    '大埔區': { level: '中', factor: 1.05 },
+    '深水埗區': { level: '中', factor: 1.05 },
+    '觀塘區': { level: '中', factor: 1.02 },
+    '荃灣區': { level: '中', factor: 1.02 },
+    '黃大仙區': { level: '中', factor: 1.00 },
+    '葵青區': { level: '中', factor: 1.00 },
+    '屯門區': { level: '中', factor: 1.00 },
+    '元朗區': { level: '中低', factor: 0.98 },
+    '北區': { level: '中低', factor: 0.98 },
+    '離島區': { level: '低', factor: 0.95 },
 };
-/** 年级插班难度系数 */
-const GRADE_DIFFICULTY = {
-    'S1': 0.90, // 中一相对容易
-    'S2': 0.95,
-    'S3': 1.00,
-    'S4': 1.15, // 中四开始DSE课程，难度增加
-    'S5': 1.25, // 中五更难
-    'S6': 1.40, // 中六最难插班
+// ============================================================
+// 👩‍🎓 学生风险规则 (Student Risk Rules)
+// ============================================================
+const RISK_FACTORS = {
+    lowEnglish: {
+        threshold: 65,
+        message: '英文成绩偏弱，会显著影响插班竞争力'
+    },
+    lowMath: {
+        threshold: 60,
+        message: '数学成绩偏弱，影响整体学术表现'
+    },
+    coreSubjectGap: {
+        difference: 10,
+        message: '核心科目存在明显短板'
+    },
+    highGradeSensitivity: {
+        grades: ['S4', 'S5'],
+        message: '高年级插班名额稀缺，竞争激烈'
+    },
+    bandJump: {
+        message: '跨Band插班难度较大，需充分准备'
+    }
+};
+// ============================================================
+// 转化话术系统 (Conversion Copy System)
+// ============================================================
+const CONVERSION_COPIES = {
+    'A': {
+        headline: '✨ 你的孩子目前具备插班机会',
+        description: '但插班竞争非常激烈，是否能成功，关键在接下来3–6个月的针对性提升。',
+        ctaText: '预约一对一升学规划',
+        ctaType: 'primary',
+        suggestions: [
+            '插班强化英文/数学专项班',
+            '插班模拟测评',
+            '面试技巧培训'
+        ]
+    },
+    'B': {
+        headline: '💪 具备一定插班机会',
+        description: '核心科目仍有提升空间，通过系统训练可以大幅提升竞争力。',
+        ctaText: '了解提升方案',
+        ctaType: 'primary',
+        suggestions: [
+            '3个月能力提升计划',
+            '英文阅读写作强化',
+            '数学解题专项训练'
+        ]
+    },
+    'C': {
+        headline: '📚 以目前成绩直接插班风险较高',
+        description: '但通过系统训练是有机会改善条件的，建议制定提升计划。',
+        ctaText: '获取提升方案',
+        ctaType: 'secondary',
+        suggestions: [
+            '3个月能力提升计划',
+            '插班目标学校可适当调整',
+            '基础巩固课程'
+        ]
+    },
+    'D': {
+        headline: '⚠️ 不建议在现阶段直接尝试该校插班',
+        description: '否则容易对孩子信心造成打击，建议先进行基础提升。',
+        ctaText: '制定成绩重建方案',
+        ctaType: 'warning',
+        suggestions: [
+            '成绩重建方案',
+            '重新制定插班策略',
+            '考虑更现实的目标学校'
+        ]
+    },
+    'E': {
+        headline: '🎯 需要重新评估目标',
+        description: '当前条件与目标差距较大，建议从更实际的目标开始，逐步实现升学规划。',
+        ctaText: '咨询升学顾问',
+        ctaType: 'warning',
+        suggestions: [
+            '长期成绩提升计划',
+            '重新制定现实目标',
+            '基础学科强化课程'
+        ]
+    }
 };
 /** 科目名称映射 */
 const SUBJECT_NAMES = {
     'chinese': '中文',
+    'Chinese': '中文',
     'english': '英文',
+    'English': '英文',
     'math': '数学',
-    'science': '科学/常识',
+    'Math': '数学',
+    'science': '综合科学',
+    'Science': '综合科学',
     'liberal': '公民与社会发展',
     'physics': '物理',
     'chemistry': '化学',
@@ -60,6 +169,16 @@ const SUBJECT_NAMES = {
     'geography': '地理',
     'history': '历史',
 };
+/** 可行性等级描述 */
+const LEVEL_DESCRIPTIONS = {
+    'A': '可行性较高 - 学生条件与目标学校要求匹配度良好，建议把握机会',
+    'B': '可行性中等 - 需要在部分方面加强，建议重点提升短板科目',
+    'C': '可行性一般 - 存在较明显差距，需要较长时间准备和显著提升',
+    'D': '可行性较低 - 差距较大，建议重新评估目标或制定长期计划',
+    'E': '可行性极低 - 建议先巩固基础，调整目标后再考虑插班'
+};
+/** 免责声明 */
+const DISCLAIMER = `⚠️ 重要声明：本分析基于公开教育资料与经验模型，仅供参考。香港中学插班并无公开成功率或官方成绩门槛，实际录取结果受多种因素影响，包括但不限于学校当年招生名额、面试表现、其他申请者情况等。所有建议不构成任何录取保证，建议结合学校官方信息做出决策。`;
 // ============================================================
 // 规则引擎核心逻辑
 // ============================================================
@@ -67,8 +186,22 @@ const SUBJECT_NAMES = {
  * 分析学生能力档案
  */
 function analyzeStudentAbility(student) {
-    const coreSubjects = ['chinese', 'english', 'math'];
     const scores = student.scores;
+    // 标准化科目名称（兼容不同大小写）
+    const normalizeKey = (key) => key.toLowerCase();
+    const getScore = (keys) => {
+        for (const k of keys) {
+            if (scores[k] !== undefined)
+                return scores[k];
+            const normalized = Object.keys(scores).find(sk => normalizeKey(sk) === normalizeKey(k));
+            if (normalized)
+                return scores[normalized];
+        }
+        return 0;
+    };
+    const englishScore = getScore(['english', 'English', '英文']);
+    const mathScore = getScore(['math', 'Math', '数学']);
+    const chineseScore = getScore(['chinese', 'Chinese', '中文']);
     // 计算平均分
     const allScores = Object.values(scores);
     const averageScore = allScores.length > 0
@@ -78,17 +211,15 @@ function analyzeStudentAbility(student) {
     const weakSubjects = [];
     const strongSubjects = [];
     for (const [subject, score] of Object.entries(scores)) {
-        if (score < 50) {
+        if (score < 55) {
             weakSubjects.push(subject);
         }
         else if (score >= 75) {
             strongSubjects.push(subject);
         }
     }
-    // 核心科目状态
-    const coreScores = coreSubjects
-        .filter(s => scores[s] !== undefined)
-        .map(s => scores[s]);
+    // 核心科目（中英数）平均分
+    const coreScores = [englishScore, mathScore, chineseScore].filter(s => s > 0);
     const coreAverage = coreScores.length > 0
         ? coreScores.reduce((a, b) => a + b, 0) / coreScores.length
         : 0;
@@ -102,119 +233,240 @@ function analyzeStudentAbility(student) {
     else {
         coreSubjectsStatus = 'weak';
     }
-    // 是否存在明显短板（任一核心科目低于50分）
-    const hasSignificantWeakness = coreSubjects.some(s => scores[s] !== undefined && scores[s] < 50);
+    // 最大分差（用于判断偏科）
+    const maxScoreGap = allScores.length > 1
+        ? Math.max(...allScores) - Math.min(...allScores)
+        : 0;
+    // 是否存在明显短板
+    const hasSignificantWeakness = englishScore < 50 || mathScore < 50 || chineseScore < 50;
     return {
         coreSubjectsStatus,
         weakSubjects,
         strongSubjects,
         averageScore,
+        englishScore,
+        mathScore,
+        chineseScore,
         hasSignificantWeakness,
+        maxScoreGap,
     };
+}
+/**
+ * 生成风险雷达
+ */
+function generateRiskRadar(student, targetSchool, ability) {
+    const bandRules = BAND_RULES[targetSchool.bandLevel];
+    const radar = [];
+    // 英文风险
+    if (ability.englishScore < bandRules.minEnglish - 10) {
+        radar.push({
+            area: '英文',
+            level: 'danger',
+            message: '⚠️ 英文是当前最大挑战'
+        });
+    }
+    else if (ability.englishScore < bandRules.minEnglish) {
+        radar.push({
+            area: '英文',
+            level: 'warning',
+            message: '⚠️ 英文成绩存在差距'
+        });
+    }
+    else {
+        radar.push({
+            area: '英文',
+            level: 'safe',
+            message: '✅ 英文表现达标'
+        });
+    }
+    // 数学风险
+    if (ability.mathScore < bandRules.minMath - 10) {
+        radar.push({
+            area: '数学',
+            level: 'danger',
+            message: '⚠️ 数学需要重点提升'
+        });
+    }
+    else if (ability.mathScore < bandRules.minMath) {
+        radar.push({
+            area: '数学',
+            level: 'warning',
+            message: '⚠️ 数学成绩存在波动'
+        });
+    }
+    else {
+        radar.push({
+            area: '数学',
+            level: 'safe',
+            message: '✅ 数学表现稳定'
+        });
+    }
+    // 中文风险
+    if (ability.chineseScore < bandRules.minChinese - 10) {
+        radar.push({
+            area: '中文',
+            level: 'danger',
+            message: '⚠️ 中文需要加强'
+        });
+    }
+    else if (ability.chineseScore < bandRules.minChinese) {
+        radar.push({
+            area: '中文',
+            level: 'warning',
+            message: '⚠️ 中文略低于期望'
+        });
+    }
+    else {
+        radar.push({
+            area: '中文',
+            level: 'safe',
+            message: '✅ 中文表现达标'
+        });
+    }
+    // 其他科目
+    const otherSubjects = Object.entries(student.scores)
+        .filter(([k]) => !['chinese', 'english', 'math', 'Chinese', 'English', 'Math'].includes(k));
+    if (otherSubjects.length > 0) {
+        const otherAvg = otherSubjects.reduce((sum, [, s]) => sum + s, 0) / otherSubjects.length;
+        if (otherAvg >= 60) {
+            radar.push({
+                area: '其他科目',
+                level: 'safe',
+                message: '✅ 其他科目表现稳定'
+            });
+        }
+        else {
+            radar.push({
+                area: '其他科目',
+                level: 'warning',
+                message: '⚠️ 部分科目需要关注'
+            });
+        }
+    }
+    return radar;
 }
 /**
  * 计算匹配度和风险评分
  */
 function calculateMatchingScore(student, targetSchool) {
     const ability = analyzeStudentAbility(student);
-    const thresholds = BAND_SCORE_THRESHOLDS[targetSchool.bandLevel];
-    const districtFactor = DISTRICT_COMPETITION[targetSchool.district] || 1.0;
-    const gradeFactor = GRADE_DIFFICULTY[student.currentGrade] || 1.0;
+    const bandRules = BAND_RULES[targetSchool.bandLevel];
+    const districtInfo = DISTRICT_COMPETITION[targetSchool.district] || { level: '中', factor: 1.0 };
+    const gradeFactor = GRADE_SENSITIVITY[student.currentGrade] || 1.0;
     const riskFactors = [];
     const positiveFactors = [];
     // 计算调整后的要求分数
-    const adjustedMinAverage = thresholds.minAverage * districtFactor * gradeFactor;
-    // 评估各项因素
+    const adjustedMinAverage = bandRules.minAverage * districtInfo.factor * gradeFactor;
     let riskScore = 0;
-    // 1. 平均分与要求对比
-    const scoreDiff = ability.averageScore - adjustedMinAverage;
-    if (scoreDiff < -15) {
-        riskScore += 3;
-        riskFactors.push(`整体成绩与该校常见插班要求有较大差距`);
+    // 1. 英文评估（权重最高）
+    if (ability.englishScore < bandRules.minEnglish - 15) {
+        riskScore += 4;
+        riskFactors.push(RISK_FACTORS.lowEnglish.message);
     }
-    else if (scoreDiff < -5) {
+    else if (ability.englishScore < bandRules.minEnglish) {
         riskScore += 2;
-        riskFactors.push(`整体成绩略低于该校一般要求`);
+        riskFactors.push('英文成绩略低于该校常见插班要求');
     }
-    else if (scoreDiff >= 5) {
-        positiveFactors.push(`整体成绩达到该校期望水平`);
+    else if (ability.englishScore >= bandRules.minEnglish + 10) {
+        positiveFactors.push('英文成绩优秀，具有竞争优势');
     }
-    // 2. 英文科目（Band 1学校特别重视）
-    const englishScore = student.scores['english'] || 0;
-    if (targetSchool.bandLevel === 1) {
-        if (englishScore < thresholds.english) {
-            riskScore += 2;
-            riskFactors.push(`英文成绩可能未达Band 1学校的较高要求`);
-        }
-        else if (englishScore >= 80) {
-            positiveFactors.push(`英文成绩优秀，符合该层次学校期望`);
-        }
+    // 2. 数学评估
+    if (ability.mathScore < bandRules.minMath - 15) {
+        riskScore += 3;
+        riskFactors.push(RISK_FACTORS.lowMath.message);
+    }
+    else if (ability.mathScore < bandRules.minMath) {
+        riskScore += 1.5;
+        riskFactors.push('数学稳定性不足，容易影响整体竞争力');
+    }
+    else if (ability.mathScore >= bandRules.minMath + 10) {
+        positiveFactors.push('数学表现突出');
     }
     // 3. 核心科目短板
     if (ability.hasSignificantWeakness) {
         riskScore += 2;
-        riskFactors.push(`存在核心科目明显短板，需重点加强`);
+        riskFactors.push(RISK_FACTORS.coreSubjectGap.message);
     }
-    // 4. 年级因素
-    if (['S5', 'S6'].includes(student.currentGrade)) {
+    // 4. 偏科检查
+    if (ability.maxScoreGap > 20) {
         riskScore += 1;
-        riskFactors.push(`高年级插班名额通常较少，竞争较激烈`);
+        riskFactors.push('各科成绩差距较大，建议均衡发展');
     }
-    // 5. Band跨越
+    // 5. 年级因素
+    if (RISK_FACTORS.highGradeSensitivity.grades.includes(student.currentGrade)) {
+        riskScore += 1.5;
+        riskFactors.push(RISK_FACTORS.highGradeSensitivity.message);
+    }
+    // 6. Band跨越
     if (student.currentBand && student.currentBand > targetSchool.bandLevel) {
         const bandGap = student.currentBand - targetSchool.bandLevel;
         if (bandGap >= 2) {
-            riskScore += 3;
-            riskFactors.push(`从Band ${student.currentBand}跨越至Band ${targetSchool.bandLevel}难度较大`);
+            riskScore += 4;
+            riskFactors.push(`从Band ${student.currentBand}跨越至Band ${targetSchool.bandLevel}挑战较大`);
         }
         else {
-            riskScore += 1;
-            riskFactors.push(`跨Band插班需要更充分的准备`);
+            riskScore += 2;
+            riskFactors.push(RISK_FACTORS.bandJump.message);
         }
     }
-    // 6. 区域竞争
-    if (districtFactor >= 1.1) {
-        riskFactors.push(`${targetSchool.district}属于竞争较激烈区域`);
+    // 7. 区域竞争
+    if (districtInfo.factor >= 1.1) {
+        riskScore += 1;
+        riskFactors.push(`${targetSchool.district}属于竞争${districtInfo.level}区域`);
     }
-    // 添加正面因素
+    // 8. 整体成绩
+    const scoreDiff = ability.averageScore - adjustedMinAverage;
+    if (scoreDiff < -15) {
+        riskScore += 3;
+    }
+    else if (scoreDiff < -5) {
+        riskScore += 1.5;
+    }
+    else if (scoreDiff >= 5) {
+        positiveFactors.push('整体成绩达到该校期望水平');
+    }
+    // 正面因素
     if (ability.strongSubjects.length >= 2) {
         positiveFactors.push(`多个科目表现突出（${ability.strongSubjects.map(s => SUBJECT_NAMES[s] || s).join('、')}）`);
     }
     if (student.extracurriculars && student.extracurriculars.length > 0) {
-        positiveFactors.push(`有丰富的课外活动经历`);
+        positiveFactors.push('有丰富的课外活动经历');
     }
-    // 确定可行性等级
+    // 确定可行性等级 (A-E)
     let matchLevel;
-    if (riskScore <= 1 && scoreDiff >= 0) {
+    if (riskScore <= 1.5 && scoreDiff >= 0) {
         matchLevel = 'A';
     }
-    else if (riskScore <= 3 && scoreDiff >= -10) {
+    else if (riskScore <= 4 && scoreDiff >= -10) {
         matchLevel = 'B';
     }
-    else if (riskScore <= 5) {
+    else if (riskScore <= 7) {
         matchLevel = 'C';
     }
-    else {
+    else if (riskScore <= 10) {
         matchLevel = 'D';
     }
-    return { matchLevel, riskFactors, positiveFactors };
+    else {
+        matchLevel = 'E';
+    }
+    return { matchLevel, riskFactors, positiveFactors, riskScore };
 }
 /**
  * 生成科目分析
  */
 function generateSubjectAnalysis(student, targetSchool) {
-    const thresholds = BAND_SCORE_THRESHOLDS[targetSchool.bandLevel];
+    const bandRules = BAND_RULES[targetSchool.bandLevel];
     const results = [];
     for (const [subject, score] of Object.entries(student.scores)) {
         const subjectName = SUBJECT_NAMES[subject] || subject;
-        let threshold = thresholds.minAverage;
-        // 特定科目有特定要求
-        if (subject === 'english')
-            threshold = thresholds.english;
-        if (subject === 'chinese')
-            threshold = thresholds.chinese;
-        if (subject === 'math')
-            threshold = thresholds.math;
+        const lowerSubject = subject.toLowerCase();
+        let threshold = bandRules.minAverage;
+        if (lowerSubject === 'english')
+            threshold = bandRules.minEnglish;
+        if (lowerSubject === 'chinese')
+            threshold = bandRules.minChinese;
+        if (lowerSubject === 'math')
+            threshold = bandRules.minMath;
         let status;
         let statusDescription;
         let recommendation;
@@ -231,11 +483,11 @@ function generateSubjectAnalysis(student, targetSchool) {
         else if (score >= threshold - 15) {
             status = 'weak';
             statusDescription = '略低于期望水平，需要加强';
-            recommendation = `建议每天额外投入30-45分钟进行${subjectName}专项训练`;
+            recommendation = `每天额外投入30-45分钟进行${subjectName}专项训练`;
         }
         else {
             status = 'critical';
-            statusDescription = '与期望水平有较大差距，是主要短板';
+            statusDescription = '与期望水平有较大差距';
             recommendation = `${subjectName}是目前最需要突破的科目，建议寻求专业辅导`;
         }
         results.push({
@@ -252,9 +504,38 @@ function generateSubjectAnalysis(student, targetSchool) {
     return results;
 }
 /**
+ * 生成改进计划 (3-6个月可执行)
+ */
+function generateImprovementPlan(subjectAnalysis, level) {
+    const plan = [];
+    const criticalSubjects = subjectAnalysis.filter(s => s.status === 'critical');
+    const weakSubjects = subjectAnalysis.filter(s => s.status === 'weak');
+    // 根据等级给出不同建议
+    if (level === 'A' || level === 'B') {
+        if (weakSubjects.length > 0) {
+            plan.push(`未来3个月重点加强${weakSubjects.map(s => s.subject).join('和')}训练`);
+        }
+        plan.push('通过针对性练习提升解题速度与准确率');
+        plan.push('避免同时报考过多高竞争学校');
+    }
+    else if (level === 'C') {
+        if (criticalSubjects.length > 0) {
+            plan.push(`优先解决${criticalSubjects.map(s => s.subject).join('、')}的基础问题`);
+        }
+        plan.push('制定3-6个月系统提升计划');
+        plan.push('可考虑将目标学校下调1-2所作为备选');
+    }
+    else {
+        plan.push('建议先进行3个月基础巩固');
+        plan.push('重新评估目标学校定位');
+        plan.push('建立规律学习习惯，稳扎稳打');
+    }
+    return plan;
+}
+/**
  * 生成准备计划
  */
-function generatePreparationPlan(_student, subjectAnalysis) {
+function generatePreparationPlan(subjectAnalysis) {
     const criticalSubjects = subjectAnalysis.filter(s => s.status === 'critical');
     const weakSubjects = subjectAnalysis.filter(s => s.status === 'weak');
     const priorityActions = [];
@@ -274,18 +555,17 @@ function generatePreparationPlan(_student, subjectAnalysis) {
     criticalSubjects.forEach(s => {
         shortTermGoals.push(`${s.subject}成绩提升至及格线以上`);
     });
-    shortTermGoals.push('完成各科知识点梳理，建立知识框架');
-    shortTermGoals.push('每周进行一次模拟测试，检验学习效果');
+    shortTermGoals.push('完成各科知识点梳理');
+    shortTermGoals.push('每周进行一次模拟测试');
     // 中期目标（3-4个月）
     weakSubjects.forEach(s => {
         mediumTermGoals.push(`${s.subject}达到目标学校期望水平`);
     });
     mediumTermGoals.push('全面提升综合能力，准备面试');
-    mediumTermGoals.push('培养良好学习习惯，适应更高强度学习');
+    mediumTermGoals.push('培养良好学习习惯');
     // 推荐资源
     resources.push('历年插班试题（如有）');
     resources.push('各科精编练习册');
-    resources.push('在线学习平台（如学科视频课程）');
     resources.push('专业补习班或私人导师');
     resources.push('学校开放日和咨询活动');
     return {
@@ -296,48 +576,17 @@ function generatePreparationPlan(_student, subjectAnalysis) {
     };
 }
 /**
- * 可行性等级描述
+ * 生成简短总结 (summary)
  */
-const LEVEL_DESCRIPTIONS = {
-    'A': '可行性较高 - 学生条件与目标学校要求匹配度良好，通过适当准备有较大机会',
-    'B': '可行性中等 - 需要在部分方面加强，建议重点提升短板科目',
-    'C': '可行性一般 - 存在较明显差距，需要较长时间准备和显著提升',
-    'D': '可行性较低 - 差距较大，建议重新评估目标或制定长期计划',
-};
-/**
- * 免责声明
- */
-const DISCLAIMER = `⚠️ 免责声明：本系统基于公开教育资料与经验模型进行分析，仅作为升学参考，不构成任何录取保证。实际录取结果受多种因素影响，包括但不限于学校当年招生名额、面试表现、其他申请者情况等。建议结合学校官方信息和专业教育顾问意见做出决策。`;
-// ============================================================
-// 主评估函数
-// ============================================================
-/**
- * 执行可行性评估（规则引擎版）
- */
-export function evaluateFeasibility(request) {
-    const { student, targetSchool } = request;
-    // 计算匹配度
-    const matching = calculateMatchingScore(student, targetSchool);
-    // 生成科目分析
-    const subjectAnalysis = generateSubjectAnalysis(student, targetSchool);
-    // 生成准备计划
-    const preparationPlan = generatePreparationPlan(student, subjectAnalysis);
-    // 生成综合评估描述
-    const ability = analyzeStudentAbility(student);
-    const overallAssessment = generateOverallAssessment(student, targetSchool, matching.matchLevel, ability);
-    // 生成建议
-    const recommendations = generateRecommendations(subjectAnalysis, matching.riskFactors, targetSchool);
-    return {
-        feasibilityLevel: matching.matchLevel,
-        levelDescription: LEVEL_DESCRIPTIONS[matching.matchLevel],
-        overallAssessment,
-        mainRisks: matching.riskFactors,
-        keyStrengths: matching.positiveFactors,
-        recommendations,
-        subjectAnalysis,
-        preparationPlan,
-        disclaimer: DISCLAIMER,
+function generateSummary(level, ability) {
+    const summaries = {
+        'A': (a) => `该学生整体表现良好（平均${Math.round(a.averageScore)}分），具备较好的插班条件。`,
+        'B': (a) => `该学生具备一定插班机会，但在${a.weakSubjects.length > 0 ? a.weakSubjects.map(s => SUBJECT_NAMES[s] || s).join('、') : '部分科目'}上仍存在提升空间。`,
+        'C': (a) => `该学生与目标学校存在一定差距，需要在${a.weakSubjects.length > 0 ? a.weakSubjects.map(s => SUBJECT_NAMES[s] || s).join('、') : '核心科目'}进行较大提升。`,
+        'D': () => `以目前条件直接插班风险较高，建议先进行基础提升或调整目标。`,
+        'E': () => `当前条件与目标差距较大，建议制定长期提升计划后再考虑插班。`,
     };
+    return summaries[level](ability);
 }
 /**
  * 生成综合评估描述
@@ -354,7 +603,7 @@ function generateOverallAssessment(student, targetSchool, level, ability) {
     if (level === 'A') {
         assessment += `整体学术表现良好，与目标Band ${targetSchool.bandLevel}学校（${targetSchool.schoolName}）的期望水平较为匹配。`;
         assessment += `核心科目表现${ability.coreSubjectsStatus === 'strong' ? '突出' : '稳定'}，`;
-        assessment += `通过适当的准备和保持现有水平，有较大机会获得面试机会。`;
+        assessment += `建议把握机会，做好充分准备。`;
     }
     else if (level === 'B') {
         assessment += `学术表现中等偏上，基本符合Band ${targetSchool.bandLevel}学校的要求，`;
@@ -366,19 +615,23 @@ function generateOverallAssessment(student, targetSchool, level, ability) {
         assessment += `需要在多个方面进行较大幅度的提升，`;
         assessment += `建议制定3-6个月的系统性准备计划。`;
     }
-    else {
+    else if (level === 'D') {
         assessment += `目前条件与目标学校差距较大，`;
+        assessment += `直接插班可能面临较大挑战，容易对孩子信心造成影响。`;
         assessment += `建议考虑调整目标学校层次，或制定更长期的提升计划。`;
-        assessment += `也可以先从相对容易达到的学校开始，逐步实现升学目标。`;
+    }
+    else {
+        assessment += `当前学术条件与目标学校要求差距明显，`;
+        assessment += `建议先进行基础巩固，待条件改善后再考虑插班。`;
+        assessment += `可以从更实际的目标开始，逐步实现升学规划。`;
     }
     return assessment;
 }
 /**
  * 生成建议列表
  */
-function generateRecommendations(subjectAnalysis, _riskFactors, targetSchool) {
+function generateRecommendations(subjectAnalysis, targetSchool) {
     const recommendations = [];
-    // 针对薄弱科目的建议
     const criticalSubjects = subjectAnalysis.filter(s => s.status === 'critical');
     const weakSubjects = subjectAnalysis.filter(s => s.status === 'weak');
     if (criticalSubjects.length > 0) {
@@ -396,75 +649,124 @@ function generateRecommendations(subjectAnalysis, _riskFactors, targetSchool) {
     recommendations.push('定期进行模拟测试，检验学习成效');
     recommendations.push('了解目标学校的办学理念和特色，准备个人陈述');
     recommendations.push('保持良好作息和学习习惯，确保稳定发挥');
-    return recommendations.slice(0, 6); // 最多返回6条建议
+    return recommendations.slice(0, 6);
 }
 // ============================================================
-// AI增强评估（可选）
+// 主评估函数
 // ============================================================
 /**
- * AI增强评估Prompt
+ * 执行可行性评估（规则引擎版）
+ */
+export function evaluateFeasibility(request) {
+    const { student, targetSchool } = request;
+    // 分析学生能力
+    const ability = analyzeStudentAbility(student);
+    // 计算匹配度
+    const matching = calculateMatchingScore(student, targetSchool);
+    // 生成科目分析
+    const subjectAnalysis = generateSubjectAnalysis(student, targetSchool);
+    // 生成风险雷达
+    const riskRadar = generateRiskRadar(student, targetSchool, ability);
+    // 生成准备计划
+    const preparationPlan = generatePreparationPlan(subjectAnalysis);
+    // 生成改进计划
+    const improvementPlan = generateImprovementPlan(subjectAnalysis, matching.matchLevel);
+    // 生成综合评估描述
+    const overallAssessment = generateOverallAssessment(student, targetSchool, matching.matchLevel, ability);
+    // 生成建议
+    const recommendations = generateRecommendations(subjectAnalysis, targetSchool);
+    // 生成简短总结
+    const summary = generateSummary(matching.matchLevel, ability);
+    return {
+        feasibilityLevel: matching.matchLevel,
+        levelDescription: LEVEL_DESCRIPTIONS[matching.matchLevel],
+        summary,
+        overallAssessment,
+        mainRisks: matching.riskFactors.slice(0, 3), // 最多3个风险点
+        keyStrengths: matching.positiveFactors,
+        recommendations,
+        improvementPlan,
+        subjectAnalysis,
+        preparationPlan,
+        conversionCopy: CONVERSION_COPIES[matching.matchLevel],
+        riskRadar,
+        disclaimer: DISCLAIMER,
+    };
+}
+// ============================================================
+// AI增强评估
+// ============================================================
+/**
+ * AI增强评估 System Prompt
+ */
+const AI_SYSTEM_PROMPT = `你是一名熟悉香港中学插班制度的资深升学顾问。
+
+请注意：
+- 香港中学插班并无公开成功率或官方成绩门槛
+- 你必须基于经验规则、学校难度特征与学生成绩匹配度进行分析
+- 不允许输出任何具体百分比成功率
+- 只能输出「可行性等级」与分析理由
+- 所有建议均为参考，不构成录取保证
+
+你的目标是：
+1. 判断学生与目标中学的插班匹配程度
+2. 指出最关键的风险点与短板
+3. 给出3–6个月内可执行的提升建议`;
+/**
+ * 构建AI用户提示
  */
 export function buildAIPrompt(request, ruleResult) {
     const { student, targetSchool } = request;
-    return `你是一位资深的香港教育顾问，请基于以下信息提供专业的插班可行性分析。
+    const districtInfo = DISTRICT_COMPETITION[targetSchool.district] || { level: '中', factor: 1.0 };
+    const gradeSensitivity = GRADE_SENSITIVITY[student.currentGrade] || 1.0;
+    return `学生资料：
+- 年级：${student.currentGrade}
+- 年龄：${student.age}
+- 性别：${student.gender === 'female' ? '女' : '男'}
+- 各科成绩：
+${Object.entries(student.scores).map(([s, score]) => `  - ${SUBJECT_NAMES[s] || s}：${score}`).join('\n')}
 
-## ⚠️ 重要原则
+目标中学资料：
+- 学校名称：${targetSchool.schoolName}
+- Band 等级：Band ${targetSchool.bandLevel}
+- 所在地区：${targetSchool.district}
+- 区域竞争强度：${districtInfo.level}
+- 英文要求强度：${BAND_RULES[targetSchool.bandLevel].englishIntensity}
+- 插班年级敏感度：${gradeSensitivity > 1.2 ? '高' : gradeSensitivity > 1 ? '中' : '低'}
 
-1. **无真实插班数据**：本系统没有真实的插班录取数据，分析基于经验规则和相对匹配度
-2. **禁止输出百分比**：绝对不要给出具体的成功率百分比（如"成功率70%"）
-3. **建议性而非保证**：所有建议仅供参考，不构成任何录取承诺
-4. **使用等级评估**：使用A/B/C/D等级表示可行性，而非具体数字
-
----
-
-## 学生基本信息
-
-| 项目 | 信息 |
-|------|------|
-| 年龄 | ${student.age}岁 |
-| 性别 | ${student.gender === 'female' ? '女' : '男'} |
-| 当前年级 | ${student.currentGrade} |
-| 当前学校 | ${student.currentSchool || '未提供'} |
-
-### 各科成绩
-${Object.entries(student.scores).map(([s, score]) => `- ${SUBJECT_NAMES[s] || s}: ${score}分`).join('\n')}
-
-## 目标学校
-
-| 项目 | 信息 |
-|------|------|
-| 学校名称 | ${targetSchool.schoolName} |
-| Band等级 | Band ${targetSchool.bandLevel} |
-| 所在区域 | ${targetSchool.district} |
-
-## 规则引擎初步评估
-
+规则引擎初步评估：
 - 可行性等级: ${ruleResult.feasibilityLevel}
-- ${ruleResult.levelDescription}
+- ${ruleResult.summary}
 
----
+请完成以下分析：
+1. 给出插班可行性等级（A–E）
+2. 指出不超过3个最主要的风险点
+3. 给出具体、可执行的提升建议
+4. 使用家长可理解的语言表达，避免专业术语
 
-请以JSON格式返回你的专业分析补充，结构如下：
-
+请以JSON格式返回：
 {
-  "aiInsights": "<150字以内的补充分析，从教育专家角度提供更细致的建议>",
-  "additionalRisks": ["<规则引擎可能遗漏的风险点1>", "<风险点2>"],
-  "additionalStrengths": ["<可能被忽视的优势1>"],
-  "interviewTips": ["<面试准备建议1>", "<面试准备建议2>"],
-  "alternativeSchools": "<如果目标难度较大，可考虑的备选方向建议>"
+  "feasibilityLevel": "B",
+  "summary": "该学生具备一定插班机会，但在核心科目上仍存在提升空间。",
+  "mainRisks": [
+    "英文成绩略低于该校常见插班要求",
+    "数学稳定性不足，容易影响整体竞争力"
+  ],
+  "improvementPlan": [
+    "未来3个月重点加强英文阅读与写作训练",
+    "通过针对性练习提升数学解题速度与准确率",
+    "避免同时报考过多高竞争学校"
+  ]
 }
 
-注意：
-1. 只返回JSON，不要有其他文字
-2. 所有内容都要基于香港实际教育情况
-3. 语气要专业、客观、有建设性`;
+注意：只返回JSON，不要有其他文字。`;
 }
 /**
  * 使用AI增强评估结果
  */
 export async function enhanceWithAI(request, ruleResult, aiApiKey) {
     if (!aiApiKey) {
-        return ruleResult; // 无API密钥时直接返回规则引擎结果
+        return ruleResult;
     }
     try {
         const prompt = buildAIPrompt(request, ruleResult);
@@ -477,10 +779,7 @@ export async function enhanceWithAI(request, ruleResult, aiApiKey) {
             body: JSON.stringify({
                 model: 'deepseek-chat',
                 messages: [
-                    {
-                        role: 'system',
-                        content: '你是香港教育专家，提供专业的升学建议。禁止给出具体成功率百分比。',
-                    },
+                    { role: 'system', content: AI_SYSTEM_PROMPT },
                     { role: 'user', content: prompt },
                 ],
                 max_tokens: 1000,
@@ -497,15 +796,22 @@ export async function enhanceWithAI(request, ruleResult, aiApiKey) {
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const aiResult = JSON.parse(jsonMatch[0]);
-                // 合并AI建议到结果中
-                if (aiResult.aiInsights) {
-                    ruleResult.overallAssessment += '\n\n' + aiResult.aiInsights;
+                // 合并AI建议
+                if (aiResult.summary) {
+                    ruleResult.summary = aiResult.summary;
                 }
-                if (aiResult.additionalRisks) {
-                    ruleResult.mainRisks.push(...aiResult.additionalRisks);
+                if (aiResult.mainRisks && Array.isArray(aiResult.mainRisks)) {
+                    // 去重合并
+                    const existingRisks = new Set(ruleResult.mainRisks);
+                    aiResult.mainRisks.forEach((r) => {
+                        if (!existingRisks.has(r)) {
+                            ruleResult.mainRisks.push(r);
+                        }
+                    });
+                    ruleResult.mainRisks = ruleResult.mainRisks.slice(0, 3);
                 }
-                if (aiResult.interviewTips) {
-                    ruleResult.recommendations.push(...aiResult.interviewTips);
+                if (aiResult.improvementPlan && Array.isArray(aiResult.improvementPlan)) {
+                    ruleResult.improvementPlan = aiResult.improvementPlan;
                 }
             }
         }

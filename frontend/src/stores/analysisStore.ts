@@ -3,6 +3,11 @@ import { persist } from 'zustand/middleware'
 import { apiFetch } from '../config/api'
 import { useAuthStore } from './authStore'
 import type { LearningStatus, RankPosition, ScoreSource } from '@/shared/domain'
+import type { 
+  TransferAnalysisResultV2, 
+  TransferAnalysisInputV2,
+  TransferAnalysisResponseV2,
+} from '../types/transferAnalysisV2'
 
 /**
  * 插班科目学习状态（核心输入结构）
@@ -224,6 +229,9 @@ interface AnalysisState {
   loading: boolean
   error: string | null
   
+  // ===== Transfer V2 专用状态 =====
+  transferResultV2: TransferAnalysisResultV2 | null
+  
   // 操作
   updateFormData: (data: Partial<StudentInfo>) => void
   resetFormData: () => void
@@ -233,6 +241,14 @@ interface AnalysisState {
   deleteHistoryItem: (id: string) => Promise<void>
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
+  
+  // ===== Transfer V2 专用方法 =====
+  /** 提交插班分析 V2（纯规则引擎） */
+  submitTransferAnalysisV2: (payload: TransferAnalysisInputV2) => Promise<string>
+  /** 提交插班分析 AI 增强（规则 + AI） */
+  submitTransferAnalysisAI: (payload: TransferAnalysisInputV2) => Promise<string>
+  /** 加载插班分析 V2 结果 */
+  loadTransferResultV2: (id: string) => Promise<void>
 }
 
 // 默认表单数据
@@ -260,6 +276,9 @@ export const useAnalysisStore = create<AnalysisState>()(
       history: [],
       loading: false,
       error: null,
+      
+      // ===== Transfer V2 初始状态 =====
+      transferResultV2: null,
 
       /**
        * 更新表单数据
@@ -552,6 +571,186 @@ export const useAnalysisStore = create<AnalysisState>()(
        */
       setError: (error: string | null) => {
         set({ error })
+      },
+
+      // =====================
+      // Transfer V2 专用方法
+      // =====================
+
+      /**
+       * 提交插班分析 V2（纯规则引擎）
+       * 
+       * POST /api/transfer/analyze/v2
+       * - 使用后端返回的真实 analysis_id
+       * - 保存完整 V2 结构到 store
+       * - ❌ 禁止生成临时 ID
+       * - ❌ 禁止复用 submitAnalysis（JUPAS）
+       */
+      submitTransferAnalysisV2: async (payload: TransferAnalysisInputV2): Promise<string> => {
+        set({ loading: true, error: null })
+        
+        try {
+          // 获取 token 以关联用户
+          const token = useAuthStore.getState().token
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          }
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`
+          }
+
+          const response = await apiFetch('/api/transfer/analyze/v2', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+          })
+          
+          // 严格错误处理
+          if (!response.ok) {
+            let errorMsg = `请求失败 (${response.status})`
+            try {
+              const errorData = await response.json()
+              errorMsg = errorData.error || errorData.message || errorMsg
+            } catch {
+              errorMsg = `接口返回异常 (${response.status})`
+            }
+            throw new Error(errorMsg)
+          }
+          
+          const data: TransferAnalysisResponseV2 = await response.json()
+          
+          if (!data.success || !data.data) {
+            throw new Error(data.error || '分析失败')
+          }
+
+          // 【核心】从后端获取真实的 analysis_id
+          const analysisId = data.data.analysis_id
+          if (!analysisId) {
+            console.error('[Transfer V2] 后端未返回 analysis_id', data)
+            throw new Error('分析创建失败：后端未返回有效的分析记录 ID')
+          }
+          
+          // 保存完整 V2 结果到 store
+          set({
+            transferResultV2: data.data.result,
+            loading: false,
+          })
+          
+          return analysisId
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '未知错误'
+          console.error('[Transfer V2 Error]', message)
+          set({ loading: false, error: message })
+          throw error
+        }
+      },
+
+      /**
+       * 提交插班分析 AI 增强（规则 + AI）
+       * 
+       * POST /api/transfer/analyze/ai
+       * - 先执行 V2 规则分析
+       * - 再调用 AI 增强（可选）
+       * - AI 失败自动降级为纯规则结果
+       * - ❌ 禁止生成临时 ID
+       */
+      submitTransferAnalysisAI: async (payload: TransferAnalysisInputV2): Promise<string> => {
+        set({ loading: true, error: null })
+        
+        try {
+          // 获取 token 以关联用户
+          const token = useAuthStore.getState().token
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          }
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`
+          }
+
+          const response = await apiFetch('/api/transfer/analyze/ai', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(payload),
+          })
+          
+          // 严格错误处理
+          if (!response.ok) {
+            let errorMsg = `请求失败 (${response.status})`
+            try {
+              const errorData = await response.json()
+              errorMsg = errorData.error || errorData.message || errorMsg
+            } catch {
+              errorMsg = `接口返回异常 (${response.status})`
+            }
+            throw new Error(errorMsg)
+          }
+          
+          const data: TransferAnalysisResponseV2 = await response.json()
+          
+          if (!data.success || !data.data) {
+            throw new Error(data.error || '分析失败')
+          }
+
+          // 【核心】从后端获取真实的 analysis_id
+          const analysisId = data.data.analysis_id
+          if (!analysisId) {
+            console.error('[Transfer AI] 后端未返回 analysis_id', data)
+            throw new Error('分析创建失败：后端未返回有效的分析记录 ID')
+          }
+          
+          // 保存完整 V2 结果到 store（可能包含 AI 增强）
+          set({
+            transferResultV2: data.data.result,
+            loading: false,
+          })
+          
+          console.log('[Transfer AI] 分析完成，aiEnabled =', data.data.result.aiEnabled)
+          
+          return analysisId
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '未知错误'
+          console.error('[Transfer AI Error]', message)
+          set({ loading: false, error: message })
+          throw error
+        }
+      },
+
+      /**
+       * 加载插班分析 V2 结果
+       * 
+       * GET /api/analysis/result/:id
+       * - 直接设置 transferResultV2
+       * - 不做任何字段转换
+       */
+      loadTransferResultV2: async (id: string): Promise<void> => {
+        set({ loading: true, error: null })
+        
+        try {
+          const response = await apiFetch(`/api/analysis/result/${id}`)
+          
+          if (!response.ok) {
+            throw new Error('无法加载分析结果')
+          }
+          
+          const data = await response.json()
+          
+          // 后端返回 { result: TransferAnalysisResultV2 }
+          const result = data.result as TransferAnalysisResultV2
+          
+          // 验证是否为 V2 结构
+          if (!result || result.meta?.version !== 'v2') {
+            throw new Error('此分析记录不是 V2 格式')
+          }
+          
+          set({
+            transferResultV2: result,
+            loading: false,
+          })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '未知错误'
+          set({ loading: false, error: message })
+          throw error
+        }
       },
     }),
     {

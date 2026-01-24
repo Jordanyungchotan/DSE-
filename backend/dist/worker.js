@@ -4,6 +4,17 @@
  * 适配 Cloudflare Workers 运行环境
  */
 import { SCHOOLS_BY_DISTRICT } from './data/schoolsData';
+import { ALL_SUBJECTS, CORE_SUBJECTS, CORE_SUBJECT_KEYS, ELECTIVE_SUBJECTS, ELECTIVE_SUBJECT_KEYS, isElectiveSubject, } from '@/shared/domain';
+import { AnalysisInputError, validateSubjectGrades, validateTransferSubjectStatuses, } from './validators/analysisInput.validator.js';
+import { analyzeSubjectGrade, analyzeElectiveCombination, analyzeTransferSubjectStatuses, } from './analysis/analyzeByRules.js';
+import { getLeaderboard as getPointsLeaderboard, getDailyTaskStatus, getPointsSummary, getPointHistory, getUserRank as getPointsUserRank, checkAndAwardPointsFromLearningEvent, getTodayLearningProgress, } from './services/pointsService.js';
+import { getLearningLeaderboard, getUserLearningStats, } from './services/learningLeaderboardService.js';
+import { getIncentiveLeaderboard, checkUserPrivileges, } from './services/incentiveLeaderboardService.js';
+import { getMallItems, redeemItem, getUserConsultations, updateConsultationStatus, getConversionFunnelStats, getTriggeredOffers, isInHighConversionZone, } from './services/pointsMallService.js';
+import { getDailyMissions, checkMissionProgress, } from './services/dailyMissionService.js';
+import { recordLearningEvent, } from './services/learningEventRecorder.js';
+import { recordQuestionAttemptsBatch, getWrongQuestionsByUser, updateWrongQuestionStatus, getLearningProfile, } from './services/questionAttemptRecorder.js';
+import { DEFAULT_CAPABILITY_ANALYSES, DEFAULT_TRANSITION_PLAN, DEFAULT_SUMMARY_RISKS, DEFAULT_SUMMARY_ADVANTAGES, DEFAULT_SCHOOL_ASSESSMENT_FIELDS, getFeasibilityLevel, getRecommendationType, getRiskLevel, } from './templates/transferDefaults.js';
 // 允许的 CORS 来源列表
 const ALLOWED_ORIGINS = [
     'https://dse-analysis.pages.dev',
@@ -429,6 +440,7 @@ function intelligentAnswerMatch(userAnswer, expectedAnswer, questionType, option
     if (userKeyNum !== null && expectedKeyNum === null) {
         feedback = '请检查答案格式是否正确。';
     }
+    const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects);
     return {
         isCorrect: false,
         matchType: 'exact',
@@ -1779,7 +1791,7 @@ async function analyzeWithDeepSeek(studentInfo, apiKey) {
             body: JSON.stringify({
                 model: 'deepseek-chat',
                 messages: [
-                    { role: 'system', content: '你是一位专业的香港DSE教育顾问，擅长分析学生情况并提供升学建议。请用JSON格式回复。' },
+                    { role: 'system', content: '你是一位专业的香港DSE教育顾问，擅长分析学生情况并提供升学建议。请用JSON格式回复。绝对禁止输出任何百分比或成功率数字。' },
                     { role: 'user', content: prompt },
                 ],
                 max_tokens: 4000,
@@ -1799,12 +1811,131 @@ async function analyzeWithDeepSeek(studentInfo, apiKey) {
         if (!jsonMatch) {
             return generateMockResult(studentInfo);
         }
-        return JSON.parse(jsonMatch[0]);
+        const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects);
+        // 解析 AI 返回的结果
+        const rawResult = JSON.parse(jsonMatch[0]);
+        // 标准化处理结果，确保格式正确
+        return normalizeAnalysisResult(rawResult, ruleAnalysisBySubject);
     }
     catch (error) {
         console.error('DeepSeek error:', error);
         return generateMockResult(studentInfo);
     }
+}
+// 标准化 AI 返回的分析结果
+function normalizeAnalysisResult(raw, ruleAnalysisBySubject) {
+    const overallScore = raw.overallAssessment?.feasibilityScore || 70;
+    const overallLevel = calculateFeasibilityLevel(overallScore);
+    // 处理学校评估，将百分比转换为等级
+    const rawSchoolAssessments = raw.schoolAssessments || [];
+    const schoolAssessments = rawSchoolAssessments.map((school) => {
+        // 如果 AI 仍然返回了 admissionProbability，转换为等级
+        let level = 'C';
+        if (school.admissionProbability !== undefined) {
+            level = calculateFeasibilityLevel(school.admissionProbability);
+        }
+        else if (school.feasibilityLevel) {
+            // 验证并使用 AI 返回的等级
+            const rawLevel = school.feasibilityLevel.toUpperCase();
+            if (['A', 'B', 'C', 'D', 'E'].includes(rawLevel)) {
+                level = rawLevel;
+            }
+        }
+        return {
+            schoolName: school.schoolName,
+            feasibilityLevel: level,
+            levelLabel: FEASIBILITY_LEVEL_CONFIG[level].label,
+            levelColor: FEASIBILITY_LEVEL_CONFIG[level].color,
+            requirements: school.requirements || [],
+            gaps: school.gaps || [],
+            recommendations: school.recommendations || [],
+        };
+    });
+    return {
+        overallAssessment: {
+            feasibilityScore: overallScore,
+            feasibilityLevel: overallLevel,
+            levelDescription: FEASIBILITY_LEVEL_CONFIG[overallLevel].description,
+            summary: raw.overallAssessment?.summary || '',
+            keyStrengths: raw.overallAssessment?.keyStrengths || [],
+            keyWeaknesses: raw.overallAssessment?.keyWeaknesses || [],
+        },
+        subjectAnalyses: (raw.subjectAnalyses || []).map((s) => {
+            const subjectName = s.subject;
+            const ruleAnalysis = ruleAnalysisBySubject.get(subjectName) || {
+                current: analyzeSubjectGrade({
+                    subject: subjectName,
+                    value: s.currentLevel || '',
+                }),
+                target: analyzeSubjectGrade({
+                    subject: subjectName,
+                    value: s.targetLevel || '',
+                }),
+            };
+            return {
+                subject: subjectName,
+                currentLevel: s.currentLevel,
+                targetLevel: s.targetLevel,
+                gap: s.gap,
+                strengths: s.strengths || [],
+                weaknesses: s.weaknesses || [],
+                recommendations: s.recommendations || [],
+                estimatedTimeToImprove: s.estimatedTimeToImprove,
+                ruleAnalysis,
+            };
+        }),
+        schoolAssessments,
+        studyPlan: {
+            weeklySchedule: raw.studyPlan?.weeklySchedule || [],
+            monthlyGoals: raw.studyPlan?.monthlyGoals || [],
+            resources: raw.studyPlan?.resources || [],
+        },
+        additionalAdvice: raw.additionalAdvice || [],
+    };
+}
+const FEASIBILITY_LEVEL_CONFIG = {
+    'A': {
+        label: '可行性高',
+        color: 'success',
+        description: '条件匹配度良好，通过适当准备有较大机会',
+        actionText: '建议立即准备申请材料'
+    },
+    'B': {
+        label: '可行性较高',
+        color: 'processing',
+        description: '基本符合要求，部分方面需加强',
+        actionText: '建议针对性提升后申请'
+    },
+    'C': {
+        label: '可行性中等',
+        color: 'warning',
+        description: '存在一定差距，需要较长时间准备',
+        actionText: '建议制定3-6个月提升计划'
+    },
+    'D': {
+        label: '可行性较低',
+        color: 'error',
+        description: '差距较大，需要显著提升或调整目标',
+        actionText: '建议调整目标学校或长期准备'
+    },
+    'E': {
+        label: '可行性低',
+        color: 'default',
+        description: '当前条件与目标差距显著',
+        actionText: '建议重新评估升学规划'
+    },
+};
+// 根据分数计算可行性等级
+function calculateFeasibilityLevel(score) {
+    if (score >= 80)
+        return 'A';
+    if (score >= 65)
+        return 'B';
+    if (score >= 50)
+        return 'C';
+    if (score >= 35)
+        return 'D';
+    return 'E';
 }
 // 科目名称映射
 const SUBJECT_NAME_MAP = {
@@ -1815,26 +1946,77 @@ const SUBJECT_NAME_MAP = {
     m1: '数学延伸部分(M1)', m2: '数学延伸部分(M2)',
 };
 const GRADE_NAME_MAP = {
+    // 旧格式兼容
     form4: '中四', form5: '中五', form6: '中六',
+    form1: '中一', form2: '中二', form3: '中三',
+    // 新格式
+    S1: '中一', S2: '中二', S3: '中三',
+    S4: '中四', S5: '中五', S6: '中六',
+    // 直接中文也兼容
+    '中一': '中一', '中二': '中二', '中三': '中三',
+    '中四': '中四', '中五': '中五', '中六': '中六',
 };
+function buildRuleAnalysisBySubject(subjects) {
+    const map = new Map();
+    for (const subject of subjects) {
+        map.set(subject.subject, {
+            current: analyzeSubjectGrade({
+                subject: subject.subject,
+                value: subject.currentScore,
+            }),
+            target: analyzeSubjectGrade({
+                subject: subject.subject,
+                value: subject.targetScore,
+            }),
+        });
+    }
+    return map;
+}
 // 构建分析提示词
 function buildAnalysisPrompt(studentInfo) {
     const subjectsText = studentInfo.subjects
         .map(s => `  - ${SUBJECT_NAME_MAP[s.subject] || s.subject}: 当前${s.currentScore}级，目标${s.targetScore}级`)
         .join('\n');
     const subjectNames = studentInfo.subjects.map(s => SUBJECT_NAME_MAP[s.subject] || s.subject);
+    // 获取年级名称，确保不会为空
+    const gradeName = GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade || '中四';
+    // 计算距离插班的时间
+    let timeToEnrollment = '';
+    if (studentInfo.enrollmentDate) {
+        const enrollDate = new Date(studentInfo.enrollmentDate);
+        const now = new Date();
+        const diffDays = Math.ceil((enrollDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays > 0) {
+            const months = Math.floor(diffDays / 30);
+            const days = diffDays % 30;
+            timeToEnrollment = months > 0 ? `约${months}个月${days > 0 ? days + '天' : ''}` : `${diffDays}天`;
+        }
+        else {
+            timeToEnrollment = '即将进行';
+        }
+    }
     return `你是一位资深的香港DSE教育专家。请根据以下【已完整提供】的学生信息，提供专业的插班分析和建议。
 
-【学生基本信息】（以下信息已全部提供，请直接使用这些信息进行分析，不要说信息缺失）：
-- 插班日期：${studentInfo.enrollmentDate}
-- 当前年级：${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}
-- 学生年龄：${studentInfo.age}岁
-- 原就读学校：${studentInfo.currentSchool || '未填写'}
+【学生基本信息】（★重要：以下所有信息均已完整提供，请直接使用进行分析）：
+- 插班目标日期：${studentInfo.enrollmentDate || '近期'}
+- 目标学期：${studentInfo.semester || '下学期'}
+- 距离插班时间：${timeToEnrollment || '待确定'}
+- 当前年级：${gradeName}
+- 学生年龄：${studentInfo.age || 16}岁
+- 原就读学校：${studentInfo.currentSchool || '（学生未填写，请忽略此项）'}
 
-【各科目成绩详情】：
+【各科目成绩详情】（共${studentInfo.subjects.length}个科目）：
 ${subjectsText}
 
-【目标学校】：${studentInfo.targetSchools.join('、')}
+【目标学校】（共${studentInfo.targetSchools.length}所）：${studentInfo.targetSchools.join('、')}
+
+【个人特质与综合素质】：
+- 兴趣爱好：${studentInfo.hobbies?.length ? studentInfo.hobbies.join('、') : '未填写'}
+- 个人特长：${studentInfo.strengths?.length ? studentInfo.strengths.join('、') : '未填写'}
+- 课外活动：${studentInfo.extracurriculars?.length ? studentInfo.extracurriculars.join('、') : '未填写'}
+- 获奖经历：${studentInfo.achievements || '未填写'}
+
+【学生备注】：${studentInfo.notes || '无'}
 
 请严格按照以下JSON格式返回分析结果，不要添加任何其他内容：
 
@@ -1860,10 +2042,10 @@ ${subjectsText}
   "schoolAssessments": [
     {
       "schoolName": "<学校名称>",
-      "admissionProbability": <0-100的整数，录取概率>,
+      "feasibilityLevel": "<A/B/C/D/E，可行性等级>",
       "requirements": ["录取要求1", "录取要求2"],
-      "gaps": ["差距1", "差距2"],
-      "recommendations": ["建议1", "建议2"]
+      "gaps": ["与学校要求的差距1", "差距2"],
+      "recommendations": ["针对该校的建议1", "建议2"]
     }
   ],
   "studyPlan": {
@@ -1874,21 +2056,199 @@ ${subjectsText}
   "additionalAdvice": ["建议1", "建议2", "建议3", "建议4"]
 }
 
+【★★★ 可行性等级说明（必须严格遵守）★★★】
+- A级：学生条件与学校要求高度匹配，通过适当准备有较大机会
+- B级：基本符合学校要求，部分方面需针对性加强
+- C级：与学校要求存在一定差距，需要较长时间准备
+- D级：差距较大，需要显著提升或考虑调整目标学校
+- E级：当前条件与目标学校要求差距显著，建议重新评估
+
+【★★★ 绝对禁止输出百分比或成功率 ★★★】
+- ❌ 禁止："录取概率70%"、"成功率65%"、"admissionProbability"
+- ✅ 正确：使用 A/B/C/D/E 等级表示可行性
+
 重要注意事项：
 1. subjectAnalyses 必须包含以下科目的分析：${subjectNames.join('、')}
 2. schoolAssessments 必须包含以下学校的评估：${studentInfo.targetSchools.join('、')}
 3. 所有数组字段不能为空
 4. 只返回JSON，不要有其他文字说明
-5. 【特别重要】上述学生信息已完整提供，请在分析中充分利用年级（${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}）、年龄（${studentInfo.age}岁）等信息。绝对不要在keyWeaknesses或任何地方说"信息缺失"、"资料缺失"或类似表述
-6. 请根据学生当前年级评估其与目标学校课程进度的匹配度`;
+5. 【★★★★ 最重要 - 绝对禁止以下内容 ★★★★】
+   在 keyWeaknesses 和所有其他字段中，严禁出现任何关于"信息缺失"的表述！
+   
+   ❌ 禁止的表述（一个都不能出现）：
+   - "未提供插班具体时间" 
+   - "未提供插班时间"
+   - "缺乏原校背景"
+   - "缺乏课外活动信息"
+   - "背景信息不足"
+   - "信息缺失"
+   - "资料不完整"
+   - "未明确"
+   - "未提供"
+   - "规划紧迫性不明"
+   
+   ✅ keyWeaknesses 应该只包含【学术能力相关】的待改进项，例如：
+   - "英文成绩需要提升至X级"
+   - "数学基础需要加强"
+   - "目标学校竞争激烈，需提前准备"
+   - "准备时间${timeToEnrollment || '有限'}，需抓紧复习"
+
+6. 请充分利用以上所有信息进行分析：
+   - 根据【插班日期】和【距离时间】评估准备时间是否充足
+   - 根据【年级】评估与目标学校课程的衔接
+   - 根据【各科成绩】评估学术竞争力
+   - 根据【目标学校】评估录取难度
+   - 根据【个人特质】评估综合素质和面试优势
+   - 如有【获奖经历】，请作为加分项纳入评估
+   - 如有【课外活动】，请评估是否有助于申请
+   - 如有【备注】信息，请纳入分析考量
+   
+7. 关于个人特质的分析要求：
+   - 如果学生填写了兴趣爱好、特长、课外活动等，请在keyStrengths中体现
+   - 综合评估时考虑学术成绩+综合素质的整体竞争力
+   - 在建议中可以提到如何在面试中展示个人特质`;
+}
+// ===== 插班分析结果生成（基于学习状态）=====
+/**
+ * 生成插班分析结果（新版 - 基于学习状态）
+ *
+ * ⚠️ 重要：
+ * - 仅使用 status 和 rankPosition 进行分析
+ * - schoolScore 不参与任何分析逻辑
+ */
+async function generateTransferAnalysisResult(input, ruleAnalysis, apiKey) {
+    // 处理年级名称
+    const gradeName = GRADE_NAME_MAP[input.grade] || input.grade || '中四';
+    // 使用规则引擎的可行性评分
+    const feasibilityScore = ruleAnalysis.overallFeasibility.score;
+    const feasibilityLevel = ruleAnalysis.overallFeasibility.level;
+    // 统计学习状态分布
+    const statusCounts = {
+        strong: input.subjectStatuses.filter(s => s.status === 'strong').length,
+        ok: input.subjectStatuses.filter(s => s.status === 'ok').length,
+        weak: input.subjectStatuses.filter(s => s.status === 'weak').length,
+    };
+    // 生成优势和劣势
+    const keyStrengths = [];
+    const keyWeaknesses = [];
+    if (statusCounts.strong > 0) {
+        keyStrengths.push(`${statusCounts.strong} 个科目学习状态良好`);
+    }
+    if (statusCounts.strong >= 2) {
+        keyStrengths.push('多个科目有优势，整体竞争力较强');
+    }
+    if (input.hobbies?.length) {
+        keyStrengths.push(`兴趣爱好丰富：${input.hobbies.slice(0, 3).join('、')}`);
+    }
+    if (input.achievements) {
+        keyStrengths.push('有获奖经历，综合素质较好');
+    }
+    if (statusCounts.weak > 0) {
+        keyWeaknesses.push(`${statusCounts.weak} 个科目学习吃力，需要重点加强`);
+    }
+    if (statusCounts.weak >= 2) {
+        keyWeaknesses.push('多个科目需要补强，建议制定系统学习计划');
+    }
+    if (keyWeaknesses.length === 0) {
+        keyWeaknesses.push('需要保持学习状态，持续努力');
+    }
+    // 生成摘要
+    const summary = `该学生目前就读${gradeName}，计划于${input.enrollmentDate || '近期'}插班至${input.targetSchools[0] || '目标学校'}。` +
+        `根据学习状态评估，${statusCounts.strong}个科目表现良好，${statusCounts.ok}个科目状态一般，${statusCounts.weak}个科目需要加强。` +
+        `整体可行性评级为${feasibilityLevel}级（${feasibilityScore}分）。`;
+    // 生成科目分析
+    const subjectAnalyses = ruleAnalysis.subjectAnalyses.map(analysis => {
+        const statusLabel = analysis.status === 'strong' ? '优势' : analysis.status === 'ok' ? '一般' : '吃力';
+        return {
+            subject: analysis.subjectName,
+            currentLevel: analysis.status,
+            targetLevel: 'strong',
+            gap: analysis.status === 'strong' ? '已达标' : analysis.status === 'ok' ? '需提升' : '需重点加强',
+            strengths: analysis.status === 'strong' ? ['学习状态良好', '有一定优势'] : ['有基础', '可以提升'],
+            weaknesses: analysis.status === 'weak' ? ['学习吃力', '需要重点辅导'] : ['需要保持', '争取更好'],
+            recommendations: analysis.status === 'weak'
+                ? ['建议寻求专业辅导', '每天增加该科目学习时间', '多做练习题巩固基础']
+                : ['保持当前学习节奏', '定期复习巩固', '适当拓展提高'],
+            estimatedTimeToImprove: analysis.status === 'weak' ? '3-4个月' : analysis.status === 'ok' ? '1-2个月' : '保持即可',
+        };
+    });
+    // 生成学校评估
+    const schoolAssessments = input.targetSchools.map((school, i) => {
+        // 根据学校排序和整体可行性计算等级
+        const schoolScore = Math.max(30, feasibilityScore - i * 10);
+        const level = calculateFeasibilityLevel(schoolScore);
+        return {
+            schoolName: school,
+            feasibilityLevel: level,
+            levelLabel: FEASIBILITY_LEVEL_CONFIG[level].label,
+            levelColor: FEASIBILITY_LEVEL_CONFIG[level].color,
+            requirements: ['良好的学习状态', '适应能力强', '品行端正'],
+            gaps: statusCounts.weak > 0 ? ['部分科目需要加强', '需要适应新环境'] : ['需要准备面试'],
+            recommendations: ['了解学校特色', '准备面试自我介绍', '展示学习热情'],
+        };
+    });
+    // 生成学习计划
+    const studyPlan = {
+        weeklySchedule: statusCounts.weak > 0
+            ? ['周一至周五：重点科目每天2小时', '周六：薄弱科目集中训练', '周日：综合复习和休息']
+            : ['周一至周五：每天1.5小时自习', '周六：拓展学习', '周日：综合复习'],
+        monthlyGoals: statusCounts.weak > 0
+            ? ['第1个月：补齐薄弱科目基础', '第2个月：全面提升', '第3个月：模拟训练和面试准备']
+            : ['第1个月：保持状态', '第2个月：针对性提升', '第3个月：面试准备'],
+        resources: ['学校课本和笔记', '历年考试真题', '在线学习平台'],
+    };
+    // 合并建议
+    const additionalAdvice = [
+        ...ruleAnalysis.electiveNotes,
+        '保持积极的学习态度',
+        '与老师保持良好沟通',
+        '注意劳逸结合',
+    ];
+    return {
+        overallAssessment: {
+            feasibilityScore,
+            feasibilityLevel,
+            levelDescription: FEASIBILITY_LEVEL_CONFIG[feasibilityLevel].description,
+            summary,
+            keyStrengths: keyStrengths.slice(0, 4),
+            keyWeaknesses: keyWeaknesses.slice(0, 3),
+        },
+        subjectAnalyses,
+        schoolAssessments,
+        studyPlan,
+        additionalAdvice,
+    };
 }
 // 生成模拟结果
 function generateMockResult(studentInfo) {
-    const baseScore = studentInfo.grade === 'form6' ? 60 : studentInfo.grade === 'form4' ? 75 : 70;
+    // 处理各种年级格式
+    const grade = studentInfo.grade || 'S4';
+    const isHighGrade = ['form6', 'S6', 'S5', 'form5', '中五', '中六'].includes(grade);
+    const isLowGrade = ['form4', 'S4', 'S1', 'S2', 'S3', 'form1', 'form2', 'form3', '中一', '中二', '中三', '中四'].includes(grade);
+    const baseScore = isHighGrade ? 60 : isLowGrade ? 75 : 70;
+    const gradeName = GRADE_NAME_MAP[grade] || grade || '中四';
+    const overallLevel = calculateFeasibilityLevel(baseScore);
+    // 构建规则分析映射
+    const ruleAnalysisBySubject = buildRuleAnalysisBySubject(studentInfo.subjects);
+    // 收集选修科目并生成 notes
+    const electiveSubjects = studentInfo.subjects
+        .map(s => s.subject)
+        .filter(s => isElectiveSubject(s));
+    const electiveNotes = analyzeElectiveCombination(electiveSubjects);
+    // 生成建议（包含选修科目 notes）
+    const additionalAdvice = [
+        '保持规律作息',
+        '定期与老师沟通',
+        '适当体育锻炼',
+        '保持积极心态',
+        ...electiveNotes,
+    ];
     return {
         overallAssessment: {
             feasibilityScore: baseScore,
-            summary: `该学生目前就读${GRADE_NAME_MAP[studentInfo.grade] || studentInfo.grade}，计划于${studentInfo.enrollmentDate}插班。根据提供的成绩信息，整体学术表现中等偏上。建议重点加强薄弱科目的学习，为目标学校的录取做好准备。`,
+            feasibilityLevel: overallLevel,
+            levelDescription: FEASIBILITY_LEVEL_CONFIG[overallLevel].description,
+            summary: `该学生目前就读${gradeName}，计划于${studentInfo.enrollmentDate || '近期'}插班。根据提供的成绩信息，整体学术表现中等偏上。建议重点加强薄弱科目的学习，为目标学校的录取做好准备。`,
             keyStrengths: ['学习态度积极', '部分科目基础扎实', '有明确的目标规划'],
             keyWeaknesses: ['部分科目需要提升', '时间管理能力待加强', '需要更多实战练习'],
         },
@@ -1901,20 +2261,37 @@ function generateMockResult(studentInfo) {
             weaknesses: ['需要提升', '部分知识点需巩固'],
             recommendations: ['每天复习30分钟', '完成每周练习题', '定期进行模拟测试'],
             estimatedTimeToImprove: '2-3个月',
+            ruleAnalysis: ruleAnalysisBySubject.get(s.subject) || {
+                current: analyzeSubjectGrade({
+                    subject: s.subject,
+                    value: s.currentScore,
+                }),
+                target: analyzeSubjectGrade({
+                    subject: s.subject,
+                    value: s.targetScore,
+                }),
+            },
         })),
-        schoolAssessments: studentInfo.targetSchools.map((school, i) => ({
-            schoolName: school,
-            admissionProbability: Math.max(40, baseScore - i * 10),
-            requirements: ['优异的DSE成绩', '良好的品行记录', '面试表现优秀'],
-            gaps: ['部分科目成绩需提升', '需准备面试'],
-            recommendations: ['重点提升薄弱科目', '准备自我介绍', '了解学校文化'],
-        })),
+        schoolAssessments: studentInfo.targetSchools.map((school, i) => {
+            // 根据学校排序计算可行性等级
+            const schoolScore = Math.max(35, baseScore - i * 15);
+            const level = calculateFeasibilityLevel(schoolScore);
+            return {
+                schoolName: school,
+                feasibilityLevel: level,
+                levelLabel: FEASIBILITY_LEVEL_CONFIG[level].label,
+                levelColor: FEASIBILITY_LEVEL_CONFIG[level].color,
+                requirements: ['优异的DSE成绩', '良好的品行记录', '面试表现优秀'],
+                gaps: ['部分科目成绩需提升', '需准备面试'],
+                recommendations: ['重点提升薄弱科目', '准备自我介绍', '了解学校文化'],
+            };
+        }),
         studyPlan: {
             weeklySchedule: ['周一至周五：每天2小时自习', '周六：难题训练', '周日：综合复习'],
             monthlyGoals: ['第1个月：夯实基础', '第2个月：针对性提升', '第3个月：模拟训练'],
             resources: ['DSE历年真题集', '各科知识点总结', '在线模拟平台'],
         },
-        additionalAdvice: ['保持规律作息', '定期与老师沟通', '适当体育锻炼', '保持积极心态'],
+        additionalAdvice,
     };
 }
 // 大学申请分析
@@ -1953,7 +2330,18 @@ async function analyzeUniversityApplication(input, bestFive, apiKey) {
         if (!jsonMatch) {
             return generateMockUniversityResult(input, bestFive);
         }
-        return JSON.parse(jsonMatch[0]);
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+            ...parsed,
+            subjectAnalyses: input.dseResults.map((result) => ({
+                subject: result.subject,
+                grade: result.grade,
+                ruleAnalysis: analyzeSubjectGrade({
+                    subject: result.subject,
+                    value: result.grade,
+                }),
+            })),
+        };
     }
     catch (error) {
         console.error('DeepSeek error:', error);
@@ -2018,6 +2406,18 @@ function buildUniversityAnalysisPrompt(input, bestFive) {
 // 生成模拟大学申请分析结果
 function generateMockUniversityResult(input, bestFive) {
     const chanceLevel = bestFive >= 30 ? 'high' : bestFive >= 24 ? 'medium' : 'low';
+    // 收集选修科目并生成 notes
+    const electiveSubjects = input.dseResults
+        .map(r => r.subject)
+        .filter(s => isElectiveSubject(s));
+    const electiveNotes = analyzeElectiveCombination(electiveSubjects);
+    // 合并选修科目 notes 到备选方案建议
+    const backupPlans = [
+        '考虑副学士课程',
+        '海外升学选项',
+        '重读提升成绩',
+        ...electiveNotes,
+    ];
     return {
         admissionAnalysis: {
             overallScore: Math.min(95, bestFive * 3),
@@ -2047,7 +2447,15 @@ function generateMockUniversityResult(input, bestFive) {
             interviewTips: ['了解专业课程内容', '准备个人经历分享', '展示学习热情'],
             personalStatementAdvice: ['突出个人特色', '结合实际经历', '展示对专业的理解'],
         },
-        backupPlans: ['考虑副学士课程', '海外升学选项', '重读提升成绩'],
+        backupPlans,
+        subjectAnalyses: input.dseResults.map((result) => ({
+            subject: result.subject,
+            grade: result.grade,
+            ruleAnalysis: analyzeSubjectGrade({
+                subject: result.subject,
+                value: result.grade,
+            }),
+        })),
     };
 }
 // 主请求处理
@@ -2152,11 +2560,274 @@ export default {
                     token,
                 }, 200, origin);
             }
-            // 提交分析
+            // 获取当前用户信息
+            if (path === '/api/auth/me' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                const user = await env.DB.prepare('SELECT id, name, email, avatar, created_at FROM users WHERE id = ?').bind(tokenData.userId).first();
+                if (!user) {
+                    return errorResponse('用户不存在', 404, origin);
+                }
+                return jsonResponse({
+                    user: {
+                        id: user.id,
+                        name: user.name,
+                        email: user.email,
+                        avatar: user.avatar,
+                        createdAt: user.created_at,
+                    },
+                }, 200, origin);
+            }
+            // =====================
+            // 配置数据 API
+            // =====================
+            // 获取支持的科目列表（三语支持）
+            if (path === '/api/analysis/subjects' && request.method === 'GET') {
+                // 支持语言参数
+                const lang = (url.searchParams.get('lang') || 'zh-HK');
+                const subjects = ALL_SUBJECTS.map((subject) => ({
+                    key: subject.key,
+                    category: subject.category,
+                    grading: subject.grading,
+                    displayName: subject.displayName,
+                    // 向后兼容
+                    id: subject.key,
+                    name: subject.displayName[lang],
+                    nameEn: subject.displayName.en,
+                }));
+                return jsonResponse({
+                    subjects,
+                    coreSubjects: CORE_SUBJECTS.map(s => ({ key: s.key, displayName: s.displayName })),
+                    electiveSubjects: ELECTIVE_SUBJECTS.map(s => ({ key: s.key, displayName: s.displayName })),
+                    // 向后兼容：key 列表
+                    coreSubjectKeys: CORE_SUBJECT_KEYS,
+                    electiveSubjectKeys: ELECTIVE_SUBJECT_KEYS,
+                }, 200, origin);
+            }
+            // 获取成绩等级列表
+            if (path === '/api/analysis/grades' && request.method === 'GET') {
+                const grades = [
+                    { id: 'S1', name: '中一', description: '中一相对容易插班' },
+                    { id: 'S2', name: '中二', description: '中二为基准难度' },
+                    { id: 'S3', name: '中三', description: '中三难度略增' },
+                    { id: 'S4', name: '中四', description: 'DSE选科后难度增加' },
+                    { id: 'S5', name: '中五', description: '名额稀缺，竞争激烈' },
+                    { id: 'S6', name: '中六', description: '几乎不接受插班' },
+                ];
+                return jsonResponse({ grades }, 200, origin);
+            }
+            // 获取学校列表
+            if (path === '/api/analysis/schools' && request.method === 'GET') {
+                const url = new URL(request.url);
+                const district = url.searchParams.get('district');
+                const band = url.searchParams.get('band');
+                let schools = Object.entries(SCHOOLS_BY_DISTRICT).flatMap(([dist, schoolList]) => schoolList.map(school => ({
+                    ...school,
+                    district: dist,
+                })));
+                // 按地区筛选
+                if (district) {
+                    schools = schools.filter(s => s.district === district);
+                }
+                // 按 Band 筛选
+                if (band) {
+                    const bandLevel = parseInt(band, 10);
+                    schools = schools.filter(s => s.band === bandLevel);
+                }
+                return jsonResponse({
+                    schools: schools.map(s => ({
+                        id: s.name, // 使用学校名作为 ID
+                        name: s.name,
+                        nameEn: s.nameEn || s.name,
+                        district: s.district,
+                        bandLevel: s.band,
+                        gender: s.gender || 'coed',
+                        type: s.type || 'aided',
+                    })),
+                    total: schools.length,
+                }, 200, origin);
+            }
+            // =====================
+            // 规则评分 API（不调用 AI）
+            // =====================
+            // 纯规则评分
+            if (path === '/api/placement/score' && request.method === 'POST') {
+                const body = await request.json();
+                const { student, targetSchool } = body;
+                // Band等级对应的基准分数要求
+                const BAND_THRESHOLDS = {
+                    1: { chinese: 70, english: 75, math: 70, minAverage: 72 },
+                    2: { chinese: 55, english: 60, math: 55, minAverage: 58 },
+                    3: { chinese: 40, english: 45, math: 40, minAverage: 42 },
+                };
+                // 区域竞争强度系数
+                const DISTRICT_FACTORS = {
+                    '中西區': 1.15, '灣仔區': 1.12, '東區': 1.05, '南區': 1.02,
+                    '九龍城區': 1.18, '油尖旺區': 1.10, '深水埗區': 1.05, '黃大仙區': 1.00, '觀塘區': 1.02,
+                    '沙田區': 1.12, '大埔區': 1.05, '北區': 0.98, '西貢區': 1.08,
+                    '葵青區': 1.00, '荃灣區': 1.02, '屯門區': 1.00, '元朗區': 0.98, '離島區': 0.95,
+                };
+                // 年级难度系数
+                const GRADE_FACTORS = {
+                    'S1': 0.90, 'S2': 0.95, 'S3': 1.00, 'S4': 1.15, 'S5': 1.25, 'S6': 1.40,
+                };
+                const thresholds = BAND_THRESHOLDS[targetSchool.bandLevel];
+                const districtFactor = DISTRICT_FACTORS[targetSchool.district] || 1.0;
+                const gradeFactor = GRADE_FACTORS[student.currentGrade] || 1.0;
+                // 计算平均分
+                const scores = student.scores;
+                const allScores = Object.values(scores);
+                const averageScore = allScores.length > 0 ? allScores.reduce((a, b) => a + b, 0) / allScores.length : 0;
+                // 计算调整后的要求
+                const adjustedMinAverage = thresholds.minAverage * districtFactor * gradeFactor;
+                const scoreDiff = averageScore - adjustedMinAverage;
+                // 评估风险因素
+                const reasons = [];
+                const positiveReasons = [];
+                let baseScore = 70; // 基础分
+                // 成绩评估
+                if (scoreDiff >= 10) {
+                    baseScore += 15;
+                    positiveReasons.push('整体成绩优于该校常见要求');
+                }
+                else if (scoreDiff >= 0) {
+                    baseScore += 5;
+                    positiveReasons.push('整体成绩达到基本要求');
+                }
+                else if (scoreDiff >= -10) {
+                    baseScore -= 10;
+                    reasons.push('整体成绩略低于该校一般要求');
+                }
+                else {
+                    baseScore -= 25;
+                    reasons.push('整体成绩与该校常见插班要求有较大差距');
+                }
+                // 核心科目评估
+                const coreSubjects = ['chinese', 'english', 'math'];
+                for (const subject of coreSubjects) {
+                    const score = scores[subject];
+                    if (score !== undefined) {
+                        const threshold = thresholds[subject];
+                        if (score < threshold - 15) {
+                            baseScore -= 10;
+                            reasons.push(`${subject === 'chinese' ? '中文' : subject === 'english' ? '英文' : '数学'}成绩偏低`);
+                        }
+                        else if (score >= threshold + 10) {
+                            baseScore += 5;
+                            positiveReasons.push(`${subject === 'chinese' ? '中文' : subject === 'english' ? '英文' : '数学'}成绩优秀`);
+                        }
+                    }
+                }
+                // 年级难度调整
+                if (['S4', 'S5', 'S6'].includes(student.currentGrade)) {
+                    baseScore -= 10;
+                    reasons.push('高年级插班名额稀缺，竞争激烈');
+                }
+                // Band 跨级评估
+                if (targetSchool.bandLevel === 1 && averageScore < 65) {
+                    baseScore -= 15;
+                    reasons.push('目标为 Band 1 学校，需要更高的学术表现');
+                }
+                // 加分项
+                if (student.strengths && student.strengths.length > 0) {
+                    baseScore += Math.min(student.strengths.length * 2, 10);
+                    positiveReasons.push('具备个人特长优势');
+                }
+                if (student.extracurriculars && student.extracurriculars.length > 0) {
+                    baseScore += Math.min(student.extracurriculars.length * 2, 10);
+                    positiveReasons.push('课外活动丰富');
+                }
+                // 限制分数范围
+                const finalScore = Math.max(0, Math.min(100, baseScore));
+                // 等级映射
+                let level;
+                let levelDescription;
+                if (finalScore >= 80) {
+                    level = 'A';
+                    levelDescription = '可行性高 - 具备较强竞争力';
+                }
+                else if (finalScore >= 60) {
+                    level = 'B';
+                    levelDescription = '可行性中等 - 有一定机会，建议针对性提升';
+                }
+                else if (finalScore >= 45) {
+                    level = 'C';
+                    levelDescription = '可行性偏低 - 需要系统性提升后再尝试';
+                }
+                else if (finalScore >= 30) {
+                    level = 'D';
+                    levelDescription = '可行性较低 - 不建议现阶段尝试';
+                }
+                else {
+                    level = 'E';
+                    levelDescription = '可行性极低 - 建议先巩固基础，调整目标后再考虑插班';
+                }
+                // 免责声明
+                const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。';
+                return jsonResponse({
+                    score: finalScore,
+                    level,
+                    levelDescription,
+                    reasons,
+                    positiveReasons,
+                    breakdown: {
+                        baseScore: 70,
+                        scoreAdjustment: baseScore - 70,
+                        districtFactor,
+                        gradeFactor,
+                        finalScore,
+                    },
+                    disclaimer,
+                }, 200, origin);
+            }
+            // 提交插班分析（新版 - 基于学习状态）
             if (path === '/api/analysis/submit' && request.method === 'POST') {
                 const body = await request.json();
-                // 调用 DeepSeek API
-                const analysisResult = await analyzeWithDeepSeek(body, env.DEEPSEEK_API_KEY);
+                // ===== 输入校验 =====
+                // 1. 检查必填字段
+                if (!body.enrollmentDate || !body.semester || !body.grade || !body.age) {
+                    return errorResponse('缺少必填字段: enrollmentDate, semester, grade, age', 400, origin);
+                }
+                // 2. 检查 subjectStatuses 是否存在
+                if (!body.subjectStatuses || !Array.isArray(body.subjectStatuses) || body.subjectStatuses.length === 0) {
+                    return errorResponse('subjectStatuses 必须是非空数组', 400, origin);
+                }
+                // 3. 拒绝旧的 grade/level/subjects 字段
+                const bodyAny = body;
+                if (bodyAny.subjects && Array.isArray(bodyAny.subjects) && bodyAny.subjects.length > 0) {
+                    const firstSubject = bodyAny.subjects[0];
+                    if (firstSubject && ('currentScore' in firstSubject || 'targetScore' in firstSubject)) {
+                        return errorResponse('不接受旧的 subjects 格式，请使用 subjectStatuses', 400, origin);
+                    }
+                }
+                if (bodyAny.grades) {
+                    return errorResponse('不接受 grades 字段，请使用 subjectStatuses', 400, origin);
+                }
+                // 4. 校验 subjectStatuses 中的每个科目状态
+                try {
+                    validateTransferSubjectStatuses(body.subjectStatuses);
+                }
+                catch (e) {
+                    if (e instanceof AnalysisInputError) {
+                        return errorResponse(e.message, 400, origin);
+                    }
+                    throw e;
+                }
+                // 5. 检查 targetSchools
+                if (!body.targetSchools || !Array.isArray(body.targetSchools) || body.targetSchools.length === 0) {
+                    return errorResponse('targetSchools 必须是非空数组', 400, origin);
+                }
+                // ===== 执行分析（基于学习状态）=====
+                // 使用规则引擎分析科目状态
+                const ruleAnalysis = analyzeTransferSubjectStatuses(body.subjectStatuses, 'zh-CN');
+                // 构建分析结果
+                const analysisResult = await generateTransferAnalysisResult(body, ruleAnalysis, env.DEEPSEEK_API_KEY);
                 const recordId = crypto.randomUUID();
                 const now = new Date().toISOString();
                 // 获取用户ID（如果有token）
@@ -2168,6 +2839,8 @@ export default {
                 }
                 // 保存到数据库
                 await env.DB.prepare('INSERT INTO analysis_records (id, user_id, student_info, result, created_at) VALUES (?, ?, ?, ?, ?)').bind(recordId, userId, JSON.stringify(body), JSON.stringify(analysisResult), now).run();
+                // 免责声明
+                const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。';
                 return jsonResponse({
                     message: '分析完成',
                     result: {
@@ -2175,6 +2848,159 @@ export default {
                         createdAt: now,
                         studentInfo: body,
                         ...analysisResult,
+                        disclaimer,
+                    },
+                }, 200, origin);
+            }
+            // =====================
+            // 插班分析 V2 API（纯规则，不调用 AI）
+            // =====================
+            /**
+             * 插班分析 V2 接口
+             * POST /api/transfer/analyze/v2
+             *
+             * 【设计原则】
+             * 1. 纯规则引擎，不调用 AI
+             * 2. 返回 TransferAnalysisResultV2 完整结构
+             * 3. 所有数组字段保证非空
+             * 4. analysis_id 为真实 UUID，写入数据库
+             */
+            if (path === '/api/transfer/analyze/v2' && request.method === 'POST') {
+                const body = await request.json();
+                // ===== 输入校验 =====
+                if (!body.targetSchools || !Array.isArray(body.targetSchools) || body.targetSchools.length === 0) {
+                    return errorResponse('targetSchools 必须是非空数组', 400, origin);
+                }
+                // ===== 获取用户信息（可选登录）=====
+                let userId = null;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                    userId = tokenData?.userId || null;
+                }
+                // ===== 规则引擎分析 =====
+                let ruleAnalysisResult = {
+                    subjectAnalyses: [],
+                    electiveNotes: [],
+                    overallFeasibility: { score: 65, level: 'B' },
+                };
+                // 如果有 subjectStatuses，使用规则引擎分析
+                if (body.subjectStatuses && body.subjectStatuses.length > 0) {
+                    const validStatuses = body.subjectStatuses.map(s => ({
+                        subject: s.subject,
+                        status: s.status,
+                        // 映射到正确的 RankPosition 类型：'top' | 'mid' | 'bottom'
+                        rankPosition: s.rankPosition
+                            ? (s.rankPosition === 'top' || s.rankPosition === 'top10' || s.rankPosition === 'top30'
+                                ? 'top'
+                                : s.rankPosition === 'bottom' || s.rankPosition === 'bottom30'
+                                    ? 'bottom'
+                                    : 'mid')
+                            : undefined,
+                    }));
+                    const analysisResult = analyzeTransferSubjectStatuses(validStatuses, 'zh-CN');
+                    // 将分析结果映射到本地类型
+                    ruleAnalysisResult = {
+                        subjectAnalyses: analysisResult.subjectAnalyses.map(s => ({
+                            subjectKey: s.subjectKey,
+                            subjectName: s.subjectName,
+                            status: s.status,
+                            riskLevel: s.riskLevel,
+                            summary: s.summary,
+                            advice: s.advice,
+                        })),
+                        electiveNotes: analysisResult.electiveNotes,
+                        overallFeasibility: {
+                            score: analysisResult.overallFeasibility.score,
+                            level: analysisResult.overallFeasibility.level,
+                        },
+                    };
+                }
+                const feasibilityScore = ruleAnalysisResult.overallFeasibility.score;
+                const feasibilityLevel = getFeasibilityLevel(feasibilityScore);
+                // ===== 构建 V2 结构 =====
+                const analysisId = crypto.randomUUID();
+                const now = new Date().toISOString();
+                // 构建 summary
+                const summary = {
+                    overallLevel: feasibilityScore >= 71 ? '稳妥' : feasibilityScore >= 51 ? '可尝试' : '高风险',
+                    feasibilityScore,
+                    keyAdvantages: ruleAnalysisResult.subjectAnalyses
+                        .filter(s => s.status === 'strong')
+                        .map(s => `${s.subjectName} 学习状态良好`)
+                        .slice(0, 3),
+                    keyRisks: ruleAnalysisResult.subjectAnalyses
+                        .filter(s => s.status === 'weak')
+                        .map(s => `${s.subjectName} 需要加强`)
+                        .slice(0, 3),
+                };
+                // 确保 keyAdvantages 和 keyRisks 非空
+                if (summary.keyAdvantages.length === 0) {
+                    summary.keyAdvantages = DEFAULT_SUMMARY_ADVANTAGES;
+                }
+                if (summary.keyRisks.length === 0) {
+                    summary.keyRisks = DEFAULT_SUMMARY_RISKS;
+                }
+                // 构建能力分析（使用默认模板）
+                const capabilityAnalyses = DEFAULT_CAPABILITY_ANALYSES.map(ca => ({
+                    ...ca,
+                    // 根据规则分析结果调整部分维度的评估
+                    level: ca.dimension === 'AcademicFoundation'
+                        ? (feasibilityScore >= 70 ? '强' : feasibilityScore >= 50 ? '中' : '弱')
+                        : ca.level,
+                }));
+                // 构建学校评估
+                const schoolAssessments = body.targetSchools.map((schoolName, index) => {
+                    // 根据学校顺序和整体可行性计算分数
+                    const baseScore = feasibilityScore;
+                    const positionPenalty = index * 5;
+                    const matchScore = Math.max(30, Math.min(100, baseScore - positionPenalty));
+                    return {
+                        schoolName,
+                        programme: body.targetGrade || '中四',
+                        matchScore,
+                        riskLevel: getRiskLevel(matchScore),
+                        recommendation: getRecommendationType(matchScore),
+                        requirements: DEFAULT_SCHOOL_ASSESSMENT_FIELDS.requirements,
+                        gaps: matchScore < 60
+                            ? ['部分科目需要加强', '需要适应新学校环境']
+                            : DEFAULT_SCHOOL_ASSESSMENT_FIELDS.gaps,
+                        notes: DEFAULT_SCHOOL_ASSESSMENT_FIELDS.notes,
+                    };
+                });
+                // 构建过渡计划（使用默认模板）
+                const transitionPlan = DEFAULT_TRANSITION_PLAN;
+                // 构建元数据
+                const meta = {
+                    version: 'v2',
+                    generatedAt: now,
+                };
+                // 组装完整 V2 结果
+                const transferAnalysisResultV2 = {
+                    analysisId,
+                    analysisType: 'transfer',
+                    aiEnabled: false,
+                    summary,
+                    capabilityAnalyses,
+                    schoolAssessments,
+                    transitionPlan,
+                    meta,
+                };
+                // ===== 写入数据库 =====
+                // 使用 analysis_records 表，analysis_type = 'transfer'
+                await env.DB.prepare(`INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+           VALUES (?, ?, 'transfer', ?, ?, ?)`).bind(analysisId, userId, JSON.stringify({
+                    targetSchools: body.targetSchools,
+                    targetGrade: body.targetGrade,
+                    subjectStatuses: body.subjectStatuses,
+                    languagePreference: body.languagePreference,
+                }), JSON.stringify(transferAnalysisResultV2), now).run();
+                // ===== 返回响应 =====
+                return jsonResponse({
+                    success: true,
+                    data: {
+                        analysis_id: analysisId,
+                        result: transferAnalysisResultV2,
                     },
                 }, 200, origin);
             }
@@ -2185,37 +3011,91 @@ export default {
                 if (!record) {
                     return errorResponse('记录不存在', 404, origin);
                 }
+                // 免责声明
+                const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。';
                 return jsonResponse({
                     result: {
                         id: record.id,
                         createdAt: record.created_at,
                         studentInfo: JSON.parse(record.student_info),
                         ...JSON.parse(record.result),
+                        disclaimer,
                     },
                 }, 200, origin);
             }
-            // 获取历史记录
+            /**
+             * 获取分析历史记录
+             * GET /api/analysis/history
+             *
+             * 【API 契约】
+             * 返回格式必须是: { code: number, data: { history: HistoryItem[] }, message: string }
+             * ⚠️ 禁止返回裸对象
+             */
             if (path === '/api/analysis/history' && request.method === 'GET') {
                 const authHeader = request.headers.get('Authorization');
                 if (!authHeader?.startsWith('Bearer ')) {
-                    return jsonResponse({ history: [] }, 200, origin);
+                    // 未登录返回空数组，但格式必须统一
+                    return jsonResponse({
+                        code: 0,
+                        data: { history: [] },
+                        message: 'ok'
+                    }, 200, origin);
                 }
                 const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
                 if (!tokenData) {
-                    return jsonResponse({ history: [] }, 200, origin);
+                    return jsonResponse({
+                        code: 0,
+                        data: { history: [] },
+                        message: 'ok'
+                    }, 200, origin);
                 }
-                const records = await env.DB.prepare('SELECT id, student_info, result, created_at FROM analysis_records WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(tokenData.userId).all();
+                const records = await env.DB.prepare('SELECT id, analysis_type, student_info, result, created_at FROM analysis_records WHERE user_id = ? ORDER BY created_at DESC LIMIT 50').bind(tokenData.userId).all();
                 const history = (records.results || []).map((r) => {
-                    const result = JSON.parse(r.result);
+                    let result = {};
+                    try {
+                        result = JSON.parse(r.result);
+                    }
+                    catch {
+                        // 解析失败使用空对象
+                    }
+                    let studentInfo = null;
+                    try {
+                        studentInfo = JSON.parse(r.student_info);
+                    }
+                    catch {
+                        // 解析失败使用 null
+                    }
+                    // 根据 analysis_type 提取不同字段
+                    const analysisType = r.analysis_type || 'transfer';
+                    let feasibilityScore = 0;
+                    let summary = '';
+                    if (analysisType === 'university') {
+                        // 大学分析的摘要来自 ai_report 或 student_profile
+                        const profile = result.student_profile;
+                        feasibilityScore = profile?.best5 || 0;
+                        summary = result.ai_report?.slice(0, 100) ||
+                            `Best 5: ${feasibilityScore} 分`;
+                    }
+                    else {
+                        // 插班分析
+                        const overallAssessment = result.overallAssessment;
+                        feasibilityScore = overallAssessment?.feasibilityScore || 0;
+                        summary = overallAssessment?.summary || '';
+                    }
                     return {
                         id: r.id,
                         createdAt: r.created_at,
-                        studentInfo: JSON.parse(r.student_info),
-                        feasibilityScore: result.overallAssessment?.feasibilityScore || 0,
-                        summary: result.overallAssessment?.summary || '',
+                        studentInfo,
+                        feasibilityScore,
+                        summary,
+                        analysisType, // 增加类型标识方便前端区分
                     };
                 });
-                return jsonResponse({ history }, 200, origin);
+                return jsonResponse({
+                    code: 0,
+                    data: { history },
+                    message: 'ok'
+                }, 200, origin);
             }
             // 删除历史记录
             if (path.startsWith('/api/analysis/history/') && request.method === 'DELETE') {
@@ -2239,6 +3119,233 @@ export default {
                 // 删除记录
                 await env.DB.prepare('DELETE FROM analysis_records WHERE id = ?').bind(recordId).run();
                 return jsonResponse({ message: '删除成功' }, 200, origin);
+            }
+            // =====================
+            // 用户反馈 API
+            // =====================
+            // 提交分析反馈
+            if (path === '/api/analysis/feedback' && request.method === 'POST') {
+                const body = await request.json();
+                // 验证必填字段
+                if (!body.analysisId) {
+                    return errorResponse('缺少分析ID', 400, origin);
+                }
+                if (!body.userOutcome || !['success', 'failure', 'not_tried', 'pending'].includes(body.userOutcome)) {
+                    return errorResponse('无效的结果类型', 400, origin);
+                }
+                // 验证分析记录是否存在
+                const analysisRecord = await env.DB.prepare('SELECT id FROM analysis_records WHERE id = ?').bind(body.analysisId).first();
+                if (!analysisRecord) {
+                    return errorResponse('分析记录不存在', 404, origin);
+                }
+                // 获取用户ID（如果已登录）
+                let userId = null;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const token = authHeader.substring(7);
+                    const tokenData = await verifyToken(token, env);
+                    if (tokenData) {
+                        userId = tokenData.userId;
+                    }
+                }
+                // 检查是否已有反馈
+                const existingFeedback = await env.DB.prepare('SELECT id FROM analysis_feedback WHERE analysis_id = ?').bind(body.analysisId).first();
+                const now = new Date().toISOString();
+                if (existingFeedback) {
+                    // 更新现有反馈
+                    await env.DB.prepare(`
+            UPDATE analysis_feedback SET
+              user_outcome = ?,
+              target_school = ?,
+              updated_scores = ?,
+              is_enrolled = ?,
+              enrolled_course = ?,
+              feedback_text = ?,
+              difficulty_rating = ?,
+              accuracy_rating = ?,
+              usefulness_rating = ?,
+              updated_at = ?
+            WHERE analysis_id = ?
+          `).bind(body.userOutcome, body.targetSchool || null, body.updatedScores ? JSON.stringify(body.updatedScores) : null, body.isEnrolled ? 1 : 0, body.enrolledCourse || null, body.feedbackText || null, body.difficultyRating || null, body.accuracyRating || null, body.usefulnessRating || null, now, body.analysisId).run();
+                    return jsonResponse({
+                        message: '反馈已更新',
+                        feedbackId: existingFeedback.id,
+                    }, 200, origin);
+                }
+                else {
+                    // 创建新反馈
+                    const feedbackId = crypto.randomUUID();
+                    await env.DB.prepare(`
+            INSERT INTO analysis_feedback (
+              id, analysis_id, user_id, user_outcome, target_school,
+              updated_scores, is_enrolled, enrolled_course, feedback_text,
+              difficulty_rating, accuracy_rating, usefulness_rating,
+              feedback_source, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(feedbackId, body.analysisId, userId, body.userOutcome, body.targetSchool || null, body.updatedScores ? JSON.stringify(body.updatedScores) : null, body.isEnrolled ? 1 : 0, body.enrolledCourse || null, body.feedbackText || null, body.difficultyRating || null, body.accuracyRating || null, body.usefulnessRating || null, 'web', now, now).run();
+                    return jsonResponse({
+                        message: '感谢您的反馈',
+                        feedbackId,
+                    }, 201, origin);
+                }
+            }
+            // 获取分析的反馈状态
+            if (path.startsWith('/api/analysis/feedback/') && request.method === 'GET') {
+                const analysisId = path.split('/').pop();
+                const feedback = await env.DB.prepare('SELECT * FROM analysis_feedback WHERE analysis_id = ?').bind(analysisId).first();
+                if (!feedback) {
+                    return jsonResponse({ hasFeedback: false }, 200, origin);
+                }
+                return jsonResponse({
+                    hasFeedback: true,
+                    feedback: {
+                        id: feedback.id,
+                        userOutcome: feedback.user_outcome,
+                        targetSchool: feedback.target_school,
+                        isEnrolled: feedback.is_enrolled === 1,
+                        accuracyRating: feedback.accuracy_rating,
+                        usefulnessRating: feedback.usefulness_rating,
+                        createdAt: feedback.created_at,
+                    },
+                }, 200, origin);
+            }
+            // =====================
+            // 咨询预约 API
+            // =====================
+            // 预约咨询
+            if (path === '/api/consultation/book' && request.method === 'POST') {
+                const body = await request.json();
+                // 验证必填字段
+                if (!body.contactName?.trim()) {
+                    return errorResponse('请填写联系人姓名', 400, origin);
+                }
+                if (!body.contactPhone?.trim()) {
+                    return errorResponse('请填写联系电话', 400, origin);
+                }
+                if (!body.consultationType?.trim()) {
+                    return errorResponse('请选择咨询类型', 400, origin);
+                }
+                // 验证电话格式（香港手机号）
+                const phoneRegex = /^[0-9]{8}$/;
+                if (!phoneRegex.test(body.contactPhone.replace(/\s/g, ''))) {
+                    return errorResponse('请输入有效的香港手机号码（8位数字）', 400, origin);
+                }
+                // 获取用户ID（如果已登录）
+                let userId = null;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const token = authHeader.substring(7);
+                    const tokenData = await verifyToken(token, env);
+                    if (tokenData) {
+                        userId = tokenData.userId;
+                    }
+                }
+                const bookingId = crypto.randomUUID();
+                const now = new Date().toISOString();
+                // 验证 analysisId 是否存在（如果提供）
+                if (body.analysisId) {
+                    const analysisRecord = await env.DB.prepare('SELECT id FROM analysis_records WHERE id = ?').bind(body.analysisId).first();
+                    if (!analysisRecord) {
+                        // 分析记录不存在，清空关联
+                        body.analysisId = undefined;
+                    }
+                }
+                // 创建预约记录
+                await env.DB.prepare(`
+          INSERT INTO consultation_bookings (
+            id, analysis_id, user_id,
+            contact_name, contact_phone, contact_email, contact_wechat,
+            preferred_time, preferred_time_slot, consultation_type,
+            source_level, source_action, student_grade, target_schools,
+            notes, status, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(bookingId, body.analysisId || null, userId, body.contactName.trim(), body.contactPhone.trim(), body.contactEmail?.trim() || null, body.contactWechat?.trim() || null, body.preferredTime || null, body.preferredTimeSlot || null, body.consultationType, body.sourceLevel || null, body.sourceAction || null, body.studentGrade || null, body.targetSchools ? JSON.stringify(body.targetSchools) : null, body.notes?.trim() || null, 'pending', now, now).run();
+                return jsonResponse({
+                    message: '预约成功，我们会尽快与您联系',
+                    bookingId,
+                    estimatedContactTime: '24小时内',
+                }, 201, origin);
+            }
+            // 获取推荐行动
+            if (path === '/api/consultation/actions' && request.method === 'GET') {
+                const level = new URL(request.url).searchParams.get('level');
+                // 推荐行动配置
+                const RECOMMENDED_ACTIONS = {
+                    'A': {
+                        title: '可行性较高 - 建议把握机会',
+                        actions: [
+                            { type: 'consultation', title: '插班冲刺咨询', description: '您的孩子具备较好条件，建议预约专业顾问制定冲刺计划', ctaText: '预约免费咨询' },
+                            { type: 'course', title: '插班强化课程', description: '针对目标学校的强化训练，提升面试和笔试竞争力', ctaText: '了解课程详情' },
+                        ]
+                    },
+                    'B': {
+                        title: '可行性中等 - 建议重点提升',
+                        actions: [
+                            { type: 'consultation', title: '插班规划咨询', description: '具备插班机会，建议咨询顾问制定提升策略', ctaText: '预约免费咨询' },
+                            { type: 'course', title: '核心科目提升班', description: '重点提升英文/数学，增强竞争优势', ctaText: '了解提升方案' },
+                        ]
+                    },
+                    'C': {
+                        title: '可行性一般 - 建议先提升再尝试',
+                        actions: [
+                            { type: 'consultation', title: '能力提升咨询', description: '建议先进行系统评估，制定3-6个月提升计划', ctaText: '预约免费咨询' },
+                            { type: 'course', title: '基础强化课程', description: '夯实基础，逐步提升各科成绩', ctaText: '了解课程详情' },
+                        ]
+                    },
+                    'D': {
+                        title: '可行性较低 - 建议调整目标',
+                        actions: [
+                            { type: 'consultation', title: '升学策略咨询', description: '建议重新评估目标，制定切实可行的升学方案', ctaText: '预约策略咨询' },
+                            { type: 'course', title: '基础重建方案', description: '从基础开始，系统性提升学习能力', ctaText: '了解重建方案' },
+                        ]
+                    },
+                    'E': {
+                        title: '可行性极低 - 建议从基础开始',
+                        actions: [
+                            { type: 'consultation', title: '学习规划咨询', description: '建议进行全面评估，制定长期学习计划', ctaText: '预约规划咨询' },
+                            { type: 'course', title: '基础能力培养班', description: '重建学习基础，培养良好学习习惯', ctaText: '了解培养方案' },
+                        ]
+                    }
+                };
+                if (level && RECOMMENDED_ACTIONS[level]) {
+                    return jsonResponse({
+                        level,
+                        recommendation: RECOMMENDED_ACTIONS[level],
+                    }, 200, origin);
+                }
+                // 返回所有推荐行动
+                return jsonResponse({
+                    recommendations: RECOMMENDED_ACTIONS,
+                }, 200, origin);
+            }
+            // 查询预约状态（用户查看自己的预约）
+            if (path === '/api/consultation/my-bookings' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const token = authHeader.substring(7);
+                const tokenData = await verifyToken(token, env);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                const bookings = await env.DB.prepare(`
+          SELECT id, analysis_id, consultation_type, preferred_time, status, created_at
+          FROM consultation_bookings
+          WHERE user_id = ?
+          ORDER BY created_at DESC
+          LIMIT 20
+        `).bind(tokenData.userId).all();
+                return jsonResponse({
+                    bookings: (bookings.results || []).map((b) => ({
+                        id: b.id,
+                        analysisId: b.analysis_id,
+                        consultationType: b.consultation_type,
+                        preferredTime: b.preferred_time,
+                        status: b.status,
+                        createdAt: b.created_at,
+                    })),
+                }, 200, origin);
             }
             // =====================
             // 插班可行性评估 API
@@ -2442,7 +3549,8 @@ export default {
                     ],
                     resources: ['历年插班试题（如有）', '各科精编练习册', '在线学习平台', '专业补习班或私人导师', '学校开放日和咨询活动'],
                 };
-                const DISCLAIMER = '⚠️ 免责声明：本系统基于公开教育资料与经验模型进行分析，仅作为升学参考，不构成任何录取保证。实际录取结果受多种因素影响，包括但不限于学校当年招生名额、面试表现、其他申请者情况等。建议结合学校官方信息和专业教育顾问意见做出决策。';
+                // 免责声明（统一使用简短版本）
+                const DISCLAIMER = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。';
                 // 获取用户ID
                 let userId = null;
                 const authHeader = request.headers.get('Authorization');
@@ -2649,7 +3757,7 @@ export default {
             if (path === '/api/schools/by-district' && request.method === 'GET') {
                 const url = new URL(request.url);
                 const district = url.searchParams.get('district');
-                // 使用从 chsc.hk 爬取的完整学校数据（978所学校）
+                // 使用从 schoolsData.ts 导入的学校数据（441所学校）
                 if (district && SCHOOLS_BY_DISTRICT[district]) {
                     return jsonResponse({
                         success: true,
@@ -2669,7 +3777,21 @@ export default {
             // 提交大学申请分析
             if (path === '/api/analysis/university' && request.method === 'POST') {
                 const body = await request.json();
-                // 计算最佳5科/6科分数
+                const grades = body.grades ?? body.dseResults.map((result) => ({
+                    subject: result.subject,
+                    value: result.grade,
+                }));
+                validateSubjectGrades(grades);
+                /**
+                 * 计算最佳5科/6科分数
+                 *
+                 * @deprecated 此处使用固定换算 (5**=7)，不支持课程特定加权。
+                 *
+                 * TODO: 禁止在大学分析 (JUPAS) 中依赖此值进行匹配度判断。
+                 * 应改用 RAG Worker 返回的 weighted_score（基于课程计分规则）。
+                 * 此处计算的 bestFive/bestSix 仅作为参考值传递。
+                 */
+                // @deprecated - 固定换算，不同课程有不同规则（如城大2025: 5**=8.5）
                 const gradeToScore = {
                     '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
                 };
@@ -2690,6 +3812,8 @@ export default {
                 // 保存到数据库
                 await env.DB.prepare(`INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
            VALUES (?, ?, 'university', ?, ?, ?)`).bind(recordId, userId, JSON.stringify({ ...body, bestFive, bestSix }), JSON.stringify(universityAnalysisResult), now).run();
+                // 免责声明
+                const disclaimer = '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。';
                 return jsonResponse({
                     message: '大学申请分析完成',
                     result: {
@@ -2698,6 +3822,7 @@ export default {
                         bestFive,
                         bestSix,
                         ...universityAnalysisResult,
+                        disclaimer,
                     },
                 }, 200, origin);
             }
@@ -2719,6 +3844,216 @@ export default {
                 query += ' ORDER BY min_score_2024 DESC';
                 const programs = await env.DB.prepare(query).bind(...params).all();
                 return jsonResponse({ programs: programs.results || [] }, 200, origin);
+            }
+            // =====================
+            // JUPAS AI 分析 API（大学申请分析 - 前端实际调用的接口）
+            // ⚠️ 必须登录才能调用，分析结果必须保存到 analysis_records
+            // =====================
+            /**
+             * JUPAS AI 综合分析
+             * POST /api/jupas/analyze/ai
+             *
+             * 【强制规则】
+             * 1. 必须登录（requireAuth）
+             * 2. 分析完成后必须写入 analysis_records
+             * 3. analysis_type = 'university'
+             */
+            if (path === '/api/jupas/analyze/ai' && request.method === 'POST') {
+                // 强制要求登录
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录后再进行分析', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期，请重新登录', 401, origin);
+                }
+                const userId = tokenData.userId;
+                try {
+                    const body = await request.json();
+                    // 计算 Best 5/6 分数
+                    const gradeToScore = {
+                        '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
+                    };
+                    const scores = Object.values(body.grades)
+                        .map(g => gradeToScore[g] || 0)
+                        .sort((a, b) => b - a);
+                    const best5 = scores.slice(0, 5).reduce((a, b) => a + b, 0);
+                    const best6 = scores.slice(0, 6).reduce((a, b) => a + b, 0);
+                    // 构建学生档案
+                    const studentProfile = {
+                        best5,
+                        best6,
+                        interests: body.interests || [],
+                        strengths: body.strengths || [],
+                    };
+                    // 模拟匹配课程（实际应查询数据库）
+                    const matchedProgrammes = [];
+                    // 查询匹配的课程（简化版本）
+                    const targetUniversities = body.target_universities || [];
+                    const limit = body.limit || 15;
+                    // 根据 best5 分数生成推荐
+                    const scoreLevel = best5 >= 28 ? 'high' : best5 >= 22 ? 'medium' : 'low';
+                    // 生成 AI 报告
+                    let aiReport = '';
+                    if (env.DEEPSEEK_API_KEY) {
+                        try {
+                            // 严格 system prompt：禁止继续对话/询问用户
+                            const systemPrompt = `你是一位香港升学顾问，专门帮助学生分析 JUPAS 大学申请。请用中文回复。
+
+【重要】你正在生成【正式分析报告】。
+严格规则：
+1. 输出必须是完整、封闭的分析报告
+2. 不允许向用户提问
+3. 不允许出现"是否需要我…"、"请告诉我"、"我可以为你…"等引导继续对话的句式
+4. 不允许列出可选服务、下一步选项
+5. 报告必须在总结后自然结束
+6. 结尾不得包含任何疑问句或邀请性语句
+7. 禁止说"如果你需要"、"请随时告知"、"需要我为你"等`;
+                            const aiResponse = await fetch('https://api.deepseek.com/chat/completions', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${env.DEEPSEEK_API_KEY}`,
+                                },
+                                body: JSON.stringify({
+                                    model: 'deepseek-chat',
+                                    messages: [
+                                        {
+                                            role: 'system',
+                                            content: systemPrompt
+                                        },
+                                        {
+                                            role: 'user',
+                                            content: `学生 DSE 成绩 Best 5: ${best5} 分，Best 6: ${best6} 分。
+兴趣：${(body.interests || []).join('、') || '未填写'}
+特长：${(body.strengths || []).join('、') || '未填写'}
+目标大学：${(body.target_universities || []).join('、') || '未指定'}
+职业方向：${body.career_aspirations || '未填写'}
+
+请提供简短的升学建议（100-200字），包括：
+1. 成绩定位分析
+2. 选校建议
+3. 需要注意的事项`
+                                        }
+                                    ],
+                                    max_tokens: 500,
+                                    temperature: 0.3, // 降低温度
+                                    top_p: 0.8, // 限制采样范围
+                                })
+                            });
+                            if (aiResponse.ok) {
+                                const aiData = await aiResponse.json();
+                                let rawReport = aiData.choices?.[0]?.message?.content || '';
+                                // 后处理：裁剪禁止的引导性语句
+                                const forbiddenPatterns = [
+                                    /需要我为你/i, /是否需要我/i, /请随时告知/i, /我可以为你/i,
+                                    /如果你需要/i, /如果您需要/i, /请告诉我/i, /有任何问题/i,
+                                    /还有什么.*帮助/i, /希望.*帮助到你/i,
+                                ];
+                                for (const pattern of forbiddenPatterns) {
+                                    const match = rawReport.match(pattern);
+                                    if (match && match.index !== undefined) {
+                                        const beforeMatch = rawReport.slice(0, match.index);
+                                        const lastSentenceEnd = Math.max(beforeMatch.lastIndexOf('。'), beforeMatch.lastIndexOf('\n'), beforeMatch.lastIndexOf('！'), beforeMatch.lastIndexOf('？'));
+                                        rawReport = rawReport.slice(0, lastSentenceEnd > 0 ? lastSentenceEnd + 1 : match.index).trim();
+                                        console.log('[JUPAS AI] Trimmed forbidden continuation prompt');
+                                        break;
+                                    }
+                                }
+                                aiReport = rawReport;
+                            }
+                        }
+                        catch (e) {
+                            console.error('[JUPAS AI] DeepSeek API error:', e);
+                        }
+                    }
+                    // 如果没有 AI 报告，生成默认报告
+                    if (!aiReport) {
+                        aiReport = `根据您的 DSE 成绩（Best 5: ${best5} 分），您在 JUPAS 申请中具有${scoreLevel === 'high' ? '较强' : scoreLevel === 'medium' ? '一定' : '有限'}的竞争力。建议合理选择目标专业，同时准备备选方案。`;
+                    }
+                    const now = new Date().toISOString();
+                    const recordId = crypto.randomUUID();
+                    // 构建分析结果
+                    const analysisResult = {
+                        student_profile: studentProfile,
+                        matched_programmes: matchedProgrammes,
+                        ai_report: aiReport,
+                        generated_at: now,
+                        disclaimer: '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。',
+                    };
+                    // 【强制】保存到 analysis_records 表
+                    await env.DB.prepare(`INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+             VALUES (?, ?, 'university', ?, ?, ?)`).bind(recordId, userId, JSON.stringify(body), JSON.stringify(analysisResult), now).run();
+                    console.log(`[JUPAS AI] 分析记录已保存 - userId: ${userId}, recordId: ${recordId}`);
+                    return jsonResponse({
+                        success: true,
+                        data: analysisResult,
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('[JUPAS AI] Error:', error);
+                    return errorResponse('分析失败，请稍后重试', 500, origin);
+                }
+            }
+            // JUPAS 综合分析（与 AI 分析类似，但不调用 AI）
+            if (path === '/api/jupas/analyze/comprehensive' && request.method === 'POST') {
+                // 强制要求登录
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录后再进行分析', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期，请重新登录', 401, origin);
+                }
+                const userId = tokenData.userId;
+                try {
+                    const body = await request.json();
+                    // 计算分数
+                    const gradeToScore = {
+                        '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
+                    };
+                    const scores = Object.values(body.grades)
+                        .map(g => gradeToScore[g] || 0)
+                        .sort((a, b) => b - a);
+                    const best5 = scores.slice(0, 5).reduce((a, b) => a + b, 0);
+                    const best6 = scores.slice(0, 6).reduce((a, b) => a + b, 0);
+                    const now = new Date().toISOString();
+                    const recordId = crypto.randomUUID();
+                    const analysisResult = {
+                        student_profile: {
+                            best5,
+                            best6,
+                            interests: body.interests || [],
+                            strengths: body.strengths || [],
+                            target_universities: body.target_universities || [],
+                        },
+                        summary: {
+                            total_analysed: 0,
+                            best_match_fields: [],
+                            score_position: best5 >= 28 ? '高分段' : best5 >= 22 ? '中分段' : '基础段',
+                        },
+                        recommendations: {
+                            safe: [],
+                            match: [],
+                            reach: [],
+                        },
+                        all_results: [],
+                        disclaimer: '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。',
+                    };
+                    // 保存到数据库
+                    await env.DB.prepare(`INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+             VALUES (?, ?, 'university', ?, ?, ?)`).bind(recordId, userId, JSON.stringify(body), JSON.stringify(analysisResult), now).run();
+                    return jsonResponse({
+                        success: true,
+                        data: analysisResult,
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('[JUPAS Comprehensive] Error:', error);
+                    return errorResponse('分析失败，请稍后重试', 500, origin);
+                }
             }
             // =====================
             // 就业趋势 API
@@ -2888,6 +4223,138 @@ export default {
                     console.error('搜索用户失败:', error);
                     return jsonResponse({ success: false, error: '搜索用户失败' }, 500, origin);
                 }
+            }
+            // =====================
+            // 好友系统 API（占位实现）
+            // ⚠️ 目标：页面不报错，可正常渲染
+            // ⚠️ 返回格式统一为 { code, data, message }
+            // =====================
+            /**
+             * 获取好友列表
+             * GET /api/friends?user_id=xxx
+             */
+            if (path === '/api/friends' && request.method === 'GET') {
+                const url = new URL(request.url);
+                const userId = url.searchParams.get('user_id');
+                if (!userId) {
+                    return jsonResponse({
+                        code: -1,
+                        data: [],
+                        message: '缺少 user_id 参数'
+                    }, 400, origin);
+                }
+                // TODO: 实现实际的好友列表查询
+                // 当前返回空数组，页面可正常渲染
+                return jsonResponse({
+                    code: 0,
+                    success: true,
+                    data: [],
+                    message: 'ok'
+                }, 200, origin);
+            }
+            /**
+             * 获取好友请求列表
+             * GET /api/friends/requests?user_id=xxx
+             */
+            if (path === '/api/friends/requests' && request.method === 'GET') {
+                const url = new URL(request.url);
+                const userId = url.searchParams.get('user_id');
+                if (!userId) {
+                    return jsonResponse({
+                        code: -1,
+                        data: { received: [], sent: [] },
+                        message: '缺少 user_id 参数'
+                    }, 400, origin);
+                }
+                // TODO: 实现实际的好友请求查询
+                return jsonResponse({
+                    code: 0,
+                    success: true,
+                    data: { received: [], sent: [] },
+                    message: 'ok'
+                }, 200, origin);
+            }
+            /**
+             * 发送好友请求
+             * POST /api/friends/request
+             */
+            if (path === '/api/friends/request' && request.method === 'POST') {
+                try {
+                    const body = await request.json();
+                    if (!body.requester_id || !body.receiver_id) {
+                        return jsonResponse({
+                            code: -1,
+                            success: false,
+                            message: '缺少必要参数'
+                        }, 400, origin);
+                    }
+                    // TODO: 实现实际的好友请求发送逻辑
+                    // 当前返回成功，但不实际创建数据
+                    return jsonResponse({
+                        code: 0,
+                        success: true,
+                        data: { id: crypto.randomUUID() },
+                        message: '好友请求已发送（功能开发中）'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    return jsonResponse({
+                        code: -1,
+                        success: false,
+                        message: '请求格式错误'
+                    }, 400, origin);
+                }
+            }
+            /**
+             * 响应好友请求
+             * PATCH /api/friends/respond
+             */
+            if (path === '/api/friends/respond' && request.method === 'PATCH') {
+                try {
+                    const body = await request.json();
+                    if (!body.receiver_id || !body.requester_id || !body.status) {
+                        return jsonResponse({
+                            code: -1,
+                            success: false,
+                            message: '缺少必要参数'
+                        }, 400, origin);
+                    }
+                    // TODO: 实现实际的好友请求响应逻辑
+                    return jsonResponse({
+                        code: 0,
+                        success: true,
+                        message: body.status === 'accepted' ? '已接受好友请求（功能开发中）' : '已拒绝好友请求（功能开发中）'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    return jsonResponse({
+                        code: -1,
+                        success: false,
+                        message: '请求格式错误'
+                    }, 400, origin);
+                }
+            }
+            /**
+             * 删除好友
+             * DELETE /api/friends/:id?user_id=xxx
+             */
+            if (path.startsWith('/api/friends/') && request.method === 'DELETE') {
+                const friendId = path.replace('/api/friends/', '');
+                const url = new URL(request.url);
+                const userId = url.searchParams.get('user_id');
+                if (!friendId || !userId) {
+                    return jsonResponse({
+                        code: -1,
+                        success: false,
+                        message: '缺少必要参数'
+                    }, 400, origin);
+                }
+                // TODO: 实现实际的删除好友逻辑
+                return jsonResponse({
+                    code: 0,
+                    success: true,
+                    message: '已删除好友（功能开发中）'
+                }, 200, origin);
             }
             // =====================
             // 管理员 - 用户管理 API
@@ -3400,6 +4867,79 @@ export default {
             `).bind(body.sessionId, tokenData.userId, JSON.stringify(body.config), JSON.stringify(body.questions), now, now, body.score, body.accuracy / 100, body.timeSpent, now).run();
                     }
                     console.log(`Quiz session saved: ${body.sessionId}, operation: ${operation}, user: ${tokenData.userId}`);
+                    // ========================================
+                    // 【关键】写入两个统一事实表
+                    // ========================================
+                    // 1️⃣ 计算实际数据（不依赖前端传的 score/accuracy）
+                    const actualQuestionCount = body.questions.length;
+                    const correctCount = body.questions.filter(q => q.isCorrect === true).length;
+                    const actualAccuracy = actualQuestionCount > 0 ? correctCount / actualQuestionCount : 0;
+                    console.log(`Quiz stats: questions=${actualQuestionCount}, correct=${correctCount}, accuracy=${actualAccuracy.toFixed(2)}`);
+                    // 2️⃣ 写入 learning_events 事实表（排行榜、积分数据来源）
+                    let learningEventResult = { success: false };
+                    try {
+                        learningEventResult = await recordLearningEvent(env.DB, {
+                            userId: tokenData.userId,
+                            eventType: 'QUIZ',
+                            subject: body.config.subject,
+                            questionCount: actualQuestionCount, // 用实际题目数
+                            correctCount,
+                            durationSeconds: body.timeSpent || 0,
+                            accuracy: actualAccuracy, // 用计算的正确率
+                            sourceId: body.sessionId,
+                            metadata: {
+                                grade: body.config.grade,
+                                difficulty: body.config.difficulty,
+                                operation,
+                                frontendAccuracy: body.accuracy, // 保留前端传的，用于对比
+                            },
+                        });
+                        console.log(`Learning event recorded: success=${learningEventResult.success}, eventId=${learningEventResult.eventId}`);
+                    }
+                    catch (leError) {
+                        console.error('Failed to record learning event:', leError);
+                    }
+                    // 3️⃣ 写入 question_attempts 事实表（错题本、学习档案数据来源）
+                    // 规则：一道题一次作答 = 一条记录，永远 INSERT
+                    const questionAttempts = body.questions.map((q, index) => ({
+                        userId: tokenData.userId,
+                        questionId: q.id || `${body.sessionId}_q${index}`,
+                        questionText: q.question || '',
+                        questionType: q.questionType || q.type || 'multiple_choice',
+                        subject: body.config.subject,
+                        topic: q.topicTags?.[0] || q.topic || null,
+                        selectedAnswer: String(q.userAnswer ?? q.selectedAnswer ?? ''),
+                        correctAnswer: String(q.correctAnswer ?? ''),
+                        isCorrect: q.isCorrect === true, // 确保是 boolean
+                        explanation: q.explanation || '',
+                        durationSeconds: q.timeSpent || 0,
+                        sourceType: 'QUIZ',
+                        sourceId: body.sessionId,
+                    }));
+                    let attemptResult = { success: false, count: 0, errors: [] };
+                    try {
+                        attemptResult = await recordQuestionAttemptsBatch(env.DB, questionAttempts);
+                        console.log(`Question attempts recorded: ${attemptResult.count}/${actualQuestionCount}, errors=${attemptResult.errors.length}`);
+                    }
+                    catch (qaError) {
+                        console.error('Failed to record question attempts:', qaError);
+                    }
+                    // 【关键】基于 learning_events 检查并发放积分
+                    // 积分触发条件：题目数 >= 5，正确率 >= 50%
+                    // 禁止前端直接请求加分
+                    let pointsAwarded = [];
+                    if (learningEventResult.success && learningEventResult.eventId) {
+                        const pointsResult = await checkAndAwardPointsFromLearningEvent(env.DB, tokenData.userId, 'QUIZ', learningEventResult.eventId, {
+                            questionCount: body.config.questionCount,
+                            correctCount,
+                            accuracy: body.accuracy / 100,
+                            durationSeconds: body.timeSpent,
+                        });
+                        pointsAwarded = pointsResult.awarded;
+                        if (pointsAwarded.length > 0) {
+                            console.log(`Points awarded for quiz: ${JSON.stringify(pointsAwarded)}`);
+                        }
+                    }
                     // 同时更新排行榜统计
                     const existingStats = await env.DB.prepare('SELECT * FROM user_ranking_stats WHERE user_id = ?').bind(tokenData.userId).first();
                     if (existingStats) {
@@ -3428,7 +4968,12 @@ export default {
                     return jsonResponse({
                         success: true,
                         message: '刷题记录已保存',
-                        sessionId: body.sessionId
+                        sessionId: body.sessionId,
+                        // 返回积分奖励信息（基于 learning_events 触发）
+                        pointsAwarded: pointsAwarded.length > 0 ? {
+                            tasks: pointsAwarded,
+                            totalPoints: pointsAwarded.reduce((sum, a) => sum + a.points, 0),
+                        } : null,
                     }, 200, origin);
                 }
                 catch (dbError) {
@@ -3437,100 +4982,138 @@ export default {
                 }
             }
             // 获取刷题历史记录
+            // 【数据主干对齐】数据来源：learning_events + question_attempts
+            // ⚠️ 禁止从 quiz_sessions 读取
             if (path === '/api/quiz/history' && request.method === 'GET') {
                 const authHeader = request.headers.get('Authorization');
                 if (!authHeader?.startsWith('Bearer ')) {
-                    return jsonResponse({ history: [], debug: 'no auth header' }, 200, origin);
+                    return jsonResponse({
+                        stats: { totalSessions: 0, totalQuestions: 0, averageAccuracy: 0, totalTime: 0 },
+                        history: []
+                    }, 200, origin);
                 }
                 const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
                 if (!tokenData) {
-                    return jsonResponse({ history: [], debug: 'invalid token' }, 200, origin);
+                    return jsonResponse({
+                        stats: { totalSessions: 0, totalQuestions: 0, averageAccuracy: 0, totalTime: 0 },
+                        history: []
+                    }, 200, origin);
                 }
                 try {
-                    const query = `
+                    // 1️⃣ 从 learning_events 获取刷题历史
+                    const historyQuery = `
             SELECT 
-              id,
-              config,
-              questions,
-              status,
-              score,
-              accuracy,
-              total_time as timeSpent,
-              created_at as completedAt
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed'
-            ORDER BY created_at DESC
+              le.id,
+              le.subject,
+              le.question_count as totalQuestions,
+              le.correct_count as score,
+              ROUND(le.accuracy * 100, 1) as accuracy,
+              le.duration_seconds as timeSpent,
+              le.created_at as completedAt,
+              le.source_id,
+              le.metadata
+            FROM learning_events le
+            WHERE le.user_id = ? AND le.event_type = 'QUIZ'
+            ORDER BY le.created_at DESC
             LIMIT 50
           `;
-                    const results = await env.DB.prepare(query).bind(tokenData.userId).all();
-                    const history = (results.results || []).map((row) => {
-                        let config = { subject: 'math', grade: 'f5', difficulty: 'standard', questionCount: 10 };
-                        let questionsArray = [];
+                    const historyResults = await env.DB.prepare(historyQuery).bind(tokenData.userId).all();
+                    // 2️⃣ 统计数据由后端计算（不依赖前端）
+                    const statsQuery = `
+            SELECT 
+              COUNT(*) as totalSessions,
+              COALESCE(SUM(question_count), 0) as totalQuestions,
+              COALESCE(SUM(correct_count), 0) as totalCorrect,
+              COALESCE(SUM(duration_seconds), 0) as totalTime
+            FROM learning_events
+            WHERE user_id = ? AND event_type = 'QUIZ'
+          `;
+                    const statsResult = await env.DB.prepare(statsQuery).bind(tokenData.userId).first();
+                    const totalSessions = statsResult?.totalSessions || 0;
+                    const totalQuestions = statsResult?.totalQuestions || 0;
+                    const totalCorrect = statsResult?.totalCorrect || 0;
+                    const totalTime = statsResult?.totalTime || 0;
+                    const averageAccuracy = totalQuestions > 0
+                        ? Math.round((totalCorrect / totalQuestions) * 1000) / 10
+                        : 0;
+                    // 3️⃣ 映射历史数据
+                    const history = (historyResults.results || []).map((row) => {
+                        let metadata = {};
                         try {
-                            config = JSON.parse(row.config || '{}');
+                            metadata = JSON.parse(row.metadata || '{}');
                         }
                         catch { }
-                        try {
-                            questionsArray = JSON.parse(row.questions || '[]');
-                        }
-                        catch { }
-                        // totalQuestions 优先从题目数组长度获取，其次从config获取
-                        const totalQuestions = questionsArray.length || config.questionCount || 10;
                         return {
                             id: row.id,
-                            subject: config.subject || 'math',
-                            grade: config.grade || 'f5',
-                            difficulty: config.difficulty || 'standard',
+                            subject: row.subject || 'math',
+                            grade: metadata.grade || 'f5',
+                            difficulty: metadata.difficulty || 'standard',
                             score: row.score || 0,
-                            totalQuestions,
-                            accuracy: Math.round((row.accuracy || 0) * 100),
+                            totalQuestions: row.totalQuestions || 0,
+                            accuracy: row.accuracy || 0,
                             timeSpent: row.timeSpent || 0,
                             completedAt: row.completedAt,
-                            questions: questionsArray // 添加题目数组
                         };
                     });
-                    return jsonResponse({ history, count: history.length }, 200, origin);
+                    return jsonResponse({
+                        stats: {
+                            totalSessions,
+                            totalQuestions,
+                            averageAccuracy,
+                            totalTime,
+                        },
+                        history,
+                        count: history.length
+                    }, 200, origin);
                 }
                 catch (dbError) {
                     console.error('Load quiz history error:', dbError);
-                    return jsonResponse({ history: [], error: String(dbError) }, 200, origin);
+                    return jsonResponse({
+                        stats: { totalSessions: 0, totalQuestions: 0, averageAccuracy: 0, totalTime: 0 },
+                        history: [],
+                        error: String(dbError)
+                    }, 200, origin);
                 }
             }
             // 获取错题列表
+            // 【关键】前端只"拿数据"，不"算数据"
+            // 数据来源：question_attempts + wrong_question_status
             if (path === '/api/quiz/wrong-questions' && request.method === 'GET') {
                 const authHeader = request.headers.get('Authorization');
                 if (!authHeader?.startsWith('Bearer ')) {
-                    return jsonResponse({ questions: [] }, 200, origin);
+                    return jsonResponse({
+                        stats: { total: 0, unreviewed: 0, reviewed: 0, mastered: 0 },
+                        items: []
+                    }, 200, origin);
                 }
                 const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
                 if (!tokenData) {
-                    return jsonResponse({ questions: [] }, 200, origin);
+                    return jsonResponse({
+                        stats: { total: 0, unreviewed: 0, reviewed: 0, mastered: 0 },
+                        items: []
+                    }, 200, origin);
                 }
                 try {
-                    const records = await env.DB.prepare(`SELECT 
-              id,
-              question_id as questionId,
-              question_text as questionText,
-              question_type as questionType,
-              subject,
-              topic,
-              user_answer as userAnswer,
-              correct_answer as correctAnswer,
-              explanation,
-              wrong_count as wrongCount,
-              status,
-              first_attempt_date as firstAttemptDate,
-              last_attempt_date as lastAttemptDate,
-              created_at as createdAt
-            FROM wrong_questions 
-            WHERE user_id = ? 
-            ORDER BY created_at DESC 
-            LIMIT 100`).bind(tokenData.userId).all();
-                    return jsonResponse({ questions: records.results || [] }, 200, origin);
+                    const url = new URL(request.url);
+                    const subject = url.searchParams.get('subject') || undefined;
+                    const topic = url.searchParams.get('topic') || undefined;
+                    const status = url.searchParams.get('status');
+                    // 从 question_attempts + wrong_question_status 聚合数据
+                    // 返回结构完全对齐前端
+                    const result = await getWrongQuestionsByUser(env.DB, tokenData.userId, {
+                        subject,
+                        topic,
+                        status,
+                        limit: 100,
+                    });
+                    return jsonResponse(result, 200, origin);
                 }
                 catch (error) {
                     console.error('获取错题列表失败:', error);
-                    return jsonResponse({ questions: [] }, 200, origin);
+                    return jsonResponse({
+                        stats: { total: 0, unreviewed: 0, reviewed: 0, mastered: 0 },
+                        items: []
+                    }, 200, origin);
                 }
             }
             // 添加错题
@@ -3565,6 +5148,7 @@ export default {
                 return jsonResponse({ message: '错题已添加', id }, 200, origin);
             }
             // 更新错题状态
+            // 【关键】更新 wrong_question_status 表，不更新 question_attempts
             if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+\/status$/) && request.method === 'PATCH') {
                 const authHeader = request.headers.get('Authorization');
                 if (!authHeader?.startsWith('Bearer ')) {
@@ -3577,11 +5161,22 @@ export default {
                 const pathParts = path.split('/');
                 const questionId = pathParts[pathParts.length - 2];
                 const body = await request.json();
-                await env.DB.prepare('UPDATE wrong_questions SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?').bind(body.status, new Date().toISOString(), questionId, tokenData.userId).run();
-                return jsonResponse({ message: '状态已更新' }, 200, origin);
+                // 验证状态值
+                if (!['UNREVIEWED', 'REVIEWED', 'MASTERED'].includes(body.status)) {
+                    return errorResponse('无效的状态值', 400, origin);
+                }
+                const result = await updateWrongQuestionStatus(env.DB, tokenData.userId, questionId, body.status);
+                if (result.success) {
+                    return jsonResponse({ message: '状态已更新', status: body.status }, 200, origin);
+                }
+                else {
+                    return errorResponse(result.error || '更新失败', 500, origin);
+                }
             }
-            // 删除错题
-            if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+$/) && request.method === 'DELETE') {
+            // 删除错题（标记为 MASTERED，从待复习列表移除）
+            // DELETE /api/quiz/wrong-questions/:questionId
+            // 【关键】历史事实不可删除，只更新 wrong_question_status 为 MASTERED
+            if (path.match(/^\/api\/quiz\/wrong-questions\/[^/]+$/) && !path.endsWith('/status') && request.method === 'DELETE') {
                 const authHeader = request.headers.get('Authorization');
                 if (!authHeader?.startsWith('Bearer ')) {
                     return errorResponse('请先登录', 401, origin);
@@ -3591,10 +5186,22 @@ export default {
                     return errorResponse('登录已过期', 401, origin);
                 }
                 const questionId = path.split('/').pop();
-                await env.DB.prepare('DELETE FROM wrong_questions WHERE id = ? AND user_id = ?').bind(questionId, tokenData.userId).run();
-                return jsonResponse({ message: '删除成功' }, 200, origin);
+                if (!questionId) {
+                    return errorResponse('缺少题目 ID', 400, origin);
+                }
+                // 将状态标记为 MASTERED（已掌握），从待复习列表移除
+                // 不删除 question_attempts 中的历史作答记录
+                const result = await updateWrongQuestionStatus(env.DB, tokenData.userId, questionId, 'MASTERED');
+                return jsonResponse({
+                    message: '错题已标记为已掌握',
+                    success: result.success,
+                    status: 'MASTERED',
+                    note: '历史作答记录已保留'
+                }, 200, origin);
             }
             // 获取学习档案
+            // 【关键】前端只渲染，不做任何计算
+            // 数据来源：overview/recentActivity → learning_events，subjectMastery/topicMastery → question_attempts
             if (path === '/api/quiz/learning-profile' && request.method === 'GET') {
                 const authHeader = request.headers.get('Authorization');
                 if (!authHeader?.startsWith('Bearer ')) {
@@ -3604,299 +5211,26 @@ export default {
                 if (!tokenData) {
                     return errorResponse('登录已过期', 401, origin);
                 }
-                const userId = tokenData.userId;
-                const today = new Date().toISOString().split('T')[0];
                 try {
-                    // 1. 获取所有完成的刷题记录
-                    const allSessions = await env.DB.prepare(`
-            SELECT 
-              config,
-              questions,
-              score,
-              accuracy,
-              total_time
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed'
-          `).bind(userId).all();
-                    // 计算总体统计
-                    let totalQuizzes = 0;
-                    let totalQuestions = 0;
-                    let correctAnswers = 0;
-                    let totalTimeSpent = 0;
-                    for (const row of (allSessions.results || [])) {
-                        totalQuizzes++;
-                        // 从 questions JSON 获取题目数量
-                        let questionsCount = 0;
-                        try {
-                            const questionsArr = JSON.parse(row.questions || '[]');
-                            questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0;
-                        }
-                        catch {
-                            // 尝试从 config 获取
-                            try {
-                                const config = JSON.parse(row.config || '{}');
-                                questionsCount = config.questionCount || 5;
-                            }
-                            catch { }
-                        }
-                        totalQuestions += questionsCount;
-                        correctAnswers += Number(row.score) || 0;
-                        totalTimeSpent += Number(row.total_time) || 0;
-                    }
-                    const overallStats = {
-                        totalQuizzes,
-                        totalQuestions,
-                        correctAnswers,
-                        totalTimeSpent,
-                    };
-                    // 2. 获取连续学习天数
-                    const studyDays = await env.DB.prepare(`
-            SELECT DISTINCT DATE(created_at) as study_date
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed'
-            ORDER BY study_date DESC
-          `).bind(userId).all();
-                    // 计算连续天数
-                    let currentStreak = 0;
-                    let longestStreak = 0;
-                    let tempStreak = 0;
-                    let lastDate = null;
-                    let lastStudyDate = today;
-                    if (studyDays.results && studyDays.results.length > 0) {
-                        lastStudyDate = studyDays.results[0].study_date;
-                        for (const row of studyDays.results) {
-                            const dateStr = row.study_date;
-                            const currentDate = new Date(dateStr);
-                            if (lastDate === null) {
-                                tempStreak = 1;
-                                // 检查是否是今天或昨天
-                                const todayDate = new Date(today);
-                                const diffDays = Math.floor((todayDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-                                if (diffDays <= 1) {
-                                    currentStreak = 1;
-                                }
-                            }
-                            else {
-                                const diffDays = Math.floor((lastDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-                                if (diffDays === 1) {
-                                    tempStreak++;
-                                    if (currentStreak > 0) {
-                                        currentStreak = tempStreak;
-                                    }
-                                }
-                                else {
-                                    tempStreak = 1;
-                                }
-                            }
-                            longestStreak = Math.max(longestStreak, tempStreak);
-                            lastDate = currentDate;
-                        }
-                    }
-                    // 3. 获取各科目统计（从已获取的数据计算）
-                    const subjectNameMap = {
-                        math: '数学',
-                        physics: '物理',
-                        chemistry: '化学',
-                        biology: '生物',
-                        english: '英国语文',
-                        chinese: '中国语文',
-                        liberal: '公民与社会发展',
-                        economics: '经济',
-                        bafs: '企业、会计与财务概论',
-                        geography: '地理',
-                        history: '历史',
-                        ict: '资讯及通讯科技',
-                    };
-                    // 按科目聚合统计
-                    const subjectStatsMap = {};
-                    for (const row of (allSessions.results || [])) {
-                        let subjectId = 'math';
-                        let questionsCount = 0;
-                        try {
-                            const config = JSON.parse(row.config || '{}');
-                            subjectId = config.subject || 'math';
-                        }
-                        catch { }
-                        try {
-                            const questionsArr = JSON.parse(row.questions || '[]');
-                            questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0;
-                        }
-                        catch { }
-                        if (!subjectStatsMap[subjectId]) {
-                            subjectStatsMap[subjectId] = {
-                                totalQuestions: 0,
-                                correctAnswers: 0,
-                                lastPracticed: today,
-                            };
-                        }
-                        subjectStatsMap[subjectId].totalQuestions += questionsCount;
-                        subjectStatsMap[subjectId].correctAnswers += Number(row.score) || 0;
-                    }
-                    const subjectMastery = Object.entries(subjectStatsMap).map(([subjectId, stats]) => {
-                        const accuracy = stats.totalQuestions > 0
-                            ? (stats.correctAnswers / stats.totalQuestions) * 100
-                            : 0;
-                        return {
-                            subjectId,
-                            subjectName: subjectNameMap[subjectId] || subjectId,
-                            totalQuestions: stats.totalQuestions,
-                            correctAnswers: stats.correctAnswers,
-                            accuracy: Math.round(accuracy * 10) / 10,
-                            recentTrend: 'stable',
-                            lastPracticed: stats.lastPracticed,
-                        };
-                    }).sort((a, b) => b.totalQuestions - a.totalQuestions);
-                    // 4. 获取最近活动（从已获取的数据计算最近7天）
-                    const sevenDaysAgo = new Date();
-                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-                    const recentActivitySessions = await env.DB.prepare(`
-            SELECT 
-              DATE(created_at) as date,
-              config,
-              questions,
-              score
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed'
-              AND created_at >= ?
-            ORDER BY created_at DESC
-          `).bind(userId, sevenDaysAgo.toISOString()).all();
-                    // 按日期聚合
-                    const activityByDate = {};
-                    for (const row of (recentActivitySessions.results || [])) {
-                        const date = row.date;
-                        let questionsCount = 0;
-                        try {
-                            const questionsArr = JSON.parse(row.questions || '[]');
-                            questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0;
-                        }
-                        catch { }
-                        if (!activityByDate[date]) {
-                            activityByDate[date] = { quizCount: 0, questionsAnswered: 0, correctCount: 0 };
-                        }
-                        activityByDate[date].quizCount++;
-                        activityByDate[date].questionsAnswered += questionsCount;
-                        activityByDate[date].correctCount += Number(row.score) || 0;
-                    }
-                    const recentActivity = {
-                        results: Object.entries(activityByDate).map(([date, stats]) => ({
-                            date,
-                            quizCount: stats.quizCount,
-                            questionsAnswered: stats.questionsAnswered,
-                            accuracy: stats.questionsAnswered > 0
-                                ? Math.round((stats.correctCount / stats.questionsAnswered) * 1000) / 10
-                                : 0,
-                        })).sort((a, b) => b.date.localeCompare(a.date))
-                    };
-                    // 5. 计算成就
-                    const achievements = [];
-                    // 初露锋芒 - 完成第一次刷题
-                    achievements.push({
-                        id: '1',
-                        name: '初露锋芒',
-                        description: '完成第一次刷题',
-                        icon: '🌟',
-                        unlockedAt: overallStats.totalQuizzes >= 1 ? lastStudyDate : null,
-                        progress: overallStats.totalQuizzes >= 1 ? 100 : 0,
-                    });
-                    // 勤学不倦 - 连续学习7天
-                    achievements.push({
-                        id: '2',
-                        name: '勤学不倦',
-                        description: '连续学习7天',
-                        icon: '🔥',
-                        unlockedAt: longestStreak >= 7 ? lastStudyDate : null,
-                        progress: Math.min(100, Math.round((longestStreak / 7) * 100)),
-                    });
-                    // 百题斩 - 完成100道题目
-                    achievements.push({
-                        id: '3',
-                        name: '百题斩',
-                        description: '完成100道题目',
-                        icon: '💯',
-                        unlockedAt: overallStats.totalQuestions >= 100 ? lastStudyDate : null,
-                        progress: Math.min(100, Math.round((overallStats.totalQuestions / 100) * 100)),
-                    });
-                    // 千题王 - 完成1000道题目
-                    achievements.push({
-                        id: '4',
-                        name: '千题王',
-                        description: '完成1000道题目',
-                        icon: '👑',
-                        unlockedAt: overallStats.totalQuestions >= 1000 ? lastStudyDate : null,
-                        progress: Math.min(100, Math.round((overallStats.totalQuestions / 1000) * 100)),
-                    });
-                    // 6. 计算学习目标（从已获取的数据计算）
-                    void new Date(today).toISOString(); // todayStart - reserved for future use
-                    const weekStart = new Date();
-                    weekStart.setDate(weekStart.getDate() - 7);
-                    const monthStart = new Date();
-                    monthStart.setDate(monthStart.getDate() - 30);
-                    // 获取各时间段的题目数
-                    const goalSessions = await env.DB.prepare(`
-            SELECT questions, created_at
-            FROM quiz_sessions
-            WHERE user_id = ? AND status = 'completed' 
-              AND created_at >= ?
-          `).bind(userId, monthStart.toISOString()).all();
-                    let todayCount = 0;
-                    let weekCount = 0;
-                    let monthCount = 0;
-                    for (const row of (goalSessions.results || [])) {
-                        let questionsCount = 0;
-                        try {
-                            const questionsArr = JSON.parse(row.questions || '[]');
-                            questionsCount = Array.isArray(questionsArr) ? questionsArr.length : 0;
-                        }
-                        catch { }
-                        const createdAt = new Date(row.created_at);
-                        monthCount += questionsCount;
-                        if (createdAt >= weekStart) {
-                            weekCount += questionsCount;
-                        }
-                        if (row.created_at.startsWith(today)) {
-                            todayCount += questionsCount;
-                        }
-                    }
-                    const goals = [
-                        { id: '1', title: '每日刷题', target: 20, current: todayCount, deadline: today, type: 'daily' },
-                        { id: '2', title: '本周目标', target: 100, current: weekCount, deadline: today, type: 'weekly' },
-                        { id: '3', title: '月度挑战', target: 500, current: monthCount, deadline: today, type: 'monthly' },
-                    ];
-                    return jsonResponse({
-                        totalQuizzes: overallStats?.totalQuizzes || 0,
-                        totalQuestions: overallStats?.totalQuestions || 0,
-                        correctAnswers: overallStats?.correctAnswers || 0,
-                        totalTimeSpent: Math.round((overallStats?.totalTimeSpent || 0) / 60), // 秒转分钟
-                        currentStreak,
-                        longestStreak,
-                        lastStudyDate,
-                        subjectMastery,
-                        topicMastery: [],
-                        achievements,
-                        goals,
-                        recentActivity: (recentActivity.results || []).map((row) => ({
-                            date: row.date,
-                            quizCount: Number(row.quizCount) || 0,
-                            questionsAnswered: Number(row.questionsAnswered) || 0,
-                            accuracy: Number(row.accuracy) || 0,
-                        })),
-                    }, 200, origin);
+                    // 调用统一的学习档案服务，返回结构完全对齐前端
+                    const profile = await getLearningProfile(env.DB, tokenData.userId);
+                    return jsonResponse(profile, 200, origin);
                 }
                 catch (error) {
                     console.error('获取学习档案失败:', error);
-                    // 返回空数据而不是模拟数据
+                    const today = new Date().toISOString().split('T')[0];
                     return jsonResponse({
-                        totalQuizzes: 0,
-                        totalQuestions: 0,
-                        correctAnswers: 0,
-                        totalTimeSpent: 0,
-                        currentStreak: 0,
-                        longestStreak: 0,
-                        lastStudyDate: today,
+                        overview: {
+                            totalQuizzes: 0,
+                            totalQuestions: 0,
+                            correctAnswers: 0,
+                            totalTimeSpent: 0,
+                            currentStreak: 0,
+                            longestStreak: 0,
+                            lastStudyDate: today,
+                        },
                         subjectMastery: [],
                         topicMastery: [],
-                        achievements: [],
-                        goals: [],
                         recentActivity: [],
                     }, 200, origin);
                 }
@@ -3934,9 +5268,229 @@ export default {
                 return jsonResponse({ status: 'ok', service: 'quiz' }, 200, origin);
             }
             // =====================
+            // 每日学习任务 API
+            // =====================
+            // 获取今日学习任务
+            if (path === '/api/learning/daily-mission' && request.method === 'GET') {
+                console.log('[WORKER VERSION] daily-mission v2026-01-22 - dse-analysis-api');
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const missions = await getDailyMissions(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: missions,
+                        message: 'ok'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get daily missions error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取每日任务失败'
+                    }, 500, origin);
+                }
+            }
+            // 检查任务进度（在刷题/复习后调用）
+            if (path === '/api/learning/mission-progress' && request.method === 'POST') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                const body = await request.json();
+                try {
+                    const result = await checkMissionProgress(env.DB, tokenData.userId, body.eventType, body.eventData);
+                    return jsonResponse({
+                        code: 0,
+                        data: result,
+                        message: 'ok'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Check mission progress error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '检查任务进度失败'
+                    }, 500, origin);
+                }
+            }
+            // =====================
             // 排行榜 API
             // =====================
-            // 获取排行榜
+            // 获取学习排行榜（新版，与积分系统解耦）
+            if (path === '/api/leaderboard/learning' && request.method === 'GET') {
+                const url = new URL(request.url);
+                const metric = (url.searchParams.get('metric') || 'QUIZ_COUNT');
+                const range = (url.searchParams.get('range') || 'ALL');
+                const subject = (url.searchParams.get('subject') || 'ALL');
+                const limit = parseInt(url.searchParams.get('limit') || '50');
+                // 验证参数
+                const validMetrics = ['QUIZ_COUNT', 'ACCURACY', 'SPEED'];
+                const validRanges = ['ALL', 'WEEK', 'DAY'];
+                const validSubjects = ['ALL', 'MATH', 'ENG', 'CHI', 'PHYS', 'CHEM', 'BIO', 'ECON', 'HIST', 'GEO'];
+                if (!validMetrics.includes(metric)) {
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: `Invalid metric. Valid values: ${validMetrics.join(', ')}`
+                    }, 400, origin);
+                }
+                if (!validRanges.includes(range)) {
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: `Invalid range. Valid values: ${validRanges.join(', ')}`
+                    }, 400, origin);
+                }
+                if (!validSubjects.includes(subject)) {
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: `Invalid subject. Valid values: ${validSubjects.join(', ')}`
+                    }, 400, origin);
+                }
+                // 获取当前用户（如果已登录）
+                let currentUserId;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                    currentUserId = tokenData?.userId;
+                }
+                try {
+                    const leaderboardData = await getLearningLeaderboard(env.DB, {
+                        metric,
+                        range,
+                        subject,
+                        limit,
+                        currentUserId,
+                    });
+                    return jsonResponse({
+                        code: 0,
+                        data: leaderboardData,
+                        message: 'ok'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get learning leaderboard error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取学习排行榜失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取用户学习统计
+            if (path === '/api/leaderboard/learning/me' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const stats = await getUserLearningStats(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: stats,
+                        message: 'ok'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get user learning stats error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取学习统计失败'
+                    }, 500, origin);
+                }
+            }
+            // =====================
+            // 激励排行榜 API（积分榜）
+            // =====================
+            // 获取激励排行榜（积分总榜/周榜）
+            if (path === '/api/leaderboard/incentive' && request.method === 'GET') {
+                const url = new URL(request.url);
+                const type = (url.searchParams.get('type') || 'POINTS_TOTAL');
+                const limit = parseInt(url.searchParams.get('limit') || '50');
+                // 验证参数
+                const validTypes = ['POINTS_TOTAL', 'POINTS_WEEKLY'];
+                if (!validTypes.includes(type)) {
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: `Invalid type. Valid values: ${validTypes.join(', ')}`
+                    }, 400, origin);
+                }
+                // 获取当前用户（如果已登录）
+                let currentUserId;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                    currentUserId = tokenData?.userId;
+                }
+                try {
+                    const leaderboardData = await getIncentiveLeaderboard(env.DB, {
+                        type,
+                        limit,
+                        currentUserId,
+                    });
+                    return jsonResponse({
+                        code: 0,
+                        data: leaderboardData,
+                        message: 'ok'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get incentive leaderboard error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取积分排行榜失败'
+                    }, 500, origin);
+                }
+            }
+            // 检查用户排行榜特权
+            if (path === '/api/leaderboard/privileges' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const privileges = await checkUserPrivileges(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: privileges,
+                        message: 'ok'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Check user privileges error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取特权信息失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取排行榜（旧版，保留兼容）
             if (path === '/api/leaderboard' && request.method === 'GET') {
                 const url = new URL(request.url);
                 const type = url.searchParams.get('type') || 'weekly';
@@ -4302,20 +5856,491 @@ export default {
                 }
                 return jsonResponse({ message: '排名已更新' }, 200, origin);
             }
+            // =====================
+            // 积分系统 API（使用 pointsService 统一处理）
+            // =====================
+            // 获取用户积分摘要
+            if (path === '/api/points/summary' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const summary = await getPointsSummary(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: summary,
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get points summary error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取积分摘要失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取今日学习进度（基于 learning_events）
+            // 用于前端展示"今日刷题进度"和"里程碑完成状态"
+            if (path === '/api/points/today-progress' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const progress = await getTodayLearningProgress(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: progress,
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get today learning progress error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取今日进度失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取每日任务状态（UI 可直接渲染）
+            if (path === '/api/points/daily-tasks' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                const url = new URL(request.url);
+                const lang = (url.searchParams.get('lang') || 'zh-CN');
+                try {
+                    const dailyTasks = await getDailyTaskStatus(env.DB, tokenData.userId, lang);
+                    return jsonResponse({
+                        code: 0,
+                        data: {
+                            tasks: dailyTasks,
+                            date: new Date().toISOString().split('T')[0],
+                        },
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get daily tasks error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取每日任务状态失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取积分排行榜（支持并列排名，UI 可直接渲染）
+            if (path === '/api/points/leaderboard' && request.method === 'GET') {
+                const url = new URL(request.url);
+                const limit = parseInt(url.searchParams.get('limit') || '50');
+                // 获取当前用户（如果已登录）
+                let currentUserId;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                    if (tokenData) {
+                        currentUserId = tokenData.userId;
+                    }
+                }
+                try {
+                    const leaderboardData = await getPointsLeaderboard(env.DB, currentUserId, limit);
+                    return jsonResponse({
+                        code: 0,
+                        data: leaderboardData,
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get leaderboard error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取排行榜失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取用户积分排名
+            if (path === '/api/points/rank' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const rankData = await getPointsUserRank(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: rankData || { rank: null, totalPoints: 0 },
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get user rank error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取用户排名失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取积分历史
+            if (path === '/api/points/history' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                const url = new URL(request.url);
+                const limit = parseInt(url.searchParams.get('limit') || '50');
+                const offset = parseInt(url.searchParams.get('offset') || '0');
+                try {
+                    const history = await getPointHistory(env.DB, tokenData.userId, limit, offset);
+                    return jsonResponse({
+                        code: 0,
+                        data: { history },
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get point history error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取积分历史失败'
+                    }, 500, origin);
+                }
+            }
+            // =====================
+            // 积分商城 API
+            // =====================
+            // 获取商城商品列表
+            if (path === '/api/points/mall/items' && request.method === 'GET') {
+                let userId;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                    userId = tokenData?.userId;
+                }
+                try {
+                    const items = await getMallItems(env.DB, userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: { items },
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get mall items error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取商品列表失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取个性化转化触发推荐
+            if (path === '/api/points/mall/offers' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const offersData = await getTriggeredOffers(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: offersData,
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get triggered offers error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取推荐失败'
+                    }, 500, origin);
+                }
+            }
+            // 检查是否在高转化区间
+            if (path === '/api/points/mall/conversion-zone' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const zoneInfo = await isInHighConversionZone(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: zoneInfo,
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Check conversion zone error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '检查转化区间失败'
+                    }, 500, origin);
+                }
+            }
+            // 兑换商品
+            if (path === '/api/points/mall/redeem' && request.method === 'POST') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                const body = await request.json();
+                if (!body.itemId) {
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: '请选择要兑换的商品'
+                    }, 400, origin);
+                }
+                try {
+                    const result = await redeemItem(env.DB, tokenData.userId, body.itemId);
+                    return jsonResponse({
+                        code: result.success ? 0 : -1,
+                        data: result,
+                        message: result.message
+                    }, result.success ? 200 : 400, origin);
+                }
+                catch (error) {
+                    console.error('Redeem item error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '兑换失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取用户咨询记录
+            if (path === '/api/points/mall/consultations' && request.method === 'GET') {
+                const authHeader = request.headers.get('Authorization');
+                if (!authHeader?.startsWith('Bearer ')) {
+                    return errorResponse('请先登录', 401, origin);
+                }
+                const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                if (!tokenData) {
+                    return errorResponse('登录已过期', 401, origin);
+                }
+                try {
+                    const consultations = await getUserConsultations(env.DB, tokenData.userId);
+                    return jsonResponse({
+                        code: 0,
+                        data: { consultations },
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get user consultations error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取咨询记录失败'
+                    }, 500, origin);
+                }
+            }
+            // 管理员：更新咨询状态
+            if (path.startsWith('/api/admin/consultations/') && request.method === 'PATCH') {
+                const authHeader = request.headers.get('Authorization');
+                // 简单的管理员验证（实际应该使用更安全的方式）
+                const adminKey = request.headers.get('X-Admin-Key');
+                if (adminKey !== env.ADMIN_KEY) {
+                    return errorResponse('无权限', 403, origin);
+                }
+                const conversionId = path.replace('/api/admin/consultations/', '');
+                const body = await request.json();
+                try {
+                    const success = await updateConsultationStatus(env.DB, conversionId, body);
+                    return jsonResponse({
+                        code: success ? 0 : -1,
+                        data: { success },
+                        message: success ? '更新成功' : '更新失败'
+                    }, success ? 200 : 400, origin);
+                }
+                catch (error) {
+                    console.error('Update consultation status error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '更新失败'
+                    }, 500, origin);
+                }
+            }
+            // 管理员：获取转化漏斗统计
+            if (path === '/api/admin/conversions/funnel' && request.method === 'GET') {
+                const adminKey = request.headers.get('X-Admin-Key');
+                if (adminKey !== env.ADMIN_KEY) {
+                    return errorResponse('无权限', 403, origin);
+                }
+                const url = new URL(request.url);
+                const days = parseInt(url.searchParams.get('days') || '30');
+                try {
+                    const stats = await getConversionFunnelStats(env.DB, days);
+                    return jsonResponse({
+                        code: 0,
+                        data: { stats },
+                        message: 'success'
+                    }, 200, origin);
+                }
+                catch (error) {
+                    console.error('Get conversion funnel stats error:', error);
+                    return jsonResponse({
+                        code: -1,
+                        data: null,
+                        message: error instanceof Error ? error.message : '获取统计失败'
+                    }, 500, origin);
+                }
+            }
+            // 获取积分任务规则（从 shared/domain 获取）
+            if (path === '/api/points/rules' && request.method === 'GET') {
+                const { POINT_TASKS } = await import('../../../shared/domain/points');
+                return jsonResponse({
+                    code: 0,
+                    data: { rules: POINT_TASKS },
+                    message: 'success'
+                }, 200, origin);
+            }
+            // =====================
+            // API 文档端点
+            // =====================
+            // 获取 OpenAPI/Swagger 规范
+            if (path === '/api/docs' || path === '/api/openapi.json') {
+                const openApiSpec = {
+                    openapi: '3.0.3',
+                    info: {
+                        title: 'DSE 插班智能评估 API',
+                        description: '基于规则评分引擎 + DeepSeek AI 的香港 DSE 插班可行性分析系统。所有结果为参考建议，不构成录取保证。',
+                        version: '2.1.0',
+                    },
+                    servers: [
+                        { url: 'https://dse-analysis-api.jordanyungchotan.workers.dev', description: '生产环境' },
+                        { url: 'http://localhost:5000', description: '本地开发' },
+                    ],
+                    paths: {
+                        '/api/auth/register': { post: { summary: '用户注册', tags: ['认证'] } },
+                        '/api/auth/login': { post: { summary: '用户登录', tags: ['认证'] } },
+                        '/api/auth/me': { get: { summary: '获取当前用户信息', tags: ['认证'], security: [{ bearerAuth: [] }] } },
+                        '/api/analysis/submit': { post: { summary: '提交插班分析', tags: ['插班分析'], security: [{ bearerAuth: [] }] } },
+                        '/api/analysis/result/{id}': { get: { summary: '获取分析结果', tags: ['插班分析'] } },
+                        '/api/analysis/history': { get: { summary: '获取分析历史', tags: ['插班分析'], security: [{ bearerAuth: [] }] } },
+                        '/api/analysis/history/{id}': { delete: { summary: '删除分析记录', tags: ['插班分析'], security: [{ bearerAuth: [] }] } },
+                        '/api/analysis/subjects': { get: { summary: '获取科目列表', tags: ['配置数据'] } },
+                        '/api/analysis/grades': { get: { summary: '获取年级列表', tags: ['配置数据'] } },
+                        '/api/analysis/schools': { get: { summary: '获取学校列表', tags: ['配置数据'] } },
+                        '/api/placement/score': { post: { summary: '规则评分（不调用AI）', tags: ['规则评分'], security: [{ bearerAuth: [] }] } },
+                        '/api/analysis/feedback': { post: { summary: '提交分析反馈', tags: ['用户反馈'], security: [{ bearerAuth: [] }] } },
+                        '/api/analysis/feedback/{analysisId}': { get: { summary: '获取反馈状态', tags: ['用户反馈'] } },
+                        '/api/consultation/book': { post: { summary: '预约升学咨询', tags: ['咨询预约'], security: [{ bearerAuth: [] }] } },
+                        '/api/consultation/actions': { get: { summary: '获取推荐行动', tags: ['咨询预约'] } },
+                    },
+                    components: {
+                        securitySchemes: {
+                            bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+                        },
+                    },
+                };
+                return jsonResponse(openApiSpec, 200, origin);
+            }
+            // Swagger UI HTML 页面
+            if (path === '/api-docs' || path === '/swagger') {
+                const swaggerHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <title>DSE API 文档</title>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: '/api/docs',
+      dom_id: '#swagger-ui',
+      presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+      layout: 'StandaloneLayout'
+    });
+  </script>
+</body>
+</html>`;
+                return new Response(swaggerHtml, {
+                    status: 200,
+                    headers: {
+                        'Content-Type': 'text/html; charset=utf-8',
+                        ...corsHeaders(origin),
+                    },
+                });
+            }
             // 根路径 - 显示 API 状态
             if (path === '/' || path === '') {
                 return jsonResponse({
                     name: 'DSE Analysis API',
-                    version: '2.0.0',
+                    version: '2.1.0',
+                    documentation: '/api-docs',
                     status: 'running',
                     endpoints: [
                         'GET /api/health',
+                        'GET /api-docs (Swagger UI)',
+                        'GET /api/docs (OpenAPI JSON)',
+                        // 认证 API
                         'POST /api/auth/login',
                         'POST /api/auth/register',
+                        'GET /api/auth/me',
+                        // 插班分析 API
                         'POST /api/analysis/submit',
                         'POST /api/analysis/university',
+                        'POST /api/analysis/feedback',
+                        'GET /api/analysis/feedback/:analysisId',
                         'GET /api/analysis/result/:id',
                         'GET /api/analysis/history',
+                        'DELETE /api/analysis/history/:id',
+                        // 配置数据 API
+                        'GET /api/analysis/subjects',
+                        'GET /api/analysis/grades',
+                        'GET /api/analysis/schools',
+                        // 规则评分 API
+                        'POST /api/placement/score',
+                        // 咨询预约 API
+                        'POST /api/consultation/book',
+                        'GET /api/consultation/actions',
+                        'GET /api/consultation/my-bookings',
                         'POST /api/student/residence',
                         'GET /api/student/residence',
                         'POST /api/student/preferences',
@@ -4334,6 +6359,12 @@ export default {
                         'GET /api/leaderboard',
                         'GET /api/leaderboard/me',
                         'POST /api/leaderboard/submit',
+                        // 积分系统 API
+                        'GET /api/points/summary',
+                        'GET /api/points/leaderboard',
+                        'GET /api/points/rank',
+                        'GET /api/points/history',
+                        'GET /api/points/rules',
                         'PUT /api/user/profile',
                         'POST /api/user/avatar',
                         'PUT /api/user/password',
@@ -4738,6 +6769,77 @@ export default {
               study_plan, expected_progress, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `).bind(reportId, testId, tokenData.userId, level, finalScore, calculateGradeEquivalent(finalScore, test.grade), JSON.stringify(abilityRadar), JSON.stringify(strengthPoints), JSON.stringify(weaknessPoints), JSON.stringify(aiReport.recommendations), JSON.stringify({ summary: aiReport.summary, analysis: aiReport.detailedAnalysis }), JSON.stringify(aiReport.progressTimeline), JSON.stringify({ encouragement: aiReport.encouragement }), now).run();
+                    // ========================================
+                    // 【关键】写入两个统一事实表
+                    // ========================================
+                    const correctCount = gradingResults.filter(r => r.isCorrect).length;
+                    const actualAccuracy = questions.length > 0 ? correctCount / questions.length : 0;
+                    console.log(`Level test stats: questions=${questions.length}, correct=${correctCount}, accuracy=${actualAccuracy.toFixed(2)}`);
+                    // 1️⃣ 写入 learning_events 事实表（排行榜、积分数据来源）
+                    let learningEventResult = { success: false };
+                    try {
+                        learningEventResult = await recordLearningEvent(env.DB, {
+                            userId: tokenData.userId,
+                            eventType: 'LEVEL_TEST',
+                            subject: test.subject,
+                            questionCount: questions.length,
+                            correctCount,
+                            durationSeconds: body.totalTimeSpent || 0,
+                            accuracy: actualAccuracy,
+                            sourceId: testId,
+                            metadata: {
+                                grade: test.grade,
+                                level,
+                                finalScore,
+                                reportId,
+                            },
+                        });
+                        console.log(`Learning event recorded: success=${learningEventResult.success}, eventId=${learningEventResult.eventId}`);
+                    }
+                    catch (leError) {
+                        console.error('Failed to record learning event for level test:', leError);
+                    }
+                    // 2️⃣ 写入 question_attempts 事实表（错题本、学习档案数据来源）
+                    const questionAttempts = questions.map((q, index) => {
+                        const gradeResult = gradingResults[index];
+                        return {
+                            userId: tokenData.userId,
+                            questionId: q.id || `${testId}_q${index}`,
+                            questionText: q.question_text || q.questionText || '',
+                            questionType: q.question_type || q.questionType || 'multiple_choice',
+                            subject: test.subject,
+                            topic: q.topic || q.knowledge_points?.[0] || null,
+                            selectedAnswer: String(gradeResult?.userAnswer ?? ''),
+                            correctAnswer: String(q.correct_answer || q.correctAnswer || ''),
+                            isCorrect: gradeResult?.isCorrect === true,
+                            explanation: q.explanation || '',
+                            durationSeconds: gradeResult?.timeSpent || 0,
+                            sourceType: 'LEVEL_TEST',
+                            sourceId: testId,
+                        };
+                    });
+                    try {
+                        const attemptResult = await recordQuestionAttemptsBatch(env.DB, questionAttempts);
+                        console.log(`Question attempts recorded for level test: ${attemptResult.count}/${questions.length}`);
+                    }
+                    catch (qaError) {
+                        console.error('Failed to record question attempts for level test:', qaError);
+                    }
+                    // 【关键】基于 learning_events 检查并发放积分
+                    // 积分触发条件：正确率 >= 40%
+                    let pointsAwarded = [];
+                    if (learningEventResult.success && learningEventResult.eventId) {
+                        const pointsResult = await checkAndAwardPointsFromLearningEvent(env.DB, tokenData.userId, 'LEVEL_TEST', learningEventResult.eventId, {
+                            questionCount: questions.length,
+                            correctCount,
+                            accuracy: correctCount / questions.length,
+                            durationSeconds: body.totalTimeSpent,
+                        });
+                        pointsAwarded = pointsResult.awarded;
+                        if (pointsAwarded.length > 0) {
+                            console.log(`Points awarded for level test: ${JSON.stringify(pointsAwarded)}`);
+                        }
+                    }
                     return jsonResponse({
                         success: true,
                         testId,
@@ -4749,7 +6851,12 @@ export default {
                         correctCount: gradingResults.filter(r => r.isCorrect).length,
                         abilityRadar,
                         strengthPoints,
-                        weaknessPoints
+                        weaknessPoints,
+                        // 返回积分奖励信息
+                        pointsAwarded: pointsAwarded.length > 0 ? {
+                            tasks: pointsAwarded,
+                            totalPoints: pointsAwarded.reduce((sum, a) => sum + a.points, 0),
+                        } : null,
                     }, 200, origin);
                 }
                 catch (error) {
@@ -4828,6 +6935,8 @@ export default {
                 }
             }
             // 获取测试历史
+            // 获取水平测试历史
+            // 【数据主干对齐】progressData 由后端计算
             if (path === '/api/level-test/history' && request.method === 'GET') {
                 const authHeader = request.headers.get('Authorization');
                 if (!authHeader?.startsWith('Bearer ')) {
@@ -4889,11 +6998,115 @@ export default {
                         countParams.push(grade);
                     }
                     const countResult = await env.DB.prepare(countQuery).bind(...countParams).first();
+                    // 【数据主干对齐】后端计算 progressData
+                    let progressData = null;
+                    if (tests.length > 0) {
+                        // 1️⃣ 计算科目进步
+                        const subjectProgressQuery = `
+              SELECT 
+                subject,
+                MAX(CASE WHEN rn = 1 THEN level END) as currentLevel,
+                MAX(CASE WHEN rn = 2 THEN level END) as previousLevel,
+                ROUND(AVG(final_score), 0) as avgScore,
+                COUNT(*) as testCount
+              FROM (
+                SELECT 
+                  subject, level, final_score,
+                  ROW_NUMBER() OVER (PARTITION BY subject ORDER BY completed_at DESC) as rn
+                FROM level_tests
+                WHERE user_id = ? AND status = 'graded'
+              )
+              GROUP BY subject
+            `;
+                        const subjectProgressResult = await env.DB.prepare(subjectProgressQuery)
+                            .bind(tokenData.userId).all();
+                        const levelOrder = ['U', '1', '2', '3', '4', '5', '5*', '5**'];
+                        const subjectProgress = (subjectProgressResult.results || []).map((row) => {
+                            const currentLevel = row.currentLevel || 'U';
+                            const previousLevel = row.previousLevel || currentLevel;
+                            const currentIdx = levelOrder.indexOf(currentLevel);
+                            const previousIdx = levelOrder.indexOf(previousLevel);
+                            let trend = 'stable';
+                            if (currentIdx > previousIdx)
+                                trend = 'up';
+                            else if (currentIdx < previousIdx)
+                                trend = 'down';
+                            return {
+                                subject: row.subject,
+                                currentLevel,
+                                previousLevel,
+                                trend,
+                                avgScore: row.avgScore || 0,
+                                testCount: row.testCount || 0
+                            };
+                        });
+                        // 2️⃣ 计算总体趋势
+                        const recentScoresQuery = `
+              SELECT final_score
+              FROM level_tests
+              WHERE user_id = ? AND status = 'graded'
+              ORDER BY completed_at DESC
+              LIMIT 10
+            `;
+                        const recentScoresResult = await env.DB.prepare(recentScoresQuery)
+                            .bind(tokenData.userId).all();
+                        const recentScores = (recentScoresResult.results || [])
+                            .map((r) => r.final_score)
+                            .reverse();
+                        let overallTrend = 'stable';
+                        let scoreChange = 0;
+                        if (recentScores.length >= 2) {
+                            scoreChange = recentScores[recentScores.length - 1] - recentScores[recentScores.length - 2];
+                            if (scoreChange > 5)
+                                overallTrend = 'up';
+                            else if (scoreChange < -5)
+                                overallTrend = 'down';
+                        }
+                        // 3️⃣ 找出最好和最差的科目
+                        const sortedSubjects = [...subjectProgress].sort((a, b) => b.avgScore - a.avgScore);
+                        const bestSubject = sortedSubjects[0]?.subject || '-';
+                        const worstSubject = sortedSubjects[sortedSubjects.length - 1]?.subject || '-';
+                        // 4️⃣ 计算连续天数（从 learning_events）
+                        const streakQuery = `
+              SELECT DISTINCT DATE(created_at) as test_date
+              FROM learning_events
+              WHERE user_id = ? AND event_type = 'LEVEL_TEST'
+              ORDER BY test_date DESC
+              LIMIT 31
+            `;
+                        const streakResult = await env.DB.prepare(streakQuery)
+                            .bind(tokenData.userId).all();
+                        let streakDays = 0;
+                        const today = new Date().toISOString().split('T')[0];
+                        const dates = (streakResult.results || []).map((r) => r.test_date);
+                        for (let i = 0; i < dates.length; i++) {
+                            const expectedDate = new Date();
+                            expectedDate.setDate(expectedDate.getDate() - i);
+                            const expected = expectedDate.toISOString().split('T')[0];
+                            if (dates[i] === expected || (i === 0 && dates[i] === today)) {
+                                streakDays++;
+                            }
+                            else {
+                                break;
+                            }
+                        }
+                        progressData = {
+                            overallTrend,
+                            scoreChange,
+                            levelChange: 0,
+                            bestSubject,
+                            worstSubject,
+                            streakDays,
+                            subjectProgress,
+                            recentScores
+                        };
+                    }
                     return jsonResponse({
                         tests,
                         total: countResult?.count || 0,
                         limit,
-                        offset
+                        offset,
+                        progressData // 【数据主干对齐】后端返回进步数据
                     }, 200, origin);
                 }
                 catch (error) {
@@ -4906,6 +7119,9 @@ export default {
         }
         catch (error) {
             console.error('Error:', error);
+            if (error instanceof AnalysisInputError) {
+                return errorResponse(error.message, error.status, origin);
+            }
             return errorResponse('服务器错误', 500, origin);
         }
     },

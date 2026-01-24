@@ -11,6 +11,7 @@ const UniversityAnalysisPage = lazy(() => import('./pages/UniversityAnalysisPage
 const ResultPage = lazy(() => import('./pages/ResultPage'))
 const UniversityResultPage = lazy(() => import('./pages/UniversityResultPage'))
 const FeasibilityResultPage = lazy(() => import('./pages/FeasibilityResultPage'))
+const TransferResultPage = lazy(() => import('./pages/TransferResultPage'))
 const HistoryPage = lazy(() => import('./pages/HistoryPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
 
@@ -104,6 +105,8 @@ function App() {
           <Route path="result/:id" element={<ResultPage />} />
           <Route path="result/university/:id" element={<UniversityResultPage />} />
           <Route path="result/feasibility/:id" element={<FeasibilityResultPage />} />
+          {/* Transfer V2 专用结果页 - 不复用 ResultPage */}
+          <Route path="transfer/result/:analysisId" element={<TransferResultPage />} />
           <Route path="history" element={<HistoryPage />} />
           <Route path="quiz" element={<QuizSetupPage />} />
           <Route path="quiz/practice" element={<QuizPage />} />

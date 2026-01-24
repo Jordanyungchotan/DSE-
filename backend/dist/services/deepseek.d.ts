@@ -2,6 +2,7 @@
  * DeepSeek API 服务模块
  * 集成DeepSeek AI进行DSE插班分析
  */
+import { analyzeSubjectGrade } from '../analysis/analyzeByRules.js';
 /**
  * 学生信息接口
  */
@@ -31,6 +32,10 @@ interface SubjectAnalysis {
     weaknesses: string[];
     recommendations: string[];
     estimatedTimeToImprove: string;
+    ruleAnalysis: {
+        current: ReturnType<typeof analyzeSubjectGrade>;
+        target: ReturnType<typeof analyzeSubjectGrade>;
+    };
 }
 /**
  * 学校评估结果

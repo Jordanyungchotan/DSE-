@@ -1,0 +1,546 @@
+/**
+ * 题目级别事实记录服务
+ *
+ * ⚠️ question_attempts 是错题本 & 学习档案的唯一数据来源
+ * ⚠️ 所有查询必须从此表读取，禁止读取 quiz 表
+ *
+ * 规则：
+ * 1. 一道题一次作答 = 一条记录
+ * 2. 永远 INSERT，不允许 UPDATE（append-only）
+ * 3. 这是错题本 & 学习档案的唯一"原始事实"
+ *
+ * 用途：
+ * - 错题本：统计错误次数、错误答案、解析
+ * - 学习档案：科目掌握度、知识点掌握度、学习趋势
+ *
+ * 禁止数据源：
+ * - ❌ quiz_sessions / quiz_results / quiz_answers 表
+ * - ❌ 前端统计结果
+ * - ❌ session / store 中的临时值
+ */
+/**
+ * 记录单道题目的作答事实
+ * 【关键】永远 INSERT，不允许 UPDATE
+ */
+export async function recordQuestionAttempt(db, input) {
+    try {
+        const now = new Date().toISOString();
+        const result = await db.prepare(`
+      INSERT INTO question_attempts (
+        user_id,
+        question_id,
+        question_text,
+        question_type,
+        subject,
+        topic,
+        selected_answer,
+        correct_answer,
+        is_correct,
+        explanation,
+        duration_seconds,
+        source_type,
+        source_id,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(input.userId, input.questionId, input.questionText || null, input.questionType || null, input.subject || null, input.topic || null, input.selectedAnswer || null, input.correctAnswer || null, input.isCorrect ? 1 : 0, input.explanation || null, input.durationSeconds || 0, input.sourceType, input.sourceId || null, now).run();
+        return {
+            success: true,
+            attemptId: result.meta?.last_row_id,
+        };
+    }
+    catch (error) {
+        console.error('Record question attempt error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        };
+    }
+}
+/**
+ * 批量记录题目作答事实
+ * 用于刷题完成时一次性记录所有题目
+ */
+export async function recordQuestionAttemptsBatch(db, inputs) {
+    const errors = [];
+    let successCount = 0;
+    for (const input of inputs) {
+        const result = await recordQuestionAttempt(db, input);
+        if (result.success) {
+            successCount++;
+        }
+        else {
+            errors.push(result.error || 'Unknown error');
+        }
+    }
+    return {
+        success: errors.length === 0,
+        count: successCount,
+        errors,
+    };
+}
+// ===== 查询函数（用于错题本 & 学习档案）=====
+/**
+ * 获取用户错题列表（从原始事实聚合）
+ *
+ * 【数据来源】
+ * - question_attempts: 题目作答事实
+ * - wrong_question_status: 用户标记的状态
+ *
+ * 【返回结构完全对齐前端】
+ */
+export async function getWrongQuestionsByUser(db, userId, options) {
+    const { subject, topic, status, limit = 100, offset = 0 } = options || {};
+    // 构建筛选条件
+    let whereClause = 'WHERE qa.user_id = ? AND qa.is_correct = 0';
+    const params = [userId];
+    if (subject) {
+        whereClause += ' AND qa.subject = ?';
+        params.push(subject);
+    }
+    if (topic) {
+        whereClause += ' AND qa.topic = ?';
+        params.push(topic);
+    }
+    // 聚合查询：从 question_attempts 聚合 + 从 wrong_question_status 获取状态
+    const query = `
+    SELECT 
+      qa.question_id,
+      MAX(qa.question_text) as question_text,
+      MAX(qa.question_type) as question_type,
+      MAX(qa.subject) as subject,
+      MAX(qa.topic) as topic,
+      MAX(qa.selected_answer) as user_answer,
+      MAX(qa.correct_answer) as correct_answer,
+      MAX(qa.explanation) as explanation,
+      COUNT(*) as wrong_count,
+      MIN(qa.created_at) as first_attempt_date,
+      MAX(qa.created_at) as last_attempt_date,
+      COALESCE(wqs.status, 'UNREVIEWED') as status
+    FROM question_attempts qa
+    LEFT JOIN wrong_question_status wqs 
+      ON wqs.user_id = qa.user_id AND wqs.question_id = qa.question_id
+    ${whereClause}
+    GROUP BY qa.question_id
+    ${status ? `HAVING COALESCE(wqs.status, 'UNREVIEWED') = '${status}'` : ''}
+    ORDER BY last_attempt_date DESC
+    LIMIT ? OFFSET ?
+  `;
+    const results = await db.prepare(query)
+        .bind(...params, limit, offset)
+        .all();
+    // 获取统计数据（不受 status 筛选影响）
+    const statsQuery = `
+    SELECT 
+      COUNT(DISTINCT qa.question_id) as total,
+      COUNT(DISTINCT CASE WHEN COALESCE(wqs.status, 'UNREVIEWED') = 'UNREVIEWED' THEN qa.question_id END) as unreviewed,
+      COUNT(DISTINCT CASE WHEN wqs.status = 'REVIEWED' THEN qa.question_id END) as reviewed,
+      COUNT(DISTINCT CASE WHEN wqs.status = 'MASTERED' THEN qa.question_id END) as mastered
+    FROM question_attempts qa
+    LEFT JOIN wrong_question_status wqs 
+      ON wqs.user_id = qa.user_id AND wqs.question_id = qa.question_id
+    WHERE qa.user_id = ? AND qa.is_correct = 0
+    ${subject ? `AND qa.subject = '${subject}'` : ''}
+    ${topic ? `AND qa.topic = '${topic}'` : ''}
+  `;
+    const statsResult = await db.prepare(statsQuery)
+        .bind(userId)
+        .first();
+    return {
+        stats: {
+            total: statsResult?.total || 0,
+            unreviewed: statsResult?.unreviewed || 0,
+            reviewed: statsResult?.reviewed || 0,
+            mastered: statsResult?.mastered || 0,
+        },
+        items: (results.results || []).map(row => ({
+            id: row.question_id,
+            questionText: row.question_text || '',
+            questionType: row.question_type || 'multiple_choice',
+            subject: row.subject || '',
+            topic: row.topic || '',
+            userAnswer: row.user_answer || '',
+            correctAnswer: row.correct_answer || '',
+            explanation: row.explanation || '',
+            wrongCount: row.wrong_count,
+            status: row.status || 'UNREVIEWED',
+            firstAttemptDate: row.first_attempt_date,
+            lastAttemptDate: row.last_attempt_date,
+        })),
+    };
+}
+/**
+ * 更新错题状态（用户主动标记）
+ */
+export async function updateWrongQuestionStatus(db, userId, questionId, status) {
+    try {
+        const now = new Date().toISOString();
+        await db.prepare(`
+      INSERT INTO wrong_question_status (user_id, question_id, status, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, question_id) DO UPDATE SET
+        status = excluded.status,
+        updated_at = excluded.updated_at
+    `).bind(userId, questionId, status, now).run();
+        return { success: true };
+    }
+    catch (error) {
+        console.error('Update wrong question status error:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error'
+        };
+    }
+}
+/**
+ * 批量更新错题状态
+ */
+export async function updateWrongQuestionStatusBatch(db, userId, questionIds, status) {
+    let count = 0;
+    for (const questionId of questionIds) {
+        const result = await updateWrongQuestionStatus(db, userId, questionId, status);
+        if (result.success)
+            count++;
+    }
+    return { success: count === questionIds.length, count };
+}
+/**
+ * 删除错题状态（用于重置）
+ */
+export async function deleteWrongQuestionStatus(db, userId, questionId) {
+    try {
+        await db.prepare(`
+      DELETE FROM wrong_question_status
+      WHERE user_id = ? AND question_id = ?
+    `).bind(userId, questionId).run();
+        return { success: true };
+    }
+    catch (error) {
+        console.error('Delete wrong question status error:', error);
+        return { success: false };
+    }
+}
+/**
+ * 获取用户科目掌握度（从原始事实聚合）
+ */
+export async function getSubjectMasteryByUser(db, userId) {
+    // 总体统计
+    const overallQuery = `
+    SELECT 
+      subject,
+      COUNT(*) as total_questions,
+      SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+      MAX(created_at) as last_practiced
+    FROM question_attempts
+    WHERE user_id = ? AND subject IS NOT NULL
+    GROUP BY subject
+    ORDER BY total_questions DESC
+  `;
+    const overallResults = await db.prepare(overallQuery)
+        .bind(userId)
+        .all();
+    // 最近 7 天统计
+    const recentQuery = `
+    SELECT 
+      subject,
+      COUNT(*) as total_questions,
+      SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count
+    FROM question_attempts
+    WHERE user_id = ? 
+      AND subject IS NOT NULL
+      AND created_at >= datetime('now', '-7 days')
+    GROUP BY subject
+  `;
+    const recentResults = await db.prepare(recentQuery)
+        .bind(userId)
+        .all();
+    // 之前 7 天统计（用于计算趋势）
+    const prevQuery = `
+    SELECT 
+      subject,
+      COUNT(*) as total_questions,
+      SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count
+    FROM question_attempts
+    WHERE user_id = ? 
+      AND subject IS NOT NULL
+      AND created_at >= datetime('now', '-14 days')
+      AND created_at < datetime('now', '-7 days')
+    GROUP BY subject
+  `;
+    const prevResults = await db.prepare(prevQuery)
+        .bind(userId)
+        .all();
+    const recentMap = new Map((recentResults.results || []).map(r => [r.subject, r]));
+    const prevMap = new Map((prevResults.results || []).map(r => [r.subject, r]));
+    return (overallResults.results || []).map(row => {
+        const recent = recentMap.get(row.subject);
+        const prev = prevMap.get(row.subject);
+        const recentAccuracy = recent && recent.total_questions > 0
+            ? recent.correct_count / recent.total_questions
+            : 0;
+        const prevAccuracy = prev && prev.total_questions > 0
+            ? prev.correct_count / prev.total_questions
+            : 0;
+        let recentTrend = 'stable';
+        if (recent && prev) {
+            const diff = recentAccuracy - prevAccuracy;
+            if (diff > 0.05)
+                recentTrend = 'up';
+            else if (diff < -0.05)
+                recentTrend = 'down';
+        }
+        return {
+            subject: row.subject,
+            totalQuestions: row.total_questions,
+            correctCount: row.correct_count,
+            accuracy: row.total_questions > 0 ? row.correct_count / row.total_questions : 0,
+            recentAccuracy,
+            recentTrend,
+            lastPracticed: row.last_practiced,
+        };
+    });
+}
+/**
+ * 获取用户知识点掌握度（从原始事实聚合）
+ */
+export async function getTopicMasteryByUser(db, userId, options) {
+    const { subject, limit = 20 } = options || {};
+    let whereClause = 'WHERE user_id = ? AND topic IS NOT NULL';
+    const params = [userId];
+    if (subject) {
+        whereClause += ' AND subject = ?';
+        params.push(subject);
+    }
+    const query = `
+    SELECT 
+      topic,
+      MAX(subject) as subject,
+      COUNT(*) as total_questions,
+      SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count,
+      MAX(created_at) as last_attempted
+    FROM question_attempts
+    ${whereClause}
+    GROUP BY topic
+    ORDER BY total_questions DESC
+    LIMIT ?
+  `;
+    const results = await db.prepare(query)
+        .bind(...params, limit)
+        .all();
+    return (results.results || []).map(row => ({
+        topic: row.topic,
+        subject: row.subject,
+        totalQuestions: row.total_questions,
+        correctCount: row.correct_count,
+        mastery: row.total_questions > 0
+            ? Math.round((row.correct_count / row.total_questions) * 100)
+            : 0,
+        lastAttempted: row.last_attempted,
+    }));
+}
+/**
+ * 获取用户最近学习活动（从原始事实聚合）
+ */
+export async function getRecentActivityByUser(db, userId, days = 7) {
+    const query = `
+    SELECT 
+      DATE(created_at) as date,
+      COUNT(DISTINCT source_id) as quiz_count,
+      COUNT(*) as questions_answered,
+      SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_count
+    FROM question_attempts
+    WHERE user_id = ? 
+      AND created_at >= datetime('now', '-${days} days')
+    GROUP BY DATE(created_at)
+    ORDER BY date DESC
+  `;
+    const results = await db.prepare(query)
+        .bind(userId)
+        .all();
+    return (results.results || []).map(row => ({
+        date: row.date,
+        quizCount: row.quiz_count,
+        questionsAnswered: row.questions_answered,
+        correctCount: row.correct_count,
+        accuracy: row.questions_answered > 0
+            ? (row.correct_count / row.questions_answered) * 100
+            : 0,
+    }));
+}
+/**
+ * 获取用户学习档案总体统计（从 question_attempts）
+ */
+export async function getLearningProfileStats(db, userId) {
+    const query = `
+    SELECT 
+      COUNT(DISTINCT source_id) as total_quizzes,
+      COUNT(*) as total_questions,
+      SUM(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) as correct_answers,
+      SUM(duration_seconds) as total_time_spent,
+      COUNT(DISTINCT subject) as unique_subjects,
+      COUNT(DISTINCT topic) as unique_topics
+    FROM question_attempts
+    WHERE user_id = ?
+  `;
+    const result = await db.prepare(query)
+        .bind(userId)
+        .first();
+    return {
+        totalQuizzes: result?.total_quizzes || 0,
+        totalQuestions: result?.total_questions || 0,
+        correctAnswers: result?.correct_answers || 0,
+        overallAccuracy: result && result.total_questions > 0
+            ? (result.correct_answers / result.total_questions) * 100
+            : 0,
+        totalTimeSpent: result?.total_time_spent || 0,
+        uniqueSubjects: result?.unique_subjects || 0,
+        uniqueTopics: result?.unique_topics || 0,
+    };
+}
+/**
+ * 获取完整学习档案（对齐前端结构）
+ *
+ * 数据来源：
+ * - overview: learning_events（总体统计 + streak）
+ * - recentActivity: learning_events（每日活动）
+ * - subjectMastery: question_attempts（科目掌握度）
+ * - topicMastery: question_attempts（知识点掌握度）
+ */
+export async function getLearningProfile(db, userId) {
+    const today = new Date().toISOString().split('T')[0];
+    // 1️⃣ 从 learning_events 获取概览数据
+    const overviewQuery = `
+    SELECT 
+      COUNT(*) as total_quizzes,
+      COALESCE(SUM(question_count), 0) as total_questions,
+      COALESCE(SUM(correct_count), 0) as correct_answers,
+      COALESCE(SUM(duration_seconds), 0) as total_time_spent,
+      MAX(DATE(created_at)) as last_study_date
+    FROM learning_events
+    WHERE user_id = ? AND event_type = 'QUIZ'
+  `;
+    const overviewResult = await db.prepare(overviewQuery)
+        .bind(userId)
+        .first();
+    // 2️⃣ 从 learning_events 计算 streak
+    const streakQuery = `
+    SELECT DISTINCT DATE(created_at) as study_date
+    FROM learning_events
+    WHERE user_id = ? AND event_type = 'QUIZ'
+    ORDER BY study_date DESC
+    LIMIT 60
+  `;
+    const streakDays = await db.prepare(streakQuery)
+        .bind(userId)
+        .all();
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 0;
+    let lastDate = null;
+    const todayDate = new Date(today);
+    const yesterday = new Date(todayDate);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (streakDays.results && streakDays.results.length > 0) {
+        for (const row of streakDays.results) {
+            const dateStr = row.study_date;
+            const currentDate = new Date(dateStr);
+            if (lastDate === null) {
+                tempStreak = 1;
+                // 检查是否是今天或昨天
+                const diffDays = Math.floor((todayDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays <= 1) {
+                    currentStreak = 1;
+                }
+            }
+            else {
+                const diffDays = Math.floor((lastDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays === 1) {
+                    tempStreak++;
+                    if (currentStreak > 0) {
+                        currentStreak = tempStreak;
+                    }
+                }
+                else {
+                    tempStreak = 1;
+                }
+            }
+            longestStreak = Math.max(longestStreak, tempStreak);
+            lastDate = currentDate;
+        }
+    }
+    // 3️⃣ 从 learning_events 获取最近活动
+    const recentActivityQuery = `
+    SELECT 
+      DATE(created_at) as date,
+      COUNT(*) as quiz_count,
+      SUM(question_count) as questions_answered,
+      CASE 
+        WHEN SUM(question_count) > 0 
+        THEN ROUND(SUM(correct_count) * 100.0 / SUM(question_count), 1)
+        ELSE 0 
+      END as accuracy
+    FROM learning_events
+    WHERE user_id = ? 
+      AND event_type = 'QUIZ'
+      AND created_at >= datetime('now', '-7 days')
+    GROUP BY DATE(created_at)
+    ORDER BY date DESC
+  `;
+    const recentActivityResults = await db.prepare(recentActivityQuery)
+        .bind(userId)
+        .all();
+    // 4️⃣ 从 question_attempts 获取科目掌握度
+    const subjectMasteryData = await getSubjectMasteryByUser(db, userId);
+    const subjectNameMap = {
+        math: '数学',
+        physics: '物理',
+        chemistry: '化学',
+        biology: '生物',
+        english: '英国语文',
+        chinese: '中国语文',
+        liberal: '公民与社会发展',
+        economics: '经济',
+        bafs: '企业、会计与财务概论',
+        geography: '地理',
+        history: '历史',
+        ict: '资讯及通讯科技',
+    };
+    const subjectMastery = subjectMasteryData.map(s => ({
+        subjectId: s.subject,
+        subjectName: subjectNameMap[s.subject] || s.subject,
+        totalQuestions: s.totalQuestions,
+        correctAnswers: s.correctCount,
+        accuracy: Math.round(s.accuracy * 1000) / 10, // 保留一位小数
+        recentTrend: s.recentTrend,
+        lastPracticed: s.lastPracticed,
+    }));
+    // 5️⃣ 从 question_attempts 获取知识点掌握度
+    const topicMasteryData = await getTopicMasteryByUser(db, userId, { limit: 15 });
+    const topicMastery = topicMasteryData.map(t => ({
+        topic: t.topic,
+        subject: t.subject,
+        mastery: t.mastery,
+        questionsAttempted: t.totalQuestions,
+        lastAttempted: t.lastAttempted,
+    }));
+    // 6️⃣ 组装返回结构
+    return {
+        overview: {
+            totalQuizzes: overviewResult?.total_quizzes || 0,
+            totalQuestions: overviewResult?.total_questions || 0,
+            correctAnswers: overviewResult?.correct_answers || 0,
+            totalTimeSpent: Math.round((overviewResult?.total_time_spent || 0) / 60), // 秒转分钟
+            currentStreak,
+            longestStreak,
+            lastStudyDate: overviewResult?.last_study_date || today,
+        },
+        subjectMastery,
+        topicMastery,
+        recentActivity: (recentActivityResults.results || []).map(row => ({
+            date: row.date,
+            quizCount: row.quiz_count,
+            questionsAnswered: row.questions_answered,
+            accuracy: row.accuracy,
+        })),
+    };
+}
+//# sourceMappingURL=questionAttemptRecorder.js.map

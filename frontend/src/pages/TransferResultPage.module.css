@@ -1,0 +1,222 @@
+/**
+ * 插班分析结果页面 V2 样式
+ */
+
+.resultPage {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.loadingContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.errorContainer {
+  max-width: 600px;
+  margin: 100px auto;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.pageTitle h2 {
+  margin-bottom: 8px;
+}
+
+/* 综合评估卡片 */
+.overviewCard {
+  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.levelBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border-radius: 12px;
+  border: 2px solid;
+}
+
+.levelEmoji {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.levelScore {
+  font-size: 48px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.levelTitle {
+  font-size: 18px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.overviewInfo {
+  padding: 12px 0;
+}
+
+.metaInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* 通用卡片样式 */
+.sectionCard {
+  margin-bottom: 24px;
+  border-radius: 8px;
+}
+
+/* 能力分析网格 */
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.capabilityCard {
+  border-radius: 8px;
+}
+
+.capabilityHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.capabilityDesc {
+  margin-bottom: 12px !important;
+  font-size: 13px;
+}
+
+.capabilityImpact {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.capabilitySuggestion {
+  padding: 8px;
+  background: #e6f7ff;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #1890ff;
+}
+
+/* 学校评估网格 */
+.schoolGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.schoolCard {
+  border-radius: 8px;
+}
+
+.schoolHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schoolMeta {
+  margin-bottom: 12px;
+}
+
+.schoolSection {
+  margin-top: 12px;
+}
+
+.schoolList {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  list-style: disc;
+}
+
+.schoolList li {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.schoolNotes {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* 过渡计划 */
+.planCard {
+  height: 100%;
+}
+
+/* 免责声明 */
+.disclaimer {
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+/* 底部操作 */
+.footer {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .resultPage {
+    padding: 16px;
+  }
+
+  .header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .levelBadge {
+    padding: 16px;
+  }
+
+  .levelEmoji {
+    font-size: 36px;
+  }
+
+  .levelScore {
+    font-size: 36px;
+  }
+
+  .capabilityGrid,
+  .schoolGrid {
+    grid-template-columns: 1fr;
+  }
+}

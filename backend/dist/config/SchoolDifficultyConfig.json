@@ -1,0 +1,29 @@
+{
+    "band1": {
+        "minEnglish": 75,
+        "minMath": 70,
+        "minChinese": 70,
+        "minAverage": 72,
+        "competitionLevel": "very_high",
+        "englishIntensity": "high",
+        "description": "顶尖学校，录取竞争非常激烈"
+    },
+    "band2": {
+        "minEnglish": 65,
+        "minMath": 60,
+        "minChinese": 55,
+        "minAverage": 58,
+        "competitionLevel": "high",
+        "englishIntensity": "medium",
+        "description": "优质学校，需要良好的学术表现"
+    },
+    "band3": {
+        "minEnglish": 55,
+        "minMath": 55,
+        "minChinese": 50,
+        "minAverage": 50,
+        "competitionLevel": "medium",
+        "englishIntensity": "low",
+        "description": "适合大部分学生，入学门槛相对较低"
+    }
+}

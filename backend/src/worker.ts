@@ -81,6 +81,15 @@ import {
   getLearningProfile,
   WrongQuestionStatus,
 } from './services/questionAttemptRecorder.js'
+import {
+  executeTransferAnalysisV2,
+  callAIEnhancement,
+  mergeAIEnhancement,
+} from './services/transferAnalysisV2Service.js'
+import type {
+  TransferAnalysisResult,
+  TransferAnalysisInput as TransferAnalysisInputV2,
+} from './types/transferAnalysisV2'
 
 export interface Env {
   // D1 数据库绑定
@@ -3584,6 +3593,144 @@ export default {
             studentInfo: body,
             ...analysisResult,
             disclaimer,
+          },
+        }, 200, origin)
+      }
+
+      // =====================
+      // 插班分析 V2 API（纯规则，不调用 AI）
+      // =====================
+
+      /**
+       * 插班分析 V2 接口
+       * POST /api/transfer/analyze/v2
+       * 
+       * 【设计原则】
+       * 1. 纯规则引擎，不调用 AI
+       * 2. 返回 TransferAnalysisResult 完整结构
+       * 3. 所有数组字段保证非空
+       * 4. analysis_id 为真实 UUID，写入数据库
+       */
+      if (path === '/api/transfer/analyze/v2' && request.method === 'POST') {
+        const body = await request.json() as TransferAnalysisInputV2
+
+        // ===== 输入校验 =====
+        if (!body.targetSchools || !Array.isArray(body.targetSchools) || body.targetSchools.length === 0) {
+          return errorResponse('targetSchools 必须是非空数组', 400, origin)
+        }
+
+        // ===== 执行 V2 规则分析 =====
+        const transferResultV2 = executeTransferAnalysisV2(body)
+
+        // ===== 获取用户信息（可选登录）=====
+        let userId: string | null = null
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          userId = tokenData?.userId || null
+        }
+
+        // ===== 写入数据库 =====
+        await env.DB.prepare(
+          `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+           VALUES (?, ?, 'transfer', ?, ?, ?)`
+        ).bind(
+          transferResultV2.analysisId,
+          userId,
+          JSON.stringify(body),
+          JSON.stringify(transferResultV2),
+          transferResultV2.meta.generatedAt
+        ).run()
+
+        // ===== 返回响应 =====
+        return jsonResponse({
+          success: true,
+          data: {
+            analysis_id: transferResultV2.analysisId,
+            result: transferResultV2,
+          },
+        }, 200, origin)
+      }
+
+      // =====================
+      // 插班分析 AI 增强 API
+      // =====================
+
+      /**
+       * 插班分析 AI 增强接口
+       * POST /api/transfer/analyze/ai
+       * 
+       * 【核心原则】
+       * 1. 规则引擎是唯一决策来源
+       * 2. AI 只能"补充解释"和"生成计划"
+       * 3. AI 失败必须自动降级为 V2 纯规则结果
+       * 
+       * 【合并规则】
+       * - schoolAssessments：完全使用规则结果
+       * - summary：规则 summary 不变
+       * - capabilityAnalyses：AI 成功 → 使用 AI，失败 → 使用默认
+       * - transitionPlan：AI 成功 → 使用 AI，失败 → 使用默认
+       */
+      if (path === '/api/transfer/analyze/ai' && request.method === 'POST') {
+        const body = await request.json() as TransferAnalysisInputV2
+
+        // ===== 输入校验 =====
+        if (!body.targetSchools || !Array.isArray(body.targetSchools) || body.targetSchools.length === 0) {
+          return errorResponse('targetSchools 必须是非空数组', 400, origin)
+        }
+
+        // ===== Step 1: 执行 V2 规则分析（唯一决策来源）=====
+        const ruleResultV2 = executeTransferAnalysisV2(body)
+
+        // ===== Step 2: 调用 AI 增强（可选，失败自动降级）=====
+        let finalResult: TransferAnalysisResult = ruleResultV2
+        
+        try {
+          const aiEnhancement = await callAIEnhancement(
+            env.DEEPSEEK_API_KEY,
+            body,
+            ruleResultV2
+          )
+
+          // ===== Step 3: 合并 AI 结果 =====
+          if (aiEnhancement) {
+            finalResult = mergeAIEnhancement(ruleResultV2, aiEnhancement)
+            console.log('[Transfer AI] AI 增强成功，aiEnabled =', finalResult.aiEnabled)
+          } else {
+            console.log('[Transfer AI] AI 增强失败，使用纯规则结果')
+          }
+        } catch (aiError) {
+          // AI 失败，自动降级为纯规则结果
+          console.error('[Transfer AI] AI 处理异常，自动降级:', aiError)
+          finalResult = ruleResultV2
+        }
+
+        // ===== 获取用户信息（可选登录）=====
+        let userId: string | null = null
+        const authHeader = request.headers.get('Authorization')
+        if (authHeader?.startsWith('Bearer ')) {
+          const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET)
+          userId = tokenData?.userId || null
+        }
+
+        // ===== 写入数据库 =====
+        await env.DB.prepare(
+          `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+           VALUES (?, ?, 'transfer', ?, ?, ?)`
+        ).bind(
+          finalResult.analysisId,
+          userId,
+          JSON.stringify(body),
+          JSON.stringify(finalResult),
+          finalResult.meta.generatedAt
+        ).run()
+
+        // ===== 返回响应 =====
+        return jsonResponse({
+          success: true,
+          data: {
+            analysis_id: finalResult.analysisId,
+            result: finalResult,
           },
         }, 200, origin)
       }
