@@ -74,6 +74,7 @@ const HistoryPage = () => {
   }
 
   // 表格列定义
+  // 【修复】移除前端 sorter，后端已按 created_at DESC 排序
   const columns: ColumnsType<HistoryItem> = [
     {
       title: '分析时间',
@@ -83,8 +84,7 @@ const HistoryPage = () => {
       render: (date: string) => (
         <Text>{new Date(date).toLocaleString('zh-CN')}</Text>
       ),
-      sorter: (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      defaultSortOrder: 'descend',
+      // 后端已排序，不再前端排序
     },
     {
       title: '年级',
