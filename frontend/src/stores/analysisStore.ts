@@ -274,6 +274,10 @@ export const useAnalysisStore = create<AnalysisState>()(
        * 提交分析请求
        * @returns 分析结果ID
        */
+      /**
+       * 提交插班分析
+       * 【修复】从 /api/analysis/submit（不存在）改为 /api/transfer/analyze
+       */
       submitAnalysis: async () => {
         const { formData } = get()
         set({ loading: true, error: null })
@@ -288,39 +292,123 @@ export const useAnalysisStore = create<AnalysisState>()(
             headers['Authorization'] = `Bearer ${token}`
           }
 
-          const response = await apiFetch('/api/analysis/submit', {
+          // 【修复】调用正确的后端接口 /api/transfer/analyze
+          // 后端需要: { targetSchools, targetGrade?, languagePreference? }
+          const requestBody = {
+            targetSchools: formData.targetSchools,
+            targetGrade: formData.grade,  // 映射 grade -> targetGrade
+            // 可扩展: languagePreference, subjectStatuses 等
+          }
+
+          const response = await apiFetch('/api/transfer/analyze', {
             method: 'POST',
             headers,
-            body: JSON.stringify(formData),
+            body: JSON.stringify(requestBody),
           })
           
+          // 【加强】错误处理：检查 HTTP 状态
           if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || errorData.message || '分析请求失败')
+            let errorMsg = `请求失败 (${response.status})`
+            try {
+              const errorData = await response.json()
+              errorMsg = errorData.error || errorData.message || errorMsg
+            } catch {
+              // 可能返回 HTML 而非 JSON
+              errorMsg = `接口返回异常 (${response.status})`
+            }
+            throw new Error(errorMsg)
           }
           
           const data = await response.json()
+          
+          // 【修复】后端返回 { success, data: { results, summary } }
+          // 需要转换为前端期望的格式
+          if (!data.success) {
+            throw new Error(data.error || '分析失败')
+          }
+
+          // 构建前端期望的 result 结构
+          const analysisId = `transfer-${Date.now()}`
+          const createdAt = new Date().toISOString()
+          const backendResults = data.data?.results || []
+          const backendSummary = data.data?.summary || {}
+          
+          // 计算综合风险评分（基于分析结果）
+          const highRisk = backendSummary.highRisk || 0
+          const mediumRisk = backendSummary.mediumRisk || 0
+          const lowRisk = backendSummary.lowRisk || 0
+          const total = highRisk + mediumRisk + lowRisk
+          // 风险越高，可行性分数越低
+          const feasibilityScore = total > 0 
+            ? Math.round((lowRisk * 100 + mediumRisk * 60 + highRisk * 30) / total)
+            : 50
+          
+          const summaryText = total > 0
+            ? `共分析 ${total} 所目标学校，其中高风险 ${highRisk} 所，中风险 ${mediumRisk} 所，低风险 ${lowRisk} 所`
+            : '暂无分析结果'
+
+          // 构建兼容 AnalysisResult 的完整结构
+          // FeasibilityLevel: 'A' | 'B' | 'C' | 'D' | 'E'
+          const feasibilityLevel: FeasibilityLevel = 
+            feasibilityScore >= 80 ? 'A' : 
+            feasibilityScore >= 60 ? 'B' : 
+            feasibilityScore >= 40 ? 'C' : 
+            feasibilityScore >= 20 ? 'D' : 'E'
+          
+          const result: AnalysisResult = {
+            id: analysisId,
+            createdAt,
+            studentInfo: formData,
+            overallAssessment: {
+              feasibilityScore,
+              feasibilityLevel,
+              levelDescription: feasibilityScore >= 70 ? '可行性较高' : feasibilityScore >= 40 ? '有一定风险' : '风险较高',
+              summary: summaryText,
+              keyStrengths: lowRisk > 0 ? [`${lowRisk} 所低风险学校可重点考虑`] : [],
+              keyWeaknesses: highRisk > 0 ? [`${highRisk} 所高风险学校竞争激烈`] : [],
+            },
+            // 后端返回的学校分析结果转换为 schoolAssessments
+            schoolAssessments: backendResults.map((school: any) => ({
+              school: school.school,
+              matchScore: school.riskLevel === 'low' ? 85 : school.riskLevel === 'medium' ? 60 : 35,
+              riskLevel: school.riskLevel,
+              competitionLevel: school.competitionLevel,
+              notes: school.notes || [],
+            })),
+            subjectAnalyses: [],  // 后端暂不返回科目分析
+            studyPlan: {
+              weeklySchedule: [],
+              monthlyGoals: [],
+              resources: [],
+            },
+            additionalAdvice: backendResults.length > 0 
+              ? ['建议优先申请低风险学校作为保底', '高风险学校可作为冲刺目标']
+              : [],
+            disclaimer: data.data?.disclaimer || '此分析僅供參考，不構成任何錄取承諾',
+          }
+
           set({
-            currentResult: data.result,
+            currentResult: result,
             loading: false,
           })
           
           // 添加到历史记录
           const historyItem: HistoryItem = {
-            id: data.result.id,
-            createdAt: data.result.createdAt,
+            id: result.id,
+            createdAt: result.createdAt,
             studentInfo: formData,
-            feasibilityScore: data.result.overallAssessment.feasibilityScore,
-            summary: data.result.overallAssessment.summary,
+            feasibilityScore: result.overallAssessment.feasibilityScore,
+            summary: result.overallAssessment.summary,
           }
           
           set((state) => ({
             history: [historyItem, ...state.history],
           }))
           
-          return data.result.id
+          return result.id
         } catch (error) {
           const message = error instanceof Error ? error.message : '未知错误'
+          console.error('[Transfer Analysis Error]', message)
           set({ loading: false, error: message })
           throw error
         }
