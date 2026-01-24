@@ -546,7 +546,7 @@ const ResultPage = () => {
                     <Col span={12}>
                       <Text strong>录取要求：</Text>
                       <ul className={styles.compactList}>
-                        {school.requirements.map((r, i) => (
+                        {(school.requirements ?? []).map((r, i) => (
                           <li key={i}>{r}</li>
                         ))}
                       </ul>
@@ -554,7 +554,7 @@ const ResultPage = () => {
                     <Col span={12}>
                       <Text strong>建议：</Text>
                       <ul className={styles.compactList}>
-                        {school.recommendations.map((r, i) => (
+                        {(school.recommendations ?? []).map((r, i) => (
                           <li key={i}>{r}</li>
                         ))}
                       </ul>

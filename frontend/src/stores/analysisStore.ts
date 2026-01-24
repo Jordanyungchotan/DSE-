@@ -375,12 +375,24 @@ export const useAnalysisStore = create<AnalysisState>()(
               keyWeaknesses: highRisk > 0 ? [`${highRisk} 所高风险学校竞争激烈`] : [],
             },
             // 后端返回的学校分析结果转换为 schoolAssessments
+            // 【修复】字段名必须与 SchoolAssessment 接口和 ResultPage 完全一致
             schoolAssessments: backendResults.map((school: any) => ({
-              school: school.school,
-              matchScore: school.riskLevel === 'low' ? 85 : school.riskLevel === 'medium' ? 60 : 35,
-              riskLevel: school.riskLevel,
-              competitionLevel: school.competitionLevel,
-              notes: school.notes || [],
+              // 基础字段
+              schoolName: school.school || school.schoolName || '未知学校',
+              programme: school.programme ?? '',
+              
+              // 评分字段
+              matchScore: school.matchScore ?? (school.riskLevel === 'low' ? 85 : school.riskLevel === 'medium' ? 60 : 35),
+              
+              // 风险/可行性字段
+              feasibilityLevel: school.feasibilityLevel ?? (school.riskLevel === 'low' ? 'A' : school.riskLevel === 'medium' ? 'B' : 'C') as 'A' | 'B' | 'C' | 'D' | 'E',
+              levelLabel: school.levelLabel ?? (school.riskLevel === 'low' ? '低风险' : school.riskLevel === 'medium' ? '中风险' : '高风险'),
+              levelColor: school.levelColor ?? (school.riskLevel === 'low' ? 'success' : school.riskLevel === 'medium' ? 'warning' : 'error'),
+              
+              // ResultPage 必需的数组字段（必须有 fallback）
+              requirements: school.requirements ?? school.notes ?? [],
+              recommendations: school.recommendations ?? (school.riskLevel === 'low' ? ['可作为主要目标'] : ['谨慎考虑']),
+              gaps: school.gaps ?? (school.riskLevel === 'high' ? ['竞争激烈', '名额有限'] : []),
             })),
             subjectAnalyses: [],  // 后端暂不返回科目分析
             studyPlan: {
