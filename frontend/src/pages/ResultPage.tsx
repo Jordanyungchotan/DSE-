@@ -235,6 +235,7 @@ const ResultPage = () => {
     schoolAssessments: [
       {
         schoolName: '喇沙书院',
+        programme: '中四插班',
         feasibilityLevel: 'B' as const,
         levelLabel: '可行性较高',
         levelColor: 'processing',
@@ -244,6 +245,7 @@ const ResultPage = () => {
       },
       {
         schoolName: '拔萃男书院',
+        programme: '中四插班',
         feasibilityLevel: 'C' as const,
         levelLabel: '可行性中等',
         levelColor: 'warning',
