@@ -522,15 +522,22 @@ const ResultPage = () => {
                   size="small"
                   className={styles.schoolCard}
                   title={
-                    <Space>
-                      <Text strong>{school.schoolName}</Text>
-                      <Tag color={school.levelColor as 'success' | 'processing' | 'warning' | 'error' | 'default' || 
-                        (school.feasibilityLevel === 'A' ? 'success' : 
-                         school.feasibilityLevel === 'B' ? 'processing' : 
-                         school.feasibilityLevel === 'C' ? 'warning' : 'error')}>
-                        {school.levelLabel || `${school.feasibilityLevel}级`}
-                      </Tag>
-                    </Space>
+                    <div>
+                      <Space>
+                        <Text strong>{school.schoolName}</Text>
+                        <Tag color={school.levelColor as 'success' | 'processing' | 'warning' | 'error' | 'default' || 
+                          (school.feasibilityLevel === 'A' ? 'success' : 
+                           school.feasibilityLevel === 'B' ? 'processing' : 
+                           school.feasibilityLevel === 'C' ? 'warning' : 'error')}>
+                          {school.levelLabel || `${school.feasibilityLevel}级`}
+                        </Tag>
+                      </Space>
+                      {school.programme && (
+                        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
+                          {school.programme.length > 60 ? school.programme.substring(0, 60) + '...' : school.programme}
+                        </Text>
+                      )}
+                    </div>
                   }
                 >
                   <Row gutter={16}>

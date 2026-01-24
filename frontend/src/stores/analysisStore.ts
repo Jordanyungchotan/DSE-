@@ -152,6 +152,13 @@ export const FEASIBILITY_LEVEL_CONFIG: Record<FeasibilityLevel, {
  */
 export interface SchoolAssessment {
   schoolName: string
+  programme?: string  // 具体专业/课程名称
+  programmeCode?: string  // 课程代码
+  field?: string  // 专业领域
+  matchScore?: number  // 综合匹配度
+  academicScore?: number  // 学术匹配度
+  personalScore?: number  // 特质匹配度
+  riskLevel?: string  // 风险等级
   feasibilityLevel: FeasibilityLevel
   levelLabel: string
   levelColor: string
