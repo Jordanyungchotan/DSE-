@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import {
   Card,
   Row,
@@ -15,6 +15,7 @@ import {
   Space,
   Collapse,
   Tooltip,
+  Empty,
 } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -285,6 +286,13 @@ const ResultPage = () => {
     ],
   }
 
+  // 【保险措施】如果是 V2 插班分析，重定向到 TransferResultPage
+  // 防止任何路径误入旧页面
+  const resultAny = result as { analysisType?: string; analysisId?: string }
+  if (resultAny.analysisType === 'transfer') {
+    return <Navigate to={`/transfer/result/${resultAny.analysisId || id}`} replace />
+  }
+
   // 雷达图数据
   const radarData = result.subjectAnalyses.map((subject) => ({
     subject: subject.subject,
@@ -415,78 +423,88 @@ const ResultPage = () => {
             <Col xs={24} lg={12}>
               <div className={styles.chartContainer}>
                 <Title level={5} style={{ textAlign: 'center' }}>成绩雷达图</Title>
-                <ResponsiveContainer width="100%" height={300}>
-                  <RadarChart data={radarData}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="subject" />
-                    <PolarRadiusAxis domain={[0, 7]} />
-                    <Radar
-                      name="当前成绩"
-                      dataKey="current"
-                      stroke="#2b6cb0"
-                      fill="#2b6cb0"
-                      fillOpacity={0.3}
-                    />
-                    <Radar
-                      name="目标成绩"
-                      dataKey="target"
-                      stroke="#d69e2e"
-                      fill="#d69e2e"
-                      fillOpacity={0.3}
-                    />
-                    <Legend />
-                  </RadarChart>
-                </ResponsiveContainer>
+                {/* 【防御性渲染】仅在有数据时渲染图表，避免 SVG d="Z" 错误 */}
+                {radarData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RadarChart data={radarData}>
+                      <PolarGrid />
+                      <PolarAngleAxis dataKey="subject" />
+                      <PolarRadiusAxis domain={[0, 7]} />
+                      <Radar
+                        name="当前成绩"
+                        dataKey="current"
+                        stroke="#2b6cb0"
+                        fill="#2b6cb0"
+                        fillOpacity={0.3}
+                      />
+                      <Radar
+                        name="目标成绩"
+                        dataKey="target"
+                        stroke="#d69e2e"
+                        fill="#d69e2e"
+                        fillOpacity={0.3}
+                      />
+                      <Legend />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty description="暂无科目数据" style={{ height: 300, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} />
+                )}
               </div>
             </Col>
             <Col xs={24} lg={12}>
-              <Collapse defaultActiveKey={['0']} ghost>
-                {result.subjectAnalyses.map((subject, index) => (
-                  <Panel
-                    key={index}
-                    header={
-                      <div className={styles.subjectHeader}>
-                        <Text strong>{subject.subject}</Text>
-                        <Space>
-                          <Tag>{subject.currentLevel} → {subject.targetLevel}</Tag>
-                          {getGapTag(subject.gap)}
-                        </Space>
-                      </div>
-                    }
-                  >
-                    <div className={styles.subjectDetail}>
-                      <div className={styles.strengthWeakness}>
-                        <div>
-                          <Text type="success" strong>优势：</Text>
-                          <ul>
-                            {subject.strengths.map((s, i) => (
-                              <li key={i}>{s}</li>
-                            ))}
-                          </ul>
+              {/* 【防御性渲染】仅在有科目数据时渲染详情 */}
+              {result.subjectAnalyses && result.subjectAnalyses.length > 0 ? (
+                <Collapse defaultActiveKey={['0']} ghost>
+                  {result.subjectAnalyses.map((subject, index) => (
+                    <Panel
+                      key={index}
+                      header={
+                        <div className={styles.subjectHeader}>
+                          <Text strong>{subject.subject}</Text>
+                          <Space>
+                            <Tag>{subject.currentLevel} → {subject.targetLevel}</Tag>
+                            {getGapTag(subject.gap)}
+                          </Space>
                         </div>
-                        <div>
-                          <Text type="warning" strong>待改进：</Text>
-                          <ul>
-                            {subject.weaknesses.map((w, i) => (
-                              <li key={i}>{w}</li>
-                            ))}
-                          </ul>
+                      }
+                    >
+                      <div className={styles.subjectDetail}>
+                        <div className={styles.strengthWeakness}>
+                          <div>
+                            <Text type="success" strong>优势：</Text>
+                            <ul>
+                              {(subject.strengths || []).map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                          <div>
+                            <Text type="warning" strong>待改进：</Text>
+                            <ul>
+                              {(subject.weaknesses || []).map((w, i) => (
+                                <li key={i}>{w}</li>
+                              ))}
+                            </ul>
+                          </div>
                         </div>
+                        <Divider />
+                        <Text strong>建议：</Text>
+                        <ul>
+                          {(subject.recommendations || []).map((r, i) => (
+                            <li key={i}>{r}</li>
+                          ))}
+                        </ul>
+                        <Text type="secondary">
+                          预计提升时间：{subject.estimatedTimeToImprove || '待评估'}
+                        </Text>
                       </div>
-                      <Divider />
-                      <Text strong>建议：</Text>
-                      <ul>
-                        {subject.recommendations.map((r, i) => (
-                          <li key={i}>{r}</li>
-                        ))}
-                      </ul>
-                      <Text type="secondary">
-                        预计提升时间：{subject.estimatedTimeToImprove}
-                      </Text>
-                    </div>
-                  </Panel>
-                ))}
-              </Collapse>
+                    </Panel>
+                  ))}
+                </Collapse>
+              ) : (
+                <Empty description="暂无科目分析数据" />
+              )}
             </Col>
           </Row>
         </Card>
@@ -497,71 +515,81 @@ const ResultPage = () => {
             <Col xs={24} lg={10}>
               <div className={styles.chartContainer}>
                 <Title level={5} style={{ textAlign: 'center' }}>可行性评估对比</Title>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={schoolChartData} layout="vertical" margin={{ left: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
-                      width={140}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <RechartsTooltip />
-                    <Bar
-                      dataKey="probability"
-                      fill="#2b6cb0"
-                      radius={[0, 4, 4, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                {/* 【防御性渲染】仅在有数据时渲染图表 */}
+                {schoolChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={schoolChartData} layout="vertical" margin={{ left: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" domain={[0, 100]} />
+                      <YAxis 
+                        type="category" 
+                        dataKey="name" 
+                        width={140}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <RechartsTooltip />
+                      <Bar
+                        dataKey="probability"
+                        fill="#2b6cb0"
+                        radius={[0, 4, 4, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <Empty description="暂无学校数据" style={{ height: 250, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} />
+                )}
               </div>
             </Col>
             <Col xs={24} lg={14}>
-              {result.schoolAssessments.map((school, index) => (
-                <Card
-                  key={index}
-                  size="small"
-                  className={styles.schoolCard}
-                  title={
-                    <div>
-                      <Space>
-                        <Text strong>{school.schoolName}</Text>
-                        <Tag color={school.levelColor as 'success' | 'processing' | 'warning' | 'error' | 'default' || 
-                          (school.feasibilityLevel === 'A' ? 'success' : 
-                           school.feasibilityLevel === 'B' ? 'processing' : 
-                           school.feasibilityLevel === 'C' ? 'warning' : 'error')}>
-                          {school.levelLabel || `${school.feasibilityLevel}级`}
-                        </Tag>
-                      </Space>
-                      {school.programme && (
-                        <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
-                          {school.programme.length > 60 ? school.programme.substring(0, 60) + '...' : school.programme}
-                        </Text>
-                      )}
-                    </div>
-                  }
-                >
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Text strong>录取要求：</Text>
-                      <ul className={styles.compactList}>
-                        {(school.requirements ?? []).map((r, i) => (
-                          <li key={i}>{r}</li>
-                        ))}
-                      </ul>
-                    </Col>
-                    <Col span={12}>
-                      <Text strong>建议：</Text>
-                      <ul className={styles.compactList}>
-                        {(school.recommendations ?? []).map((r, i) => (
-                          <li key={i}>{r}</li>
-                        ))}
-                      </ul>
-                    </Col>
-                  </Row>
-                </Card>
-              ))}
+              {/* 【防御性渲染】仅在有学校数据时渲染卡片 */}
+              {result.schoolAssessments && result.schoolAssessments.length > 0 ? (
+                result.schoolAssessments.map((school, index) => (
+                  <Card
+                    key={index}
+                    size="small"
+                    className={styles.schoolCard}
+                    title={
+                      <div>
+                        <Space>
+                          <Text strong>{school.schoolName}</Text>
+                          <Tag color={school.levelColor as 'success' | 'processing' | 'warning' | 'error' | 'default' || 
+                            (school.feasibilityLevel === 'A' ? 'success' : 
+                             school.feasibilityLevel === 'B' ? 'processing' : 
+                             school.feasibilityLevel === 'C' ? 'warning' : 'error')}>
+                            {school.levelLabel || `${school.feasibilityLevel}级`}
+                          </Tag>
+                        </Space>
+                        {school.programme && (
+                          <Text type="secondary" style={{ display: 'block', fontSize: 12, marginTop: 4 }}>
+                            {school.programme.length > 60 ? school.programme.substring(0, 60) + '...' : school.programme}
+                          </Text>
+                        )}
+                      </div>
+                    }
+                  >
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Text strong>录取要求：</Text>
+                        <ul className={styles.compactList}>
+                          {(school.requirements ?? []).map((r, i) => (
+                            <li key={i}>{r}</li>
+                          ))}
+                        </ul>
+                      </Col>
+                      <Col span={12}>
+                        <Text strong>建议：</Text>
+                        <ul className={styles.compactList}>
+                          {(school.recommendations ?? []).map((r, i) => (
+                            <li key={i}>{r}</li>
+                          ))}
+                        </ul>
+                      </Col>
+                    </Row>
+                  </Card>
+                ))
+              ) : (
+                <Empty description="暂无学校评估数据" />
+              )}
             </Col>
           </Row>
         </Card>

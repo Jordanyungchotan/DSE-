@@ -152,7 +152,7 @@ const AnalysisFormPage = () => {
   ])
   
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
-  const { updateFormData, submitAnalysis, loading } = useAnalysisStore()
+  const { updateFormData, submitTransferAnalysisV2, loading } = useAnalysisStore()
 
   // 分析进度状态
   const [analysisProgress, setAnalysisProgress] = useState(0)
@@ -435,6 +435,11 @@ const AnalysisFormPage = () => {
 
   /**
    * 提交分析
+   * 
+   * 【核心修复】插班分析必须走 Transfer Analysis V2 系统
+   * - 调用 submitTransferAnalysisV2（纯规则引擎）
+   * - 跳转到 /transfer/result/:analysisId
+   * - 禁止使用旧的 submitAnalysis 和 /result/:id
    */
   const handleSubmit = async () => {
     try {
@@ -462,13 +467,35 @@ const AnalysisFormPage = () => {
         achievements: values.achievements || '',
       }
 
-      // 更新store
+      // 更新store（保持兼容）
       updateFormData(formData)
 
-      // 提交分析
-      const resultId = await submitAnalysis()
+      // 【V2 核心】构建 TransferAnalysisInputV2 payload
+      const v2Payload = {
+        targetSchools: selectedSchools,
+        targetGrade: values.grade,
+        languagePreference: undefined, // 暂不支持语言偏好选择
+        enableAI: false, // 使用纯规则引擎
+        subjectStatuses: subjectStatuses.map(s => ({
+          subject: s.subject,
+          status: s.status as 'strong' | 'ok' | 'weak',
+          rankPosition: s.rankPosition,
+        })),
+        selfAssessment: {
+          // 可从表单扩展
+          englishLevel: undefined,
+          mathLevel: undefined,
+          academicLevel: undefined,
+          adaptability: undefined,
+        },
+      }
+
+      // 【V2 核心】提交到 Transfer Analysis V2 接口
+      const analysisId = await submitTransferAnalysisV2(v2Payload)
       message.success('分析已完成！')
-      navigate(`/result/${resultId}`)
+      
+      // 【V2 核心】跳转到 V2 专用结果页
+      navigate(`/transfer/result/${analysisId}`)
     } catch (error) {
       if (error instanceof Error) {
         message.error(error.message)

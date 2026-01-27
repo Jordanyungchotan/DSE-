@@ -210,6 +210,8 @@ export interface HistoryItem {
   studentInfo: StudentInfo
   feasibilityScore: number
   summary: string
+  /** 分析类型：transfer=插班分析, university=大学申请分析, feasibility=可行性分析 */
+  analysisType?: 'transfer' | 'university' | 'feasibility'
 }
 
 /**

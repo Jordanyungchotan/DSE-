@@ -147,7 +147,15 @@ const HistoryPage = () => {
           <Button
             type="link"
             icon={<EyeOutlined />}
-            onClick={() => navigate(`/result/${record.id}`)}
+            onClick={() => {
+              // 【核心修复】根据分析类型跳转到不同的结果页
+              if (record.analysisType === 'transfer') {
+                navigate(`/transfer/result/${record.id}`)
+              } else {
+                // university / feasibility / 其他默认走 ResultPage
+                navigate(`/result/${record.id}`)
+              }
+            }}
           >
             查看
           </Button>
