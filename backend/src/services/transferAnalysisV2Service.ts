@@ -817,6 +817,9 @@ ${triggerReasons.map(r => `- ${r}`).join('\n')}
 
 /**
  * 调用 AI 进行外部数据核验
+ * 
+ * ⚠️ 重要：API Key 缺失时返回 null，不返回默认模板
+ * 这是为了确保 aiEnabled 状态准确反映 AI 是否真正执行
  */
 export async function callExternalDataVerification(
   apiKey: string,
@@ -824,9 +827,10 @@ export async function callExternalDataVerification(
   schoolAssessments: SchoolAssessment[],
   triggerReasons: string[]
 ): Promise<ExternalDataVerification | null> {
+  // 【强制】API Key 缺失时返回 null，不返回伪 AI 模板
   if (!apiKey) {
-    console.warn('[External Verification] API Key 未配置，跳过核验')
-    return createDefaultVerification(triggerReasons)
+    console.warn('[External Verification] API Key 未配置，返回 null（禁止返回默认模板）')
+    return null
   }
 
   const startTime = Date.now()
@@ -1065,29 +1069,80 @@ export function enrichSummaryWithVerification(
 
 /**
  * 完整的带外部核验的分析流程
+ * 
+ * ⚠️ 重要架构原则（强制执行）：
+ * 1. 规则引擎不能被 AI 替代 - feasibilityScore/decisionBasis 始终来自规则
+ * 2. AI 只能做"增强层（Enhancement Layer）"
+ * 3. 任何 AI 未执行的情况必须：aiEnabled = false，禁止使用伪 AI 模板
+ * 
+ * ⚠️ 禁止将模板文字伪装为 AI 分析结果
+ * AI 未执行时，必须：
+ * 1. aiEnabled = false
+ * 2. 不输出任何"根据 AI 分析..."句式
+ * 3. 不返回 externalDataVerification（这是 AI 专属模块）
  */
 export async function executeTransferAnalysisV2WithVerification(
   input: TransferAnalysisInput,
   apiKey?: string
 ): Promise<TransferAnalysisResult> {
-  // Step 1: 执行规则分析
+  // Step 1: 执行规则分析（始终执行，这是唯一决策来源）
   const ruleResult = executeTransferAnalysisV2(input)
 
+  // ===== AI 增强阶段（仅在 API Key 存在时执行）=====
+  
+  // 如果没有 API Key，直接返回纯规则结果
+  if (!apiKey) {
+    console.warn('[Transfer V2] DEEPSEEK_API_KEY 未配置，返回纯规则分析结果')
+    // 【强制】aiEnabled = false，不返回任何 AI 模块
+    return {
+      ...ruleResult,
+      aiEnabled: false,
+      // 【强制】不设置 externalDataVerification - 这是 AI 专属模块
+    }
+  }
+
   // Step 2: 检测数据缺口
-  const { shouldTrigger, triggerReasons, schoolsWithGaps } = detectDataGaps(input, ruleResult.schoolAssessments)
+  const { shouldTrigger, triggerReasons } = detectDataGaps(input, ruleResult.schoolAssessments)
 
   if (!shouldTrigger) {
-    return ruleResult
+    return {
+      ...ruleResult,
+      aiEnabled: false, // 即使有 API Key，如果不需要触发 AI，也标记为 false
+    }
   }
 
   // Step 3: 调用 AI 外部核验
-  const verification = apiKey
-    ? await callExternalDataVerification(apiKey, input, ruleResult.schoolAssessments, triggerReasons)
-    : createDefaultVerification(triggerReasons)
+  let verification: ExternalDataVerification | null = null
+  let aiActuallyExecuted = false
 
-  if (!verification) {
-    return ruleResult
+  try {
+    verification = await callExternalDataVerification(apiKey, input, ruleResult.schoolAssessments, triggerReasons)
+    // 检查 AI 是否真正执行成功（不是返回默认模板）
+    aiActuallyExecuted = verification !== null && verification.triggered === true
+    
+    // 额外检查：如果返回的是默认模板内容，也视为 AI 未执行
+    if (verification && isDefaultVerificationTemplate(verification)) {
+      console.warn('[Transfer V2] AI 返回默认模板，标记为 AI 未执行')
+      aiActuallyExecuted = false
+    }
+  } catch (aiError) {
+    console.error('[Transfer V2] AI 外部核验失败:', aiError)
+    verification = null
+    aiActuallyExecuted = false
   }
+
+  // 如果 AI 没有真正执行，返回纯规则结果
+  if (!aiActuallyExecuted || !verification) {
+    console.log('[Transfer V2] AI 未成功执行，返回纯规则结果，aiEnabled = false')
+    return {
+      ...ruleResult,
+      aiEnabled: false,
+      // 【强制】不设置 externalDataVerification
+    }
+  }
+
+  // ===== AI 成功执行，进行结果增强 =====
+  console.log('[Transfer V2] AI 外部核验成功，进行结果增强，aiEnabled = true')
 
   // Step 4: 丰富学校评估
   const enrichedSchoolAssessments = enrichSchoolAssessmentsWithVerification(
@@ -1099,12 +1154,32 @@ export async function executeTransferAnalysisV2WithVerification(
   // Step 5: 丰富 Summary
   const enrichedSummary = enrichSummaryWithVerification(ruleResult.summary, verification)
 
-  // Step 6: 返回增强结果
+  // Step 6: 返回 AI 增强结果
   return {
     ...ruleResult,
     summary: enrichedSummary,
     schoolAssessments: enrichedSchoolAssessments,
     externalDataVerification: verification,
-    aiEnabled: !!apiKey, // 如果有 API Key 则标记为 AI 增强
+    aiEnabled: true, // 【强制】只有 AI 真正执行成功才设为 true
   }
+}
+
+/**
+ * 检查是否为默认模板（用于判断 AI 是否真正执行）
+ */
+function isDefaultVerificationTemplate(verification: ExternalDataVerification): boolean {
+  // 检查 publicFindings 是否为默认模板
+  const defaultFindings = getDefaultPublicFindings()
+  if (verification.publicFindings?.length === defaultFindings.length) {
+    const allMatch = verification.publicFindings.every((f, i) => f === defaultFindings[i])
+    if (allMatch) return true
+  }
+  
+  // 检查 realityInference 是否为默认模板
+  const defaultInference = getDefaultRealityInference()
+  if (verification.realityInference === defaultInference) {
+    return true
+  }
+  
+  return false
 }

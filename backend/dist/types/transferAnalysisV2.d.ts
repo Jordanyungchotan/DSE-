@@ -29,6 +29,13 @@ export interface TransferAnalysisResult {
     schoolAssessments: SchoolAssessment[];
     /** 过渡/学习计划（替代 studyPlan） */
     transitionPlan: TransitionPlan;
+    /**
+     * AI 外部数据核验结果（V2 新增）
+     *
+     * 当系统检测到数据缺失时自动触发
+     * 用于增强报告的现实可信度
+     */
+    externalDataVerification?: ExternalDataVerification;
     /** 分析元数据 */
     meta: AnalysisMeta;
 }
@@ -98,6 +105,20 @@ export interface SchoolAssessment {
     gaps: string[];
     /** 补充说明（学校特点、注意事项等） */
     notes: string[];
+    /**
+     * 该学校的数据缺口解释（V2 新增）
+     *
+     * 替代"暂无数据"的结构化三段式输出
+     * 只有当该学校存在数据缺口时才有值
+     */
+    dataGapExplanations?: DataGapExplanation[];
+    /**
+     * 融合结论（V2 新增）
+     *
+     * 系统规则结论 + AI 网络现实对照 + 针对该学生的行动建议
+     * 必须达到三层信息融合的层级
+     */
+    integratedConclusion?: string;
 }
 /**
  * 过渡/学习计划
@@ -131,6 +152,79 @@ export interface TransferSummary {
     keyAdvantages: string[];
     /** 主要风险 */
     keyRisks: string[];
+    /**
+     * 决策依据（规则引擎解释）
+     *
+     * 回答"这个结论是如何得出的？"
+     * - 至少 3 条
+     * - 纯规则生成
+     */
+    decisionBasis: string[];
+    /**
+     * AI 实际参与内容（可选）
+     *
+     * 仅当 AI 增强成功时存在
+     * - 描述 AI 实际生成的内容
+     * - AI 失败/未启用时不存在
+     */
+    aiContribution?: string[];
+    /**
+     * 整体数据缺口解释（V2 新增）
+     *
+     * 当分析中存在全局性数据缺口时使用
+     */
+    dataGapExplanations?: DataGapExplanation[];
+    /**
+     * 综合现实结论（V2 新增）
+     *
+     * 融合三层信息：系统规则结论 + AI 网络现实对照 + 行动建议
+     */
+    integratedRealityConclusion?: string;
+}
+/**
+ * 数据可用性等级
+ */
+export type DataAvailability = '充分' | '有限' | '极少' | '几乎没有';
+/**
+ * 对评估的影响程度
+ */
+export type ImpactLevel = '不影响' | '轻微影响' | '明显影响';
+/**
+ * AI 外部数据核验结果
+ *
+ * 当系统检测到数据缺失时，触发 AI 进行网络公开信息核验
+ * 这不是实时爬虫，而是基于公开网络常识的综合判断
+ */
+export interface ExternalDataVerification {
+    /** 是否触发了核验 */
+    triggered: boolean;
+    /** 触发核验的原因 */
+    triggerReasons?: string[];
+    /** 数据可用性评估 */
+    dataAvailability?: DataAvailability;
+    /** 公开信息发现（AI 对公开经验的总结） */
+    publicFindings?: string[];
+    /** 现实推断结论 */
+    realityInference?: string;
+    /** 对当前评估的影响 */
+    impactOnAssessment?: ImpactLevel;
+    /** 建议的行动 */
+    recommendedActions?: string[];
+}
+/**
+ * 数据缺口结构化解释
+ *
+ * 用于替代"暂无数据"的三段式输出
+ */
+export interface DataGapExplanation {
+    /** 缺失数据类型（如 "插班名额"、"历史录取数据"） */
+    gapType: string;
+    /** 为什么缺失（现实原因 + AI 网络判断） */
+    whyMissing: string;
+    /** 是否影响当前判断（定性说明） */
+    impactStatement: string;
+    /** 用户可以做什么（可执行建议） */
+    userActions: string[];
 }
 /**
  * 分析元数据
@@ -142,6 +236,18 @@ export interface AnalysisMeta {
     generatedAt: string;
     /** 数据结构版本 */
     version: 'v2';
+    /** AI 模型信息（如有） */
+    aiModel?: string;
+    /** AI 调用延迟（毫秒） */
+    aiLatency?: number;
+}
+/**
+ * 科目状态输入
+ */
+export interface SubjectStatusInput {
+    subject: string;
+    status: 'strong' | 'ok' | 'weak';
+    rankPosition?: 'top' | 'top10' | 'top30' | 'mid' | 'middle' | 'bottom' | 'bottom30';
 }
 /**
  * 插班分析输入参数
@@ -157,6 +263,8 @@ export interface TransferAnalysisInput {
     languagePreference?: 'EMI' | 'CMI';
     /** 是否启用 AI 增强分析 */
     enableAI?: boolean;
+    /** 科目学习状态（用于规则引擎分析） */
+    subjectStatuses?: SubjectStatusInput[];
     /** 学生自评能力（可选，用于 AI 分析） */
     selfAssessment?: {
         englishLevel?: 'strong' | 'medium' | 'weak';

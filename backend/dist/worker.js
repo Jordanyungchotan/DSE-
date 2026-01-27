@@ -14,7 +14,7 @@ import { getMallItems, redeemItem, getUserConsultations, updateConsultationStatu
 import { getDailyMissions, checkMissionProgress, } from './services/dailyMissionService.js';
 import { recordLearningEvent, } from './services/learningEventRecorder.js';
 import { recordQuestionAttemptsBatch, getWrongQuestionsByUser, updateWrongQuestionStatus, getLearningProfile, } from './services/questionAttemptRecorder.js';
-import { DEFAULT_CAPABILITY_ANALYSES, DEFAULT_TRANSITION_PLAN, DEFAULT_SUMMARY_RISKS, DEFAULT_SUMMARY_ADVANTAGES, DEFAULT_SCHOOL_ASSESSMENT_FIELDS, getFeasibilityLevel, getRecommendationType, getRiskLevel, } from './templates/transferDefaults.js';
+import { executeTransferAnalysisV2, executeTransferAnalysisV2WithVerification, callAIEnhancement, mergeAIEnhancement, } from './services/transferAnalysisV2Service.js';
 // 允许的 CORS 来源列表
 const ALLOWED_ORIGINS = [
     'https://dse-analysis.pages.dev',
@@ -2859,17 +2859,85 @@ export default {
              * 插班分析 V2 接口
              * POST /api/transfer/analyze/v2
              *
-             * 【设计原则】
-             * 1. 纯规则引擎，不调用 AI
-             * 2. 返回 TransferAnalysisResultV2 完整结构
+             * 【设计原则 - V2 强制优化】
+             * 1. 规则引擎 + AI 外部数据核验
+             * 2. 返回 TransferAnalysisResult 完整结构
              * 3. 所有数组字段保证非空
-             * 4. analysis_id 为真实 UUID，写入数据库
+             * 4. 禁止"暂无数据"，必须提供结构化解释
+             * 5. 融合三层信息：系统规则 + AI 现实对照 + 行动建议
              */
             if (path === '/api/transfer/analyze/v2' && request.method === 'POST') {
                 const body = await request.json();
                 // ===== 输入校验 =====
                 if (!body.targetSchools || !Array.isArray(body.targetSchools) || body.targetSchools.length === 0) {
                     return errorResponse('targetSchools 必须是非空数组', 400, origin);
+                }
+                // ===== 执行 V2 规则分析（带外部数据核验）=====
+                // 使用 DeepSeek API Key 进行 AI 外部核验
+                const transferResultV2 = await executeTransferAnalysisV2WithVerification(body, env.DEEPSEEK_API_KEY // 传入 API Key 启用 AI 核验
+                );
+                // ===== 获取用户信息（可选登录）=====
+                let userId = null;
+                const authHeader = request.headers.get('Authorization');
+                if (authHeader?.startsWith('Bearer ')) {
+                    const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
+                    userId = tokenData?.userId || null;
+                }
+                // ===== 写入数据库 =====
+                await env.DB.prepare(`INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+           VALUES (?, ?, 'transfer', ?, ?, ?)`).bind(transferResultV2.analysisId, userId, JSON.stringify(body), JSON.stringify(transferResultV2), transferResultV2.meta.generatedAt).run();
+                // ===== 返回响应 =====
+                return jsonResponse({
+                    success: true,
+                    data: {
+                        analysis_id: transferResultV2.analysisId,
+                        result: transferResultV2,
+                    },
+                }, 200, origin);
+            }
+            // =====================
+            // 插班分析 AI 增强 API
+            // =====================
+            /**
+             * 插班分析 AI 增强接口
+             * POST /api/transfer/analyze/ai
+             *
+             * 【核心原则】
+             * 1. 规则引擎是唯一决策来源
+             * 2. AI 只能"补充解释"和"生成计划"
+             * 3. AI 失败必须自动降级为 V2 纯规则结果
+             *
+             * 【合并规则】
+             * - schoolAssessments：完全使用规则结果
+             * - summary：规则 summary 不变
+             * - capabilityAnalyses：AI 成功 → 使用 AI，失败 → 使用默认
+             * - transitionPlan：AI 成功 → 使用 AI，失败 → 使用默认
+             */
+            if (path === '/api/transfer/analyze/ai' && request.method === 'POST') {
+                const body = await request.json();
+                // ===== 输入校验 =====
+                if (!body.targetSchools || !Array.isArray(body.targetSchools) || body.targetSchools.length === 0) {
+                    return errorResponse('targetSchools 必须是非空数组', 400, origin);
+                }
+                // ===== Step 1: 执行 V2 规则分析（唯一决策来源）=====
+                const ruleResultV2 = executeTransferAnalysisV2(body);
+                // ===== Step 2: 调用 AI 增强（可选，失败自动降级）=====
+                let finalResult = ruleResultV2;
+                try {
+                    const aiEnhancement = await callAIEnhancement(env.DEEPSEEK_API_KEY, body, ruleResultV2);
+                    // ===== Step 3: 合并 AI 结果 =====
+                    if (aiEnhancement) {
+                        finalResult = mergeAIEnhancement(ruleResultV2, aiEnhancement);
+                        console.log('[Transfer AI] AI 增强成功，aiEnabled =', finalResult.aiEnabled);
+                    }
+                    else {
+                        console.log('[Transfer AI] AI 增强失败，使用纯规则结果');
+                    }
+                }
+                catch (aiError) {
+                    // AI 失败，自动降级为纯规则结果
+                    console.error('[Transfer AI] AI 处理异常，自动降级:', aiError);
+                    finalResult = ruleResultV2;
                 }
                 // ===== 获取用户信息（可选登录）=====
                 let userId = null;
@@ -2878,129 +2946,15 @@ export default {
                     const tokenData = await verifyToken(authHeader.slice(7), env.JWT_SECRET);
                     userId = tokenData?.userId || null;
                 }
-                // ===== 规则引擎分析 =====
-                let ruleAnalysisResult = {
-                    subjectAnalyses: [],
-                    electiveNotes: [],
-                    overallFeasibility: { score: 65, level: 'B' },
-                };
-                // 如果有 subjectStatuses，使用规则引擎分析
-                if (body.subjectStatuses && body.subjectStatuses.length > 0) {
-                    const validStatuses = body.subjectStatuses.map(s => ({
-                        subject: s.subject,
-                        status: s.status,
-                        // 映射到正确的 RankPosition 类型：'top' | 'mid' | 'bottom'
-                        rankPosition: s.rankPosition
-                            ? (s.rankPosition === 'top' || s.rankPosition === 'top10' || s.rankPosition === 'top30'
-                                ? 'top'
-                                : s.rankPosition === 'bottom' || s.rankPosition === 'bottom30'
-                                    ? 'bottom'
-                                    : 'mid')
-                            : undefined,
-                    }));
-                    const analysisResult = analyzeTransferSubjectStatuses(validStatuses, 'zh-CN');
-                    // 将分析结果映射到本地类型
-                    ruleAnalysisResult = {
-                        subjectAnalyses: analysisResult.subjectAnalyses.map(s => ({
-                            subjectKey: s.subjectKey,
-                            subjectName: s.subjectName,
-                            status: s.status,
-                            riskLevel: s.riskLevel,
-                            summary: s.summary,
-                            advice: s.advice,
-                        })),
-                        electiveNotes: analysisResult.electiveNotes,
-                        overallFeasibility: {
-                            score: analysisResult.overallFeasibility.score,
-                            level: analysisResult.overallFeasibility.level,
-                        },
-                    };
-                }
-                const feasibilityScore = ruleAnalysisResult.overallFeasibility.score;
-                const feasibilityLevel = getFeasibilityLevel(feasibilityScore);
-                // ===== 构建 V2 结构 =====
-                const analysisId = crypto.randomUUID();
-                const now = new Date().toISOString();
-                // 构建 summary
-                const summary = {
-                    overallLevel: feasibilityScore >= 71 ? '稳妥' : feasibilityScore >= 51 ? '可尝试' : '高风险',
-                    feasibilityScore,
-                    keyAdvantages: ruleAnalysisResult.subjectAnalyses
-                        .filter(s => s.status === 'strong')
-                        .map(s => `${s.subjectName} 学习状态良好`)
-                        .slice(0, 3),
-                    keyRisks: ruleAnalysisResult.subjectAnalyses
-                        .filter(s => s.status === 'weak')
-                        .map(s => `${s.subjectName} 需要加强`)
-                        .slice(0, 3),
-                };
-                // 确保 keyAdvantages 和 keyRisks 非空
-                if (summary.keyAdvantages.length === 0) {
-                    summary.keyAdvantages = DEFAULT_SUMMARY_ADVANTAGES;
-                }
-                if (summary.keyRisks.length === 0) {
-                    summary.keyRisks = DEFAULT_SUMMARY_RISKS;
-                }
-                // 构建能力分析（使用默认模板）
-                const capabilityAnalyses = DEFAULT_CAPABILITY_ANALYSES.map(ca => ({
-                    ...ca,
-                    // 根据规则分析结果调整部分维度的评估
-                    level: ca.dimension === 'AcademicFoundation'
-                        ? (feasibilityScore >= 70 ? '强' : feasibilityScore >= 50 ? '中' : '弱')
-                        : ca.level,
-                }));
-                // 构建学校评估
-                const schoolAssessments = body.targetSchools.map((schoolName, index) => {
-                    // 根据学校顺序和整体可行性计算分数
-                    const baseScore = feasibilityScore;
-                    const positionPenalty = index * 5;
-                    const matchScore = Math.max(30, Math.min(100, baseScore - positionPenalty));
-                    return {
-                        schoolName,
-                        programme: body.targetGrade || '中四',
-                        matchScore,
-                        riskLevel: getRiskLevel(matchScore),
-                        recommendation: getRecommendationType(matchScore),
-                        requirements: DEFAULT_SCHOOL_ASSESSMENT_FIELDS.requirements,
-                        gaps: matchScore < 60
-                            ? ['部分科目需要加强', '需要适应新学校环境']
-                            : DEFAULT_SCHOOL_ASSESSMENT_FIELDS.gaps,
-                        notes: DEFAULT_SCHOOL_ASSESSMENT_FIELDS.notes,
-                    };
-                });
-                // 构建过渡计划（使用默认模板）
-                const transitionPlan = DEFAULT_TRANSITION_PLAN;
-                // 构建元数据
-                const meta = {
-                    version: 'v2',
-                    generatedAt: now,
-                };
-                // 组装完整 V2 结果
-                const transferAnalysisResultV2 = {
-                    analysisId,
-                    analysisType: 'transfer',
-                    aiEnabled: false,
-                    summary,
-                    capabilityAnalyses,
-                    schoolAssessments,
-                    transitionPlan,
-                    meta,
-                };
                 // ===== 写入数据库 =====
-                // 使用 analysis_records 表，analysis_type = 'transfer'
                 await env.DB.prepare(`INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
-           VALUES (?, ?, 'transfer', ?, ?, ?)`).bind(analysisId, userId, JSON.stringify({
-                    targetSchools: body.targetSchools,
-                    targetGrade: body.targetGrade,
-                    subjectStatuses: body.subjectStatuses,
-                    languagePreference: body.languagePreference,
-                }), JSON.stringify(transferAnalysisResultV2), now).run();
+           VALUES (?, ?, 'transfer', ?, ?, ?)`).bind(finalResult.analysisId, userId, JSON.stringify(body), JSON.stringify(finalResult), finalResult.meta.generatedAt).run();
                 // ===== 返回响应 =====
                 return jsonResponse({
                     success: true,
                     data: {
-                        analysis_id: analysisId,
-                        result: transferAnalysisResultV2,
+                        analysis_id: finalResult.analysisId,
+                        result: finalResult,
                     },
                 }, 200, origin);
             }

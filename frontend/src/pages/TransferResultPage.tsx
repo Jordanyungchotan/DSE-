@@ -23,6 +23,7 @@ import {
   Space,
   Divider,
   Collapse,
+  message,
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -41,6 +42,7 @@ import {
   GlobalOutlined,
   InfoCircleOutlined,
   SearchOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import { useAnalysisStore } from '../stores/analysisStore'
 import type { 
@@ -129,6 +131,17 @@ const TransferResultPage: React.FC = () => {
       loadTransferResultV2(analysisId).catch(console.error)
     }
   }, [analysisId, loadTransferResultV2])
+
+  // 【强制】AI 未启用时显示用户提示
+  useEffect(() => {
+    if (transferResultV2 && !transferResultV2.aiEnabled) {
+      message.warning({
+        content: '当前显示的是基础规则分析，AI 深度分析暂未启用',
+        duration: 5,
+        key: 'ai-not-enabled',
+      })
+    }
+  }, [transferResultV2])
 
   // 加载中
   if (loading) {
@@ -417,8 +430,8 @@ const TransferResultPage: React.FC = () => {
                   format={(percent) => `匹配度 ${percent}%`}
                 />
 
-                {/* V2 新增：融合结论（三层信息） */}
-                {school.integratedConclusion && (
+                {/* V2 新增：融合结论（三层信息） - 仅 AI 启用时显示 */}
+                {aiEnabled && school.integratedConclusion && (
                   <div className={styles.integratedConclusion}>
                     <Alert
                       type="info"
@@ -453,8 +466,8 @@ const TransferResultPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* V2 新增：数据缺口解释（替代"暂无数据"） */}
-                {school.dataGapExplanations && school.dataGapExplanations.length > 0 && (
+                {/* V2 新增：数据缺口解释 - 仅 AI 启用时显示 */}
+                {aiEnabled && school.dataGapExplanations && school.dataGapExplanations.length > 0 && (
                   <Collapse 
                     ghost 
                     size="small"
@@ -713,6 +726,27 @@ const TransferResultPage: React.FC = () => {
         </Button>
       </div>
 
+      {/* 【强制】AI 状态显示 - 区分分析级别 */}
+      {aiEnabled ? (
+        <Alert
+          message={<><RobotOutlined /> AI 深度分析</>}
+          description="本报告包含 AI 增强内容：个性化能力分析、过渡计划、外部数据核验"
+          type="success"
+          showIcon
+          icon={<RobotOutlined />}
+          style={{ marginBottom: 16 }}
+        />
+      ) : (
+        <Alert
+          message={<><BarChartOutlined /> 基础规则分析</>}
+          description="当前为基础规则分析结果。AI 深度分析暂未启用，部分高级功能（如外部数据核验、个性化建议）不可用。"
+          type="warning"
+          showIcon
+          icon={<BarChartOutlined />}
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       {/* 页面标题 */}
       <div className={styles.pageTitle}>
         <Title level={2}>
@@ -721,13 +755,19 @@ const TransferResultPage: React.FC = () => {
         <Text type="secondary">
           分析编号：{transferResultV2.analysisId}
         </Text>
+        <div style={{ marginTop: 8 }}>
+          {aiEnabled 
+            ? <Tag color="green">🤖 AI 深度分析</Tag>
+            : <Tag color="orange">📊 基础规则分析</Tag>
+          }
+        </div>
       </div>
 
       {/* 1️⃣ 综合评估 */}
       {renderSummary(summary)}
 
-      {/* 1.5️⃣ 综合现实结论（V2 新增：融合三层信息） */}
-      {renderIntegratedRealityConclusion(summary)}
+      {/* 1.5️⃣ 综合现实结论（仅 AI 启用时显示） */}
+      {aiEnabled && renderIntegratedRealityConclusion(summary)}
 
       {/* 2️⃣ 优势与风险 */}
       {renderStrengthsAndRisks(summary)}
@@ -735,8 +775,8 @@ const TransferResultPage: React.FC = () => {
       {/* 2.5️⃣ 决策依据与 AI 贡献（Explainability） */}
       {renderDecisionBasis(summary)}
 
-      {/* 3️⃣ AI 外部数据核验（V2 新增：现实世界对齐） */}
-      {renderExternalVerification(externalDataVerification)}
+      {/* 3️⃣ AI 外部数据核验（仅 AI 启用时显示） */}
+      {aiEnabled && renderExternalVerification(externalDataVerification)}
 
       {/* 4️⃣ 能力分析 */}
       {renderCapabilityAnalyses(capabilityAnalyses)}

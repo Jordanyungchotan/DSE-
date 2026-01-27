@@ -152,7 +152,8 @@ const AnalysisFormPage = () => {
   ])
   
   const [selectedSchools, setSelectedSchools] = useState<string[]>([])
-  const { updateFormData, submitTransferAnalysisV2, loading } = useAnalysisStore()
+  // 【核心修复】使用 AI 增强接口而非纯规则接口
+  const { updateFormData, submitTransferAnalysisAI, loading } = useAnalysisStore()
 
   // 分析进度状态
   const [analysisProgress, setAnalysisProgress] = useState(0)
@@ -490,8 +491,9 @@ const AnalysisFormPage = () => {
         },
       }
 
-      // 【V2 核心】提交到 Transfer Analysis V2 接口
-      const analysisId = await submitTransferAnalysisV2(v2Payload)
+      // 【核心修复】提交到 Transfer Analysis AI 增强接口
+      // AI 失败会自动降级为纯规则结果，aiEnabled 会准确反映实际状态
+      const analysisId = await submitTransferAnalysisAI(v2Payload)
       message.success('分析已完成！')
       
       // 【V2 核心】跳转到 V2 专用结果页
