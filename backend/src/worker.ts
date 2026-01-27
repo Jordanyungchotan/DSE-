@@ -83,8 +83,13 @@ import {
 } from './services/questionAttemptRecorder.js'
 import {
   executeTransferAnalysisV2,
+  executeTransferAnalysisV2WithVerification,
   callAIEnhancement,
   mergeAIEnhancement,
+  detectDataGaps,
+  callExternalDataVerification,
+  enrichSchoolAssessmentsWithVerification,
+  enrichSummaryWithVerification,
 } from './services/transferAnalysisV2Service.js'
 import type {
   TransferAnalysisResult,
@@ -3605,11 +3610,12 @@ export default {
        * 插班分析 V2 接口
        * POST /api/transfer/analyze/v2
        * 
-       * 【设计原则】
-       * 1. 纯规则引擎，不调用 AI
+       * 【设计原则 - V2 强制优化】
+       * 1. 规则引擎 + AI 外部数据核验
        * 2. 返回 TransferAnalysisResult 完整结构
        * 3. 所有数组字段保证非空
-       * 4. analysis_id 为真实 UUID，写入数据库
+       * 4. 禁止"暂无数据"，必须提供结构化解释
+       * 5. 融合三层信息：系统规则 + AI 现实对照 + 行动建议
        */
       if (path === '/api/transfer/analyze/v2' && request.method === 'POST') {
         const body = await request.json() as TransferAnalysisInputV2
@@ -3619,8 +3625,12 @@ export default {
           return errorResponse('targetSchools 必须是非空数组', 400, origin)
         }
 
-        // ===== 执行 V2 规则分析 =====
-        const transferResultV2 = executeTransferAnalysisV2(body)
+        // ===== 执行 V2 规则分析（带外部数据核验）=====
+        // 使用 DeepSeek API Key 进行 AI 外部核验
+        const transferResultV2 = await executeTransferAnalysisV2WithVerification(
+          body,
+          env.DEEPSEEK_API_KEY // 传入 API Key 启用 AI 核验
+        )
 
         // ===== 获取用户信息（可选登录）=====
         let userId: string | null = null

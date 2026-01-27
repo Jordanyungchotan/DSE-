@@ -21,6 +21,8 @@ import {
   Col,
   Empty,
   Space,
+  Divider,
+  Collapse,
 } from 'antd'
 import {
   CheckCircleOutlined,
@@ -36,6 +38,9 @@ import {
   CalendarOutlined,
   FileTextOutlined,
   RobotOutlined,
+  GlobalOutlined,
+  InfoCircleOutlined,
+  SearchOutlined,
 } from '@ant-design/icons'
 import { useAnalysisStore } from '../stores/analysisStore'
 import type { 
@@ -43,6 +48,8 @@ import type {
   SchoolAssessment, 
   TransitionPlan,
   TransferSummary,
+  ExternalDataVerification,
+  DataGapExplanation,
 } from '../types/transferAnalysisV2'
 import styles from './TransferResultPage.module.css'
 
@@ -151,7 +158,7 @@ const TransferResultPage: React.FC = () => {
     )
   }
 
-  const { summary, capabilityAnalyses, schoolAssessments, transitionPlan, meta, aiEnabled } = transferResultV2
+  const { summary, capabilityAnalyses, schoolAssessments, transitionPlan, meta, aiEnabled, externalDataVerification } = transferResultV2
   const levelConfig = LEVEL_CONFIG[summary.overallLevel] || LEVEL_CONFIG['可尝试']
 
   // 渲染综合评估
@@ -344,6 +351,36 @@ const TransferResultPage: React.FC = () => {
     </Card>
   )
 
+  // 渲染数据缺口解释（三段式）
+  const renderDataGapExplanation = (gap: DataGapExplanation) => (
+    <div className={styles.dataGapExplanation}>
+      <div className={styles.gapSection}>
+        <Text strong style={{ color: '#1890ff' }}>
+          <InfoCircleOutlined /> 1️⃣ 为什么缺失
+        </Text>
+        <Paragraph className={styles.gapText}>{gap.whyMissing}</Paragraph>
+      </div>
+      
+      <div className={styles.gapSection}>
+        <Text strong style={{ color: '#faad14' }}>
+          <ExclamationCircleOutlined /> 2️⃣ 是否影响判断
+        </Text>
+        <Paragraph className={styles.gapText}>{gap.impactStatement}</Paragraph>
+      </div>
+      
+      <div className={styles.gapSection}>
+        <Text strong style={{ color: '#52c41a' }}>
+          <CheckCircleOutlined /> 3️⃣ 您可以做什么
+        </Text>
+        <ul className={styles.actionList}>
+          {(gap.userActions || []).map((action, i) => (
+            <li key={i}>{action}</li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+
   // 渲染学校评估
   const renderSchoolAssessments = (assessments: SchoolAssessment[]) => (
     <Card 
@@ -379,6 +416,20 @@ const TransferResultPage: React.FC = () => {
                   strokeColor={riskCfg.color}
                   format={(percent) => `匹配度 ${percent}%`}
                 />
+
+                {/* V2 新增：融合结论（三层信息） */}
+                {school.integratedConclusion && (
+                  <div className={styles.integratedConclusion}>
+                    <Alert
+                      type="info"
+                      showIcon
+                      icon={<BulbOutlined />}
+                      message="综合分析结论"
+                      description={school.integratedConclusion}
+                      style={{ marginTop: 12, marginBottom: 12 }}
+                    />
+                  </div>
+                )}
                 
                 {school.requirements && school.requirements.length > 0 && (
                   <div className={styles.schoolSection}>
@@ -401,6 +452,24 @@ const TransferResultPage: React.FC = () => {
                     </ul>
                   </div>
                 )}
+
+                {/* V2 新增：数据缺口解释（替代"暂无数据"） */}
+                {school.dataGapExplanations && school.dataGapExplanations.length > 0 && (
+                  <Collapse 
+                    ghost 
+                    size="small"
+                    items={[{
+                      key: 'gaps',
+                      label: <Text type="secondary"><SearchOutlined /> 数据说明（为什么某些信息缺失）</Text>,
+                      children: school.dataGapExplanations.map((gap, i) => (
+                        <div key={i}>
+                          {renderDataGapExplanation(gap)}
+                          {i < (school.dataGapExplanations?.length || 0) - 1 && <Divider />}
+                        </div>
+                      ))
+                    }]}
+                  />
+                )}
                 
                 {school.notes && school.notes.length > 0 && (
                   <div className={styles.schoolNotes}>
@@ -418,6 +487,148 @@ const TransferResultPage: React.FC = () => {
       )}
     </Card>
   )
+
+  // 渲染外部数据核验结果（V2 新增）
+  const renderExternalVerification = (verification: ExternalDataVerification | undefined) => {
+    if (!verification || !verification.triggered) return null
+
+    // 数据可用性颜色映射
+    const availabilityColors: Record<string, string> = {
+      '充分': '#52c41a',
+      '有限': '#1890ff',
+      '极少': '#faad14',
+      '几乎没有': '#ff4d4f',
+    }
+
+    // 影响程度颜色映射
+    const impactColors: Record<string, string> = {
+      '不影响': '#52c41a',
+      '轻微影响': '#faad14',
+      '明显影响': '#ff4d4f',
+    }
+
+    const availabilityColor = availabilityColors[verification.dataAvailability || '有限']
+    const impactColor = impactColors[verification.impactOnAssessment || '轻微影响']
+
+    return (
+      <Card 
+        title={<><GlobalOutlined /> AI 外部数据核验</>}
+        className={styles.sectionCard}
+        extra={
+          <Space>
+            <Tag color="blue">数据可用性</Tag>
+            <Tag 
+              style={{ 
+                color: availabilityColor, 
+                borderColor: availabilityColor,
+                backgroundColor: `${availabilityColor}10`
+              }}
+            >
+              {verification.dataAvailability || '有限'}
+            </Tag>
+          </Space>
+        }
+      >
+        {/* 核验原因 */}
+        {verification.triggerReasons && verification.triggerReasons.length > 0 && (
+          <div className={styles.verificationSection}>
+            <Text strong>核验触发原因：</Text>
+            <div style={{ marginTop: 8 }}>
+              {verification.triggerReasons.map((reason, i) => (
+                <Tag key={i} color="default" style={{ marginBottom: 4 }}>{reason}</Tag>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 公开信息发现 */}
+        {verification.publicFindings && verification.publicFindings.length > 0 && (
+          <div className={styles.verificationSection}>
+            <Text strong><SearchOutlined /> 公开信息发现：</Text>
+            <List
+              size="small"
+              dataSource={verification.publicFindings}
+              renderItem={(item) => (
+                <List.Item style={{ padding: '4px 0' }}>
+                  <Text>• {item}</Text>
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
+
+        {/* 现实推断结论 */}
+        {verification.realityInference && (
+          <div className={styles.verificationSection}>
+            <Alert
+              type="info"
+              showIcon
+              icon={<BulbOutlined />}
+              message="现实综合判断"
+              description={verification.realityInference}
+            />
+          </div>
+        )}
+
+        {/* 对评估的影响 */}
+        <div className={styles.verificationSection}>
+          <Text strong>对当前评估的影响：</Text>
+          <Tag 
+            style={{ 
+              marginLeft: 8,
+              color: impactColor, 
+              borderColor: impactColor,
+              backgroundColor: `${impactColor}10`
+            }}
+          >
+            {verification.impactOnAssessment || '轻微影响'}
+          </Tag>
+        </div>
+
+        {/* 建议行动 */}
+        {verification.recommendedActions && verification.recommendedActions.length > 0 && (
+          <div className={styles.verificationSection}>
+            <Text strong><RocketOutlined /> 建议行动：</Text>
+            <List
+              size="small"
+              dataSource={verification.recommendedActions}
+              renderItem={(item, index) => (
+                <List.Item style={{ padding: '4px 0' }}>
+                  <Text><Tag color="green">{index + 1}</Tag> {item}</Text>
+                </List.Item>
+              )}
+            />
+          </div>
+        )}
+      </Card>
+    )
+  }
+
+  // 渲染综合现实结论（V2 新增）
+  const renderIntegratedRealityConclusion = (summaryData: TransferSummary) => {
+    if (!summaryData.integratedRealityConclusion) return null
+
+    return (
+      <Card 
+        className={styles.realityConclusionCard}
+        style={{ 
+          background: 'linear-gradient(135deg, #e6f4ff 0%, #f0f5ff 100%)',
+          border: '1px solid #91d5ff',
+          marginBottom: 16
+        }}
+      >
+        <div className={styles.realityConclusion}>
+          <Title level={5}>
+            <BulbOutlined style={{ color: '#1890ff', marginRight: 8 }} />
+            综合现实结论
+          </Title>
+          <Paragraph style={{ marginBottom: 0, fontSize: 14 }}>
+            {summaryData.integratedRealityConclusion}
+          </Paragraph>
+        </div>
+      </Card>
+    )
+  }
 
   // 渲染过渡计划
   const renderTransitionPlan = (plan: TransitionPlan) => (
@@ -515,19 +726,25 @@ const TransferResultPage: React.FC = () => {
       {/* 1️⃣ 综合评估 */}
       {renderSummary(summary)}
 
+      {/* 1.5️⃣ 综合现实结论（V2 新增：融合三层信息） */}
+      {renderIntegratedRealityConclusion(summary)}
+
       {/* 2️⃣ 优势与风险 */}
       {renderStrengthsAndRisks(summary)}
 
       {/* 2.5️⃣ 决策依据与 AI 贡献（Explainability） */}
       {renderDecisionBasis(summary)}
 
-      {/* 3️⃣ 能力分析 */}
+      {/* 3️⃣ AI 外部数据核验（V2 新增：现实世界对齐） */}
+      {renderExternalVerification(externalDataVerification)}
+
+      {/* 4️⃣ 能力分析 */}
       {renderCapabilityAnalyses(capabilityAnalyses)}
 
-      {/* 4️⃣ 学校评估 */}
+      {/* 5️⃣ 学校评估（含融合结论） */}
       {renderSchoolAssessments(schoolAssessments)}
 
-      {/* 5️⃣ 过渡计划 */}
+      {/* 6️⃣ 过渡计划 */}
       {renderTransitionPlan(transitionPlan)}
 
       {/* 免责声明 */}

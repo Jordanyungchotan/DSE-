@@ -36,6 +36,22 @@ export type RiskLevel = '低' | '中' | '高'
 
 export type RecommendationType = '保底' | '目标' | '冲刺'
 
+/**
+ * 数据缺口结构化解释
+ * 
+ * 用于替代"暂无数据"的三段式输出
+ */
+export interface DataGapExplanation {
+  /** 缺失数据类型（如 "插班名额"、"历史录取数据"） */
+  gapType: string
+  /** 为什么缺失（现实原因 + AI 网络判断） */
+  whyMissing: string
+  /** 是否影响当前判断（定性说明） */
+  impactStatement: string
+  /** 用户可以做什么（可执行建议） */
+  userActions: string[]
+}
+
 export interface SchoolAssessment {
   schoolName: string
   programme: string
@@ -45,6 +61,10 @@ export interface SchoolAssessment {
   requirements: string[]
   gaps: string[]
   notes: string[]
+  /** 该学校的数据缺口解释（V2 新增） */
+  dataGapExplanations?: DataGapExplanation[]
+  /** 融合结论（V2 新增）：系统规则 + AI 现实对照 + 行动建议 */
+  integratedConclusion?: string
 }
 
 // ============================================
@@ -72,6 +92,39 @@ export interface TransferSummary {
   decisionBasis: string[]
   /** AI 实际参与内容（仅 AI 增强成功时存在） */
   aiContribution?: string[]
+  /** 整体数据缺口解释（V2 新增） */
+  dataGapExplanations?: DataGapExplanation[]
+  /** 综合现实结论（V2 新增）：系统规则 + AI 现实对照 + 行动建议 */
+  integratedRealityConclusion?: string
+}
+
+// ============================================
+// 外部数据核验类型（V2 新增）
+// ============================================
+
+export type DataAvailability = '充分' | '有限' | '极少' | '几乎没有'
+export type ImpactLevel = '不影响' | '轻微影响' | '明显影响'
+
+/**
+ * AI 外部数据核验结果
+ * 
+ * 当系统检测到数据缺失时，触发 AI 进行网络公开信息核验
+ */
+export interface ExternalDataVerification {
+  /** 是否触发了核验 */
+  triggered: boolean
+  /** 触发核验的原因 */
+  triggerReasons?: string[]
+  /** 数据可用性评估 */
+  dataAvailability?: DataAvailability
+  /** 公开信息发现（AI 对公开经验的总结） */
+  publicFindings?: string[]
+  /** 现实推断结论 */
+  realityInference?: string
+  /** 对当前评估的影响 */
+  impactOnAssessment?: ImpactLevel
+  /** 建议的行动 */
+  recommendedActions?: string[]
 }
 
 // ============================================
@@ -81,6 +134,8 @@ export interface TransferSummary {
 export interface AnalysisMeta {
   generatedAt: string
   version: 'v2'
+  aiModel?: string
+  aiLatency?: number
 }
 
 // ============================================
@@ -95,6 +150,8 @@ export interface TransferAnalysisResultV2 {
   capabilityAnalyses: CapabilityAnalysis[]
   schoolAssessments: SchoolAssessment[]
   transitionPlan: TransitionPlan
+  /** AI 外部数据核验结果（V2 新增） */
+  externalDataVerification?: ExternalDataVerification
   meta: AnalysisMeta
 }
 

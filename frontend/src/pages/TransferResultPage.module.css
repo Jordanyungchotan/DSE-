@@ -179,6 +179,68 @@
   height: 100%;
 }
 
+/* V2 新增：数据缺口解释 */
+.dataGapExplanation {
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.gapSection {
+  margin-bottom: 12px;
+}
+
+.gapSection:last-child {
+  margin-bottom: 0;
+}
+
+.gapText {
+  margin: 8px 0 0 0 !important;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.actionList {
+  margin: 8px 0 0 16px;
+  padding: 0;
+  list-style: decimal;
+}
+
+.actionList li {
+  font-size: 13px;
+  color: #52c41a;
+  margin-bottom: 4px;
+}
+
+/* V2 新增：融合结论 */
+.integratedConclusion {
+  margin-top: 12px;
+}
+
+/* V2 新增：外部数据核验 */
+.verificationSection {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.verificationSection:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* V2 新增：综合现实结论卡片 */
+.realityConclusionCard {
+  margin-bottom: 24px;
+}
+
+.realityConclusion {
+  padding: 8px;
+}
+
 /* 免责声明 */
 .disclaimer {
   margin-top: 24px;
