@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { apiFetch } from '../config/api'
+import { apiFetch, analysisFetch } from '../config/api'
 import { useAuthStore } from './authStore'
 import type { LearningStatus, RankPosition, ScoreSource } from '@/shared/domain'
 import type { 
@@ -601,7 +601,8 @@ export const useAnalysisStore = create<AnalysisState>()(
             headers['Authorization'] = `Bearer ${token}`
           }
 
-          const response = await apiFetch('/api/transfer/analyze/v2', {
+          // 【关键】使用 analysisFetch 调用 dse-analysis-api
+          const response = await analysisFetch('/api/transfer/analyze/v2', {
             method: 'POST',
             headers,
             body: JSON.stringify(payload),
@@ -650,10 +651,9 @@ export const useAnalysisStore = create<AnalysisState>()(
       /**
        * 提交插班分析 AI 增强（规则 + AI）
        * 
-       * POST /api/transfer/analyze/ai
-       * - 先执行 V2 规则分析
-       * - 再调用 AI 增强（可选）
-       * - AI 失败自动降级为纯规则结果
+       * 【架构裁决】现在使用 /api/transfer/analyze/v2
+       * - V2 接口已强制 AI，不可绕过
+       * - AI 失败时接口直接返回 500
        * - ❌ 禁止生成临时 ID
        */
       submitTransferAnalysisAI: async (payload: TransferAnalysisInputV2): Promise<string> => {
@@ -669,7 +669,8 @@ export const useAnalysisStore = create<AnalysisState>()(
             headers['Authorization'] = `Bearer ${token}`
           }
 
-          const response = await apiFetch('/api/transfer/analyze/ai', {
+          // 【架构裁决】V2 接口已强制 AI，直接使用 V2
+          const response = await apiFetch('/api/transfer/analyze/v2', {
             method: 'POST',
             headers,
             body: JSON.stringify(payload),
