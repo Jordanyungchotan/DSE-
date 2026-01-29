@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Select, Button, message, Typography, Row, Col, Tag, Alert, Spin, Radio } from 'antd'
+import { Card, Select, Button, message, Typography, Row, Col, Tag, Alert, Radio, Modal, Progress } from 'antd'
 import { 
   ExperimentOutlined, 
   ClockCircleOutlined, 
   BookOutlined,
   ThunderboltOutlined,
   TrophyOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons'
 import { apiFetch, ragFetch } from '../config/api'
 import { useLanguageStore } from '../stores/languageStore'
@@ -51,6 +52,53 @@ export default function LevelTestSetupPage() {
   const [subject, setSubject] = useState<string>('')
   const [testType, setTestType] = useState<'quick' | 'full'>('full')
   const [loading, setLoading] = useState(false)
+  
+  // 加载进度状态
+  const [loadingTipIndex, setLoadingTipIndex] = useState(0)
+  const [loadingProgress, setLoadingProgress] = useState(0)
+  
+  // 加载提示文案
+  const loadingTips = [
+    t('quiz.loadingTips.selecting'),
+    t('quiz.loadingTips.adjusting'),
+    t('quiz.loadingTips.generating'),
+    t('quiz.loadingTips.optimizing'),
+    t('quiz.loadingTips.almostDone'),
+  ]
+  
+  // 加载时更新进度条（线性前进，不循环）
+  useEffect(() => {
+    if (loading) {
+      // 重置进度
+      setLoadingProgress(0)
+      setLoadingTipIndex(0)
+      
+      // 进度条平滑前进（15秒内从0到95%）
+      const progressInterval = setInterval(() => {
+        setLoadingProgress((prev) => {
+          if (prev >= 95) return 95 // 最多到95%，等待完成
+          return prev + 1
+        })
+      }, 150) // 每150ms增加1%
+      
+      // 提示文案切换
+      const tipInterval = setInterval(() => {
+        setLoadingTipIndex((prev) => {
+          if (prev >= loadingTips.length - 1) return prev // 到最后一条就停止
+          return prev + 1
+        })
+      }, 3000) // 每3秒切换一次提示
+      
+      return () => {
+        clearInterval(progressInterval)
+        clearInterval(tipInterval)
+      }
+    } else {
+      // 完成时重置
+      setLoadingProgress(0)
+      setLoadingTipIndex(0)
+    }
+  }, [loading, loadingTips.length])
 
   // 测试类型配置
   const TEST_TYPES = [
@@ -187,6 +235,75 @@ export default function LevelTestSetupPage() {
 
   return (
     <div className={styles.container}>
+      {/* AI生成等待弹窗 */}
+      <Modal
+        open={loading}
+        footer={null}
+        closable={false}
+        centered
+        maskClosable={false}
+        width={420}
+        styles={{
+          body: {
+            padding: '48px 32px',
+            textAlign: 'center',
+          },
+          mask: {
+            backdropFilter: 'blur(4px)',
+          },
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+          {/* 动画图标 */}
+          <div style={{ 
+            width: '80px', 
+            height: '80px', 
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(102, 126, 234, 0.3)',
+          }}>
+            <LoadingOutlined style={{ fontSize: 36, color: '#fff' }} spin />
+          </div>
+          
+          {/* 标题 */}
+          <div>
+            <Title level={3} style={{ marginBottom: '8px', background: 'linear-gradient(135deg, #667eea, #764ba2)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              🎯 {t('quiz.aiGenerating')}
+            </Title>
+            <Text style={{ fontSize: '16px', color: '#666' }}>
+              {loadingTips[loadingTipIndex]}
+            </Text>
+          </div>
+          
+          {/* 进度条 - 线性前进 */}
+          <Progress 
+            percent={loadingProgress} 
+            showInfo={false}
+            strokeColor={{
+              '0%': '#667eea',
+              '100%': '#764ba2',
+            }}
+            trailColor="#f0f0f0"
+            style={{ width: '100%' }}
+          />
+          
+          {/* 提示 */}
+          <div style={{ 
+            background: 'linear-gradient(135deg, #f5f7fa 0%, #e8ecf4 100%)',
+            padding: '12px 16px',
+            borderRadius: '8px',
+            width: '100%',
+          }}>
+            <Text type="secondary" style={{ fontSize: '13px' }}>
+              💡 {t('quiz.generatingHint')}
+            </Text>
+          </div>
+        </div>
+      </Modal>
+
       <div className={styles.header}>
         <SafetyCertificateOutlined className={styles.headerIcon} />
         <Title level={2} className={styles.title}>
@@ -355,20 +472,10 @@ export default function LevelTestSetupPage() {
           block
           className={styles.startBtn}
           onClick={handleStartTest}
-          loading={loading}
-          disabled={!grade || !subject}
+          disabled={!grade || !subject || loading}
         >
-          {loading ? (
-            <>
-              <Spin size="small" style={{ marginRight: 8 }} />
-              {t('common.generatingQuestions')}
-            </>
-          ) : (
-            <>
-              <ExperimentOutlined />
-              {t('levelTest.setup.startTest')}
-            </>
-          )}
+          <ExperimentOutlined />
+          {t('levelTest.setup.startTest')}
         </Button>
 
         {(!grade || !subject) && (
