@@ -70,7 +70,7 @@ const LEVEL_CONFIG = [
 
 export default function PointsPage() {
   const navigate = useNavigate()
-  const { token } = useAuthStore()
+  const { token, user } = useAuthStore()
   const { t, currentLanguage } = useLanguageStore()
   
   const [loading, setLoading] = useState(true)
@@ -132,9 +132,9 @@ export default function PointsPage() {
     fetchData()
   }, [fetchData])
 
-  // 每日签到（通过后端积分系统）
+  // 每日签到（调用后端 API）
   const handleDailyCheckin = async () => {
-    if (!token) {
+    if (!token || !user?.id) {
       message.warning(t('auth.loginRequired'))
       navigate('/login')
       return
@@ -142,9 +142,26 @@ export default function PointsPage() {
 
     setCheckingIn(true)
     try {
-      // 签到逻辑由后端处理，这里只是展示
-      message.info(t('points.checkinProcessing'))
-      await fetchData()
+      // ✅ 调用后端签到 API
+      const response = await apiFetch('/api/daily-checkin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ user_id: user.id }),
+      })
+
+      const result = await response.json()
+      
+      if (result.success) {
+        message.success(`${t('points.checkinSuccess')} +${result.points_earned} 积分`)
+        await fetchData() // 刷新数据
+      } else if (result.already_checked_in) {
+        message.info(t('points.alreadyCheckedIn'))
+      } else {
+        message.error(result.error || t('common.error'))
+      }
     } catch (error) {
       console.error('Check-in failed:', error)
       message.error(t('common.error'))

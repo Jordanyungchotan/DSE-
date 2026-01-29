@@ -840,6 +840,7 @@ export const zhCN = {
     alreadyCheckedIn: '今日已签到',
     checkedIn: '今日已签到 ✓',
     checkinButton: '每日签到 +10积分',
+    checkinProcessing: '正在签到中…',
     
     // 统计
     statistics: '积分统计',

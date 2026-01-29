@@ -518,9 +518,9 @@ export const useQuizStore = create<QuizState>()(
             }
           }
 
-          // 发放积分 - 依赖 Authorization header，不传 user_id
-          const isAuthenticated = useAuthStore.getState().isAuthenticated
-          if (isAuthenticated) {
+          // 发放积分 + 写入 learning_events（必须传 user_id）
+          const { isAuthenticated, user } = useAuthStore.getState()
+          if (isAuthenticated && user?.id) {
             try {
               // 计算连续答对题数
               let maxStreak = 0
@@ -535,6 +535,7 @@ export const useQuizStore = create<QuizState>()(
               }
 
               console.log('[Quiz] 准备发放积分...', {
+                user_id: user.id,
                 session_id: completedSession.id,
                 total_questions: totalQuestions,
                 correct_count: correctAnswers,
@@ -542,10 +543,11 @@ export const useQuizStore = create<QuizState>()(
                 streak: maxStreak
               })
 
-              // ⚠️ 不传 user_id，后端从 JWT 获取
+              // ✅ 必须传 user_id，后端需要写入 learning_events
               const response = await ragFetch('/api/quiz/complete', {
                 method: 'POST',
                 body: JSON.stringify({
+                  user_id: user.id,  // ✅ 修复：必须传递 user_id
                   session_id: completedSession.id,
                   total_questions: totalQuestions,
                   correct_count: correctAnswers,

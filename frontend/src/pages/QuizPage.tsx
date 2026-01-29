@@ -266,12 +266,19 @@ const QuizPage = () => {
     
     // 选择题特殊处理
     if (questionType === 'multiple_choice') {
-      const userChoice = userStr.charAt(0).toUpperCase()
-      let expectedChoice = expectedStr.charAt(0).toUpperCase()
-      // 如果是数字索引，转换为字母
-      if (/^\d$/.test(expectedChoice)) {
-        expectedChoice = String.fromCharCode(65 + parseInt(expectedChoice))
+      // 统一转换函数：数字索引 → 字母，字母 → 大写字母
+      const normalizeChoice = (input: string): string => {
+        const char = input.charAt(0)
+        if (/^\d$/.test(char)) {
+          return String.fromCharCode(65 + parseInt(char)) // 0 → A, 1 → B, 2 → C, 3 → D
+        }
+        return char.toUpperCase()
       }
+      
+      const userChoice = normalizeChoice(userStr)
+      const expectedChoice = normalizeChoice(expectedStr)
+      
+      // 只要两边都是有效选项且相等，即为正确
       if (/^[A-D]$/.test(userChoice) && userChoice === expectedChoice) return true
     }
     
