@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: false, // 生产环境不需要sourcemap
+      target: 'es2020', // 确保兼容性，支持 ?? 和 ?. 语法
     },
   }
 })
