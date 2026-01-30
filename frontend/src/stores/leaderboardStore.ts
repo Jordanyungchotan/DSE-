@@ -36,7 +36,9 @@ export interface LeaderboardV2Entry {
 
 export interface LeaderboardV2Response {
   type: LeaderboardV2Type;
-  entries: LeaderboardV2Entry[];
+  title?: string;
+  rankings: LeaderboardV2Entry[];
+  currentUserRank?: LeaderboardV2Entry & { percentile?: number };
   myRank?: LeaderboardV2Entry & { percentile: number };
   totalParticipants: number;
   lastUpdated: string;

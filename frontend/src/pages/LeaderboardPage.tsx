@@ -812,7 +812,7 @@ const LeaderboardPage: React.FC = () => {
             </div>
           ) : leaderboardCategory === 'v2' ? (
             // V2 多维排行榜内容（新增）
-            !v2Data || v2Data.entries.length === 0 ? (
+            !v2Data || (v2Data.rankings ?? []).length === 0 ? (
               <div className={styles.emptyContainer}>
                 <Empty 
                   description="暂无排行数据" 
@@ -826,18 +826,18 @@ const LeaderboardPage: React.FC = () => {
             ) : (
               <>
                 <V2Podium 
-                  entries={v2Data.entries.slice(0, 3)} 
+                  entries={(v2Data.rankings ?? []).slice(0, 3)} 
                   currentUserAvatar={currentUser?.avatar}
                   type={v2Filters.type}
                 />
 
                 <Card className={styles.rankingTable}>
                   <Table
-                    dataSource={v2Data.entries}
+                    dataSource={v2Data.rankings ?? []}
                     columns={v2Columns}
                     rowKey="userId"
                     pagination={{
-                      total: v2Data.totalParticipants,
+                      total: v2Data.totalParticipants ?? 0,
                       pageSize: 50,
                       showSizeChanger: false,
                       showTotal: (total) => `共 ${total} 名参与者`
@@ -850,7 +850,7 @@ const LeaderboardPage: React.FC = () => {
             )
           ) : leaderboardCategory === 'learning' ? (
             // 学习排行榜内容
-            !learningData || learningData.entries.length === 0 ? (
+            !learningData || (learningData.entries ?? []).length === 0 ? (
               <div className={styles.emptyContainer}>
                 <Empty 
                   description="暂无排行数据" 
@@ -864,7 +864,7 @@ const LeaderboardPage: React.FC = () => {
             ) : (
               <>
                 <LearningPodium 
-                  entries={learningData.entries.slice(0, 3)} 
+                  entries={(learningData.entries ?? []).slice(0, 3)} 
                   currentUserAvatar={currentUser?.avatar}
                   metric={learningFilters.metric}
                 />
@@ -877,11 +877,11 @@ const LeaderboardPage: React.FC = () => {
 
                 <Card className={styles.rankingTable}>
                   <Table
-                    dataSource={learningData.entries}
+                    dataSource={learningData.entries ?? []}
                     columns={learningColumns}
                     rowKey="userId"
                     pagination={{
-                      total: learningData.totalParticipants,
+                      total: learningData.totalParticipants ?? 0,
                       pageSize: 50,
                       showSizeChanger: false,
                       showTotal: (total) => `共 ${total} 名参与者`
@@ -894,7 +894,7 @@ const LeaderboardPage: React.FC = () => {
             )
           ) : (
             // 激励排行榜内容
-            !incentiveData || incentiveData.entries.length === 0 ? (
+            !incentiveData || (incentiveData.entries ?? []).length === 0 ? (
               <div className={styles.emptyContainer}>
                 <Empty 
                   description="暂无排行数据" 
@@ -908,18 +908,18 @@ const LeaderboardPage: React.FC = () => {
             ) : (
               <>
                 <IncentivePodium 
-                  entries={incentiveData.entries.slice(0, 3)} 
+                  entries={(incentiveData.entries ?? []).slice(0, 3)} 
                   currentUserAvatar={currentUser?.avatar}
                   type={incentiveFilters.type}
                 />
 
                 <Card className={styles.rankingTable}>
                   <Table
-                    dataSource={incentiveData.entries}
+                    dataSource={incentiveData.entries ?? []}
                     columns={incentiveColumns}
                     rowKey="userId"
                     pagination={{
-                      total: incentiveData.totalParticipants,
+                      total: incentiveData.totalParticipants ?? 0,
                       pageSize: 50,
                       showSizeChanger: false,
                       showTotal: (total) => `共 ${total} 名参与者`
