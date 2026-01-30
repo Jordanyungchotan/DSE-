@@ -389,9 +389,11 @@ export const useQuizStore = create<QuizState>()(
        * 提交当前题目答案
        * @param answer 用户答案
        * @param isCorrectOverride 可选，由后端智能匹配返回的正确性判断
+       * 
+       * ✅ 同时向后端 /api/quiz/answer 记录答题事件
        */
       submitAnswer: (answer: string | number, isCorrectOverride?: boolean) => {
-        const { currentSession } = get()
+        const { currentSession, config } = get()
         if (!currentSession) return
 
         const currentQuestion = currentSession.questions[currentSession.currentQuestionIndex]
@@ -401,6 +403,45 @@ export const useQuizStore = create<QuizState>()(
         const isCorrect = isCorrectOverride !== undefined 
           ? isCorrectOverride 
           : String(answer).toLowerCase().trim() === String(currentQuestion.correctAnswer).toLowerCase().trim()
+
+        // 计算当前连对数
+        let currentStreak = 0
+        if (isCorrect) {
+          for (let i = currentSession.currentQuestionIndex - 1; i >= 0; i--) {
+            if (currentSession.questions[i].isCorrect) {
+              currentStreak++
+            } else {
+              break
+            }
+          }
+          currentStreak++ // 加上当前这道
+        }
+
+        // ✅ 异步记录答题到后端（不阻塞 UI）
+        const userId = useAuthStore.getState().user?.id
+        if (userId && USE_RAG_SERVICE) {
+          // 计算平均答题时间
+          const startTimeMs = currentSession.startTime ? new Date(currentSession.startTime).getTime() : Date.now()
+          const avgTimeSpent = Math.round((Date.now() - startTimeMs) / 1000 / (currentSession.currentQuestionIndex + 1))
+          
+          ragFetch('/api/quiz/answer', {
+            method: 'POST',
+            body: JSON.stringify({
+              user_id: userId,
+              session_id: currentSession.id,
+              question_id: currentQuestion.id || `q_${currentSession.currentQuestionIndex}`,
+              is_correct: isCorrect,
+              current_streak: currentStreak,
+              time_spent: avgTimeSpent,
+              subject: config.subject,
+              module_code: config.moduleCodes?.[0],
+              user_answer: String(answer),
+            }),
+          }).catch((err) => {
+            console.error('[QuizStore] Failed to record answer:', err)
+            // 不阻塞用户继续答题
+          })
+        }
 
         // 更新题目状态
         const updatedQuestions = currentSession.questions.map((q, index) => {
