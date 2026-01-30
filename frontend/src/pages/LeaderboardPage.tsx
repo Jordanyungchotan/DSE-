@@ -349,18 +349,18 @@ const LearningMyRankCard: React.FC<{
 
       {/* 优势和劣势分析 */}
       <div className={styles.analysisSection}>
-        {myRank.strengths.length > 0 && (
+        {(myRank.strengths ?? []).length > 0 && (
           <div className={styles.strengthsList}>
             <Text type="success" strong>💪 优势：</Text>
-            {myRank.strengths.map((s, i) => (
+            {(myRank.strengths ?? []).map((s, i) => (
               <Tag key={i} color="green">{s}</Tag>
             ))}
           </div>
         )}
-        {myRank.weaknesses.length > 0 && (
+        {(myRank.weaknesses ?? []).length > 0 && (
           <div className={styles.weaknessesList}>
             <Text type="warning" strong>📈 待提升：</Text>
-            {myRank.weaknesses.map((w, i) => (
+            {(myRank.weaknesses ?? []).map((w, i) => (
               <Tag key={i} color="orange">{w}</Tag>
             ))}
           </div>

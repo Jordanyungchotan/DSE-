@@ -70,8 +70,8 @@ export interface MyRankInfo extends LearningLeaderboardEntry {
     metric: string;
     value: number;
   };
-  strengths: string[];
-  weaknesses: string[];
+  strengths?: string[];
+  weaknesses?: string[];
 }
 
 /**
