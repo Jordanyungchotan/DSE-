@@ -398,7 +398,7 @@ export default function PointsPage() {
       {/* 快捷入口 */}
       <Card className={styles.quickActions}>
         <Row gutter={16}>
-          <Col span={8}>
+          <Col span={6}>
             <Button 
               block 
               size="large"
@@ -410,7 +410,7 @@ export default function PointsPage() {
               <Text type="secondary" style={{ fontSize: 12 }}>+{POINT_TASKS.COMPLETE_QUIZ.points}</Text>
             </Button>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
             <Button 
               block 
               size="large"
@@ -422,7 +422,19 @@ export default function PointsPage() {
               <Text type="secondary" style={{ fontSize: 12 }}>+{POINT_TASKS.COMPLETE_LEVEL_TEST.points}</Text>
             </Button>
           </Col>
-          <Col span={8}>
+          <Col span={6}>
+            <Button 
+              block 
+              size="large"
+              onClick={() => navigate('/achievements')}
+              className={styles.actionBtn}
+            >
+              <CrownOutlined style={{ fontSize: 24, color: '#eb2f96' }} />
+              <div>我的成就</div>
+              <Text type="secondary" style={{ fontSize: 12 }}>查看进度</Text>
+            </Button>
+          </Col>
+          <Col span={6}>
             <Button 
               block 
               size="large"

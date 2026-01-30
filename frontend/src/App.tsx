@@ -42,6 +42,7 @@ const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage'))
 // 积分系统页面
 const PointsPage = lazy(() => import('./pages/PointsPage'))
 const PointsMallPage = lazy(() => import('./pages/PointsMallPage'))
+const AchievementsPage = lazy(() => import('./pages/AchievementsPage'))
 
 // 学习社区页面
 const CommunityPage = lazy(() => import('./pages/CommunityPage'))
@@ -130,6 +131,7 @@ function App() {
           {/* 积分系统 */}
           <Route path="points" element={<PointsPage />} />
           <Route path="points/mall" element={<PointsMallPage />} />
+          <Route path="achievements" element={<AchievementsPage />} />
           
           {/* 学习社区"量子纠缠" */}
           <Route path="community" element={<CommunityPage />} />

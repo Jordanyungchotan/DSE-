@@ -1,0 +1,229 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.loadingWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+}
+
+.loadingText {
+  margin-top: 16px;
+  color: white;
+}
+
+.backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  cursor: pointer;
+  padding: 8px 0;
+  margin-bottom: 16px;
+  font-size: 14px;
+  transition: opacity 0.2s;
+}
+
+.backButton:hover {
+  opacity: 0.8;
+}
+
+.loginBtn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* 头部卡片 */
+.headerCard {
+  border-radius: 16px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #fff 0%, #fffbf0 100%);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.headerContent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.trophyIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #faad14 0%, #fa8c16 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(250, 173, 20, 0.4);
+}
+
+.headerInfo {
+  flex: 1;
+}
+
+.headerTitle {
+  margin: 0 0 4px 0 !important;
+  color: #1a1a2e;
+}
+
+.headerSubtitle {
+  color: #666;
+}
+
+/* 列表卡片 */
+.listCard {
+  border-radius: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.achievementList {
+  min-height: 200px;
+}
+
+/* 成就卡片 */
+.achievementCard {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 2px solid;
+  transition: all 0.2s ease;
+  height: 100%;
+}
+
+.achievementCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.lockedCard {
+  opacity: 0.7;
+  background: #fafafa !important;
+}
+
+.achievementIcon {
+  font-size: 36px;
+  min-width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.achievementInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.achievementName {
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a1a2e;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rarityTag {
+  font-size: 11px;
+  padding: 0 6px;
+  height: 18px;
+  line-height: 18px;
+  border-radius: 4px;
+}
+
+.achievementDesc {
+  font-size: 13px;
+  color: #666;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.achievementMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.achievementPoints {
+  color: #faad14;
+  font-weight: 500;
+}
+
+.achievementDate {
+  color: #999;
+}
+
+.progressSection {
+  margin-top: 8px;
+}
+
+/* 提示卡片 */
+.tipsCard {
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.tipsList {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.tipsList li {
+  padding: 8px 0;
+  color: #666;
+  font-size: 14px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.tipsList li:last-child {
+  border-bottom: none;
+}
+
+/* 响应式 */
+@media (max-width: 576px) {
+  .container {
+    padding: 16px 12px;
+  }
+  
+  .headerContent {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .achievementCard {
+    padding: 12px;
+  }
+  
+  .achievementIcon {
+    font-size: 28px;
+    min-width: 40px;
+    height: 40px;
+  }
+  
+  .achievementName {
+    font-size: 14px;
+  }
+}
