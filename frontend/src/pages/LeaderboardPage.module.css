@@ -375,6 +375,15 @@
   color: #999;
 }
 
+/* V2 排名详情（新增） */
+.v2RankDetail {
+  padding: 12px;
+  background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
 .rankChange {
   display: flex;
   align-items: center;

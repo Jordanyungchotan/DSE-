@@ -38,8 +38,10 @@ import {
   RANGE_OPTIONS,
   SUBJECT_OPTIONS,
   INCENTIVE_TYPE_OPTIONS,
+  V2_TYPE_OPTIONS,
   LearningLeaderboardEntry,
   IncentiveLeaderboardEntry,
+  LeaderboardV2Entry,
   MyRankInfo,
 } from '../stores/leaderboardStore'
 import { useAuthStore } from '../stores/authStore'
@@ -192,6 +194,83 @@ const IncentivePodium: React.FC<{
 }
 
 /**
+ * V2 排行榜前三名领奖台（新增）
+ */
+const V2Podium: React.FC<{ 
+  entries: LeaderboardV2Entry[]
+  currentUserAvatar?: string
+  type: string
+}> = ({ entries, currentUserAvatar, type }) => {
+  const [first, second, third] = entries
+
+  if (!first) return null
+
+  const renderPodiumUser = (user: LeaderboardV2Entry | undefined, position: 1 | 2 | 3) => {
+    if (!user) return <div className={styles.emptyPodium}>-</div>
+
+    const colors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' }
+    const icons = { 1: '👑', 2: '🥈', 3: '🥉' }
+    const heights = { 1: 120, 2: 90, 3: 70 }
+
+    const avatarSrc = user.isCurrentUser && currentUserAvatar ? currentUserAvatar : user.avatarUrl
+
+    // 根据类型格式化分数显示
+    const formatScore = () => {
+      switch (type) {
+        case 'points':
+          return `${user.score} 积分`
+        case 'intensity':
+          return `${user.score} 分`
+        case 'streak':
+          return `${user.score} 天`
+        case 'achievements':
+          return `${user.score} 个`
+        default:
+          return `${user.score}`
+      }
+    }
+
+    return (
+      <div className={styles.podiumUser}>
+        <div className={styles.podiumAvatar}>
+          <Avatar 
+            key={avatarSrc || 'default'}
+            size={position === 1 ? 80 : 64} 
+            icon={<UserOutlined />}
+            src={avatarSrc}
+            style={{ border: `3px solid ${colors[position]}` }}
+          />
+          <span className={styles.podiumCrown}>{icons[position]}</span>
+        </div>
+        <div className={styles.podiumName}>{user.name}</div>
+        <div className={styles.podiumScore}>
+          <span className={styles.scoreValue}>{formatScore()}</span>
+        </div>
+        {user.detail && (
+          <div className={styles.podiumStats}>
+            <span>{user.detail}</span>
+          </div>
+        )}
+        <div 
+          className={styles.podiumBase} 
+          style={{ height: heights[position], backgroundColor: colors[position] }}
+        >
+          <span className={styles.podiumRank}>{position}</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.podiumContainer}>
+      {renderPodiumUser(second, 2)}
+      {renderPodiumUser(first, 1)}
+      {renderPodiumUser(third, 3)}
+    </div>
+  )
+}
+
+/**
  * 我的排名卡片（学习排行榜）
  */
 const LearningMyRankCard: React.FC<{ 
@@ -306,16 +385,20 @@ const LeaderboardPage: React.FC = () => {
     leaderboardCategory,
     learningData, 
     incentiveData,
+    v2Data,
     learningFilters,
     incentiveFilters,
+    v2Filters,
     loading, 
     error,
     setLeaderboardCategory,
     fetchLearningLeaderboard,
     fetchIncentiveLeaderboard,
+    fetchV2Leaderboard,
     fetchUserStats,
     updateLearningFilters,
     updateIncentiveFilters,
+    updateV2Filters,
   } = useLeaderboardStore()
   
   const { user: currentUser, isAuthenticated, token } = useAuthStore()
@@ -345,8 +428,10 @@ const LeaderboardPage: React.FC = () => {
   useEffect(() => {
     if (leaderboardCategory === 'learning') {
       fetchLearningLeaderboard()
-    } else {
+    } else if (leaderboardCategory === 'incentive') {
       fetchIncentiveLeaderboard()
+    } else {
+      fetchV2Leaderboard()
     }
     if (isAuthenticated) {
       fetchUserStats()
@@ -357,8 +442,10 @@ const LeaderboardPage: React.FC = () => {
   const handleRefresh = () => {
     if (leaderboardCategory === 'learning') {
       fetchLearningLeaderboard()
-    } else {
+    } else if (leaderboardCategory === 'incentive') {
       fetchIncentiveLeaderboard()
+    } else {
+      fetchV2Leaderboard()
     }
     message.success('排行榜已刷新')
   }
@@ -508,6 +595,76 @@ const LeaderboardPage: React.FC = () => {
     },
   ]
 
+  // V2 排行榜表格列（新增）
+  const v2Columns = [
+    {
+      title: '排名',
+      dataIndex: 'rank',
+      key: 'rank',
+      width: 80,
+      render: (rank: number) => (
+        <div className={styles.rankCell}>
+          {rank <= 3 ? (
+            <span className={`${styles.topRank} ${styles[`rank${rank}`]}`}>
+              {rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉'}
+            </span>
+          ) : (
+            <span className={styles.normalRank}>{rank}</span>
+          )}
+        </div>
+      )
+    },
+    {
+      title: '用户',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string, record: LeaderboardV2Entry) => {
+        const avatarSrc = record.isCurrentUser && currentUser?.avatar ? currentUser.avatar : record.avatarUrl
+        return (
+          <div className={`${styles.userCell} ${record.isCurrentUser ? styles.currentUser : ''}`}>
+            <Avatar key={avatarSrc || 'default'} size={36} icon={<UserOutlined />} src={avatarSrc} />
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>
+                {name}
+                {record.isCurrentUser && <Tag color="blue" className={styles.meTag}>我</Tag>}
+              </span>
+            </div>
+          </div>
+        )
+      }
+    },
+    {
+      title: V2_TYPE_OPTIONS.find(o => o.id === v2Filters.type)?.label || '分数',
+      dataIndex: 'score',
+      key: 'score',
+      width: 120,
+      render: (score: number) => {
+        const typeConfig = V2_TYPE_OPTIONS.find(o => o.id === v2Filters.type)
+        const formatScore = () => {
+          switch (v2Filters.type) {
+            case 'points': return `${score} 积分`
+            case 'intensity': return `${score} 分`
+            case 'streak': return `${score} 天`
+            case 'achievements': return `${score} 个`
+            default: return `${score}`
+          }
+        }
+        return (
+          <span className={styles.scoreCell}>
+            <span style={{ color: typeConfig?.color || '#1890ff' }}>{typeConfig?.icon}</span> {formatScore()}
+          </span>
+        )
+      }
+    },
+    {
+      title: '详情',
+      dataIndex: 'detail',
+      key: 'detail',
+      width: 150,
+      render: (detail: string | undefined) => detail || '-'
+    },
+  ]
+
   // 获取当前指标的标签
   const currentMetricLabel = METRIC_OPTIONS.find(m => m.id === learningFilters.metric)?.label || '刷题数量'
   const currentRangeLabel = RANGE_OPTIONS.find(r => r.id === learningFilters.range)?.label || '总榜'
@@ -520,9 +677,11 @@ const LeaderboardPage: React.FC = () => {
           <div className={styles.headerLeft}>
             <h1><TrophyOutlined /> 排行榜</h1>
             <p>
-              {leaderboardCategory === 'learning' 
-                ? `${currentMetricLabel} · ${currentRangeLabel}`
-                : `${INCENTIVE_TYPE_OPTIONS.find(t => t.id === incentiveFilters.type)?.label}`
+              {leaderboardCategory === 'v2' 
+                ? `${V2_TYPE_OPTIONS.find(t => t.id === v2Filters.type)?.icon} ${V2_TYPE_OPTIONS.find(t => t.id === v2Filters.type)?.label}`
+                : leaderboardCategory === 'learning' 
+                  ? `${currentMetricLabel} · ${currentRangeLabel}`
+                  : `${INCENTIVE_TYPE_OPTIONS.find(t => t.id === incentiveFilters.type)?.label}`
               }
             </p>
           </div>
@@ -541,10 +700,11 @@ const LeaderboardPage: React.FC = () => {
       <Card className={styles.categoryCard}>
         <Segmented
           value={leaderboardCategory}
-          onChange={(value) => setLeaderboardCategory(value as 'learning' | 'incentive')}
+          onChange={(value) => setLeaderboardCategory(value as 'learning' | 'incentive' | 'v2')}
           options={[
-            { value: 'learning', label: '🎓 学习排行榜', icon: <FireOutlined /> },
-            { value: 'incentive', label: '💰 积分排行榜', icon: <StarOutlined /> },
+            { value: 'v2', label: '🏆 多维排行榜' },
+            { value: 'learning', label: '🎓 学习排行榜' },
+            { value: 'incentive', label: '💰 积分排行榜' },
           ]}
           size="large"
           block
@@ -553,7 +713,25 @@ const LeaderboardPage: React.FC = () => {
 
       {/* 筛选栏 */}
       <Card className={styles.filterCard}>
-        {leaderboardCategory === 'learning' ? (
+        {leaderboardCategory === 'v2' ? (
+          <Space wrap size="middle">
+            <div className={styles.filterItem}>
+              <span className={styles.filterLabel}>排行维度：</span>
+              <Segmented
+                value={v2Filters.type}
+                onChange={(value) => updateV2Filters({ type: value as typeof v2Filters.type })}
+                options={V2_TYPE_OPTIONS.map(opt => ({
+                  value: opt.id,
+                  label: (
+                    <span style={{ color: opt.color }}>
+                      {opt.icon} {opt.label}
+                    </span>
+                  ),
+                }))}
+              />
+            </div>
+          </Space>
+        ) : leaderboardCategory === 'learning' ? (
           <Space wrap size="middle">
             <div className={styles.filterItem}>
               <span className={styles.filterLabel}>排行维度：</span>
@@ -632,6 +810,44 @@ const LeaderboardPage: React.FC = () => {
               <Empty description={error} />
               <Button onClick={handleRefresh}>重试</Button>
             </div>
+          ) : leaderboardCategory === 'v2' ? (
+            // V2 多维排行榜内容（新增）
+            !v2Data || v2Data.entries.length === 0 ? (
+              <div className={styles.emptyContainer}>
+                <Empty 
+                  description="暂无排行数据" 
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+                <p>开始学习，上榜争先！</p>
+                <Button type="primary" onClick={() => navigate('/quiz')}>
+                  开始刷题
+                </Button>
+              </div>
+            ) : (
+              <>
+                <V2Podium 
+                  entries={v2Data.entries.slice(0, 3)} 
+                  currentUserAvatar={currentUser?.avatar}
+                  type={v2Filters.type}
+                />
+
+                <Card className={styles.rankingTable}>
+                  <Table
+                    dataSource={v2Data.entries}
+                    columns={v2Columns}
+                    rowKey="userId"
+                    pagination={{
+                      total: v2Data.totalParticipants,
+                      pageSize: 50,
+                      showSizeChanger: false,
+                      showTotal: (total) => `共 ${total} 名参与者`
+                    }}
+                    rowClassName={(record) => record.isCurrentUser ? styles.currentUserRow : ''}
+                    scroll={{ x: 600 }}
+                  />
+                </Card>
+              </>
+            )
           ) : leaderboardCategory === 'learning' ? (
             // 学习排行榜内容
             !learningData || learningData.entries.length === 0 ? (
@@ -719,6 +935,52 @@ const LeaderboardPage: React.FC = () => {
 
         {/* 右侧边栏 */}
         <div className={styles.sidebar}>
+          {/* V2 用户排名卡片（新增） */}
+          {leaderboardCategory === 'v2' && v2Data?.myRank && (
+            <Card className={styles.userRankCard}>
+              <div className={styles.cardHeader}>
+                <h3><TrophyOutlined /> 我的排名</h3>
+                <Tag color="purple">前 {v2Data.myRank.percentile}%</Tag>
+              </div>
+              <div className={styles.rankDisplay}>
+                <div className={styles.rankNumber}>
+                  <span className={styles.rank}>#{v2Data.myRank.rank}</span>
+                  <span className={styles.total}>/ {v2Data.totalParticipants}</span>
+                </div>
+              </div>
+              <div className={styles.v2RankDetail}>
+                <Text>
+                  {V2_TYPE_OPTIONS.find(o => o.id === v2Filters.type)?.icon}{' '}
+                  {V2_TYPE_OPTIONS.find(o => o.id === v2Filters.type)?.label}：
+                  <Text strong style={{ color: V2_TYPE_OPTIONS.find(o => o.id === v2Filters.type)?.color }}>
+                    {' '}{v2Data.myRank.score}
+                    {v2Filters.type === 'points' && ' 积分'}
+                    {v2Filters.type === 'streak' && ' 天'}
+                    {v2Filters.type === 'achievements' && ' 个'}
+                  </Text>
+                </Text>
+              </div>
+              <div className={styles.actionButtons}>
+                <Button type="primary" onClick={() => navigate('/quiz')}>
+                  🚀 继续学习
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {leaderboardCategory === 'v2' && !v2Data?.myRank && isAuthenticated && (
+            <Card className={styles.userRankCard}>
+              <div className={styles.noRank}>
+                <TrophyOutlined className={styles.noRankIcon} />
+                <p>暂无排名</p>
+                <p className={styles.noRankHint}>开始学习后即可上榜</p>
+                <Button type="primary" onClick={() => navigate('/quiz')}>
+                  🚀 开始刷题
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {/* 用户排名卡片 */}
           {leaderboardCategory === 'learning' && (
             <LearningMyRankCard 
@@ -797,7 +1059,14 @@ const LeaderboardPage: React.FC = () => {
 
           {/* 提示信息 */}
           <Card className={styles.tipsCard} title="💡 上榜技巧">
-            {leaderboardCategory === 'learning' ? (
+            {leaderboardCategory === 'v2' ? (
+              <ul>
+                <li>💰 <strong>积分</strong>：完成任务赚取积分</li>
+                <li>🔥 <strong>学习强度</strong>：每日学习获得分数</li>
+                <li>📅 <strong>连续学习</strong>：保持每日学习习惯</li>
+                <li>🏆 <strong>成就</strong>：解锁各类学习成就</li>
+              </ul>
+            ) : leaderboardCategory === 'learning' ? (
               <ul>
                 <li>每天坚持刷题，提升排名</li>
                 <li>注重正确率，质量优先</li>

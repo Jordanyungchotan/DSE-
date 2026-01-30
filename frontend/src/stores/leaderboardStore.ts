@@ -20,6 +20,28 @@ export type LeaderboardSubject = 'ALL' | 'MATH' | 'ENG' | 'CHI' | 'PHYS' | 'CHEM
 
 export type IncentiveLeaderboardType = 'POINTS_TOTAL' | 'POINTS_WEEKLY';
 
+// ===== V2 排行榜类型（新增）=====
+
+export type LeaderboardV2Type = 'points' | 'intensity' | 'accuracy' | 'streak' | 'module_mastery' | 'weekly_questions' | 'achievements';
+
+export interface LeaderboardV2Entry {
+  userId: string;
+  name: string;
+  avatarUrl?: string;
+  rank: number;
+  score: number;
+  detail?: string;
+  isCurrentUser?: boolean;
+}
+
+export interface LeaderboardV2Response {
+  type: LeaderboardV2Type;
+  entries: LeaderboardV2Entry[];
+  myRank?: LeaderboardV2Entry & { percentile: number };
+  totalParticipants: number;
+  lastUpdated: string;
+}
+
 // ===== 接口定义 =====
 
 /**
@@ -143,17 +165,29 @@ export const INCENTIVE_TYPE_OPTIONS = [
   { id: 'POINTS_WEEKLY' as IncentiveLeaderboardType, label: '周积分榜', icon: '📈' },
 ];
 
+// ===== V2 排行榜选项（新增）=====
+
+export const V2_TYPE_OPTIONS = [
+  { id: 'points' as LeaderboardV2Type, label: '积分', icon: '💰', color: '#faad14' },
+  { id: 'intensity' as LeaderboardV2Type, label: '学习强度', icon: '🔥', color: '#ff4d4f' },
+  { id: 'streak' as LeaderboardV2Type, label: '连续学习', icon: '📅', color: '#52c41a' },
+  { id: 'achievements' as LeaderboardV2Type, label: '成就数量', icon: '🏆', color: '#722ed1' },
+];
+
 // ===== Store 状态接口 =====
 
 interface LeaderboardState {
   // 当前排行榜类型
-  leaderboardCategory: 'learning' | 'incentive';
+  leaderboardCategory: 'learning' | 'incentive' | 'v2';
   
   // 学习排行榜数据
   learningData: LearningLeaderboardResponse | null;
   
   // 激励排行榜数据
   incentiveData: IncentiveLeaderboardResponse | null;
+  
+  // V2 排行榜数据（新增）
+  v2Data: LeaderboardV2Response | null;
   
   // 当前用户统计
   userStats: UserLearningStats | null;
@@ -170,17 +204,24 @@ interface LeaderboardState {
     type: IncentiveLeaderboardType;
   };
   
+  // V2 排行榜筛选（新增）
+  v2Filters: {
+    type: LeaderboardV2Type;
+  };
+  
   // 状态
   loading: boolean;
   error: string | null;
   
   // 操作
-  setLeaderboardCategory: (category: 'learning' | 'incentive') => void;
+  setLeaderboardCategory: (category: 'learning' | 'incentive' | 'v2') => void;
   fetchLearningLeaderboard: () => Promise<void>;
   fetchIncentiveLeaderboard: () => Promise<void>;
+  fetchV2Leaderboard: () => Promise<void>;
   fetchUserStats: () => Promise<void>;
   updateLearningFilters: (filters: Partial<LeaderboardState['learningFilters']>) => void;
   updateIncentiveFilters: (filters: Partial<LeaderboardState['incentiveFilters']>) => void;
+  updateV2Filters: (filters: Partial<LeaderboardState['v2Filters']>) => void;
   setError: (error: string | null) => void;
   reset: () => void;
 }
@@ -195,17 +236,23 @@ const defaultIncentiveFilters = {
   type: 'POINTS_TOTAL' as IncentiveLeaderboardType,
 };
 
+const defaultV2Filters = {
+  type: 'points' as LeaderboardV2Type,
+};
+
 /**
  * 排行榜状态管理Store
  */
 export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   // 初始状态
-  leaderboardCategory: 'learning',
+  leaderboardCategory: 'v2',  // 默认使用 V2 排行榜
   learningData: null,
   incentiveData: null,
+  v2Data: null,
   userStats: null,
   learningFilters: { ...defaultLearningFilters },
   incentiveFilters: { ...defaultIncentiveFilters },
+  v2Filters: { ...defaultV2Filters },
   loading: false,
   error: null,
 
@@ -217,8 +264,10 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
     // 自动加载对应数据
     if (category === 'learning') {
       get().fetchLearningLeaderboard();
-    } else {
+    } else if (category === 'incentive') {
       get().fetchIncentiveLeaderboard();
+    } else {
+      get().fetchV2Leaderboard();
     }
   },
 
@@ -309,6 +358,48 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   },
 
   /**
+   * 获取 V2 排行榜数据（新增）
+   */
+  fetchV2Leaderboard: async () => {
+    const { v2Filters } = get();
+    set({ loading: true, error: null });
+
+    try {
+      const token = useAuthStore.getState().token;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const params = new URLSearchParams({
+        type: v2Filters.type,
+        limit: '50',
+      });
+
+      const response = await apiFetch(`/api/leaderboard/v2?${params}`, { headers });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '获取排行榜失败');
+      }
+
+      const result = await response.json();
+      
+      if (result.code !== 0) {
+        throw new Error(result.message || '获取排行榜失败');
+      }
+
+      set({
+        v2Data: result.data,
+        loading: false,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '未知错误';
+      set({ loading: false, error: message });
+    }
+  },
+
+  /**
    * 获取用户学习统计
    */
   fetchUserStats: async () => {
@@ -357,6 +448,16 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
   },
 
   /**
+   * 更新 V2 排行榜筛选条件（新增）
+   */
+  updateV2Filters: (newFilters) => {
+    set((state) => ({
+      v2Filters: { ...state.v2Filters, ...newFilters },
+    }));
+    get().fetchV2Leaderboard();
+  },
+
+  /**
    * 设置错误信息
    */
   setError: (error) => {
@@ -368,12 +469,14 @@ export const useLeaderboardStore = create<LeaderboardState>((set, get) => ({
    */
   reset: () => {
     set({
-      leaderboardCategory: 'learning',
+      leaderboardCategory: 'v2',
       learningData: null,
       incentiveData: null,
+      v2Data: null,
       userStats: null,
       learningFilters: { ...defaultLearningFilters },
       incentiveFilters: { ...defaultIncentiveFilters },
+      v2Filters: { ...defaultV2Filters },
       loading: false,
       error: null,
     });
