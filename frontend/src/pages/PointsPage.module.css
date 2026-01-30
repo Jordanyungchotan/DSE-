@@ -156,6 +156,11 @@
   padding: 8px !important;
 }
 
+/* 智能学习推荐 */
+.recommendSection {
+  margin-bottom: 16px;
+}
+
 /* 历史记录卡片 */
 .historyCard {
   margin-top: 16px;

@@ -17,6 +17,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useLanguageStore } from '../stores/languageStore'
 import type { DailyTaskStatus, PointTaskKey } from '@/shared/domain'
 import { getPointTaskDisplayName, POINT_TASKS } from '@/shared/domain'
+import LearningRecommendCard from '../components/LearningRecommendCard'
 import styles from './PointsPage.module.css'
 
 const { Title, Text } = Typography
@@ -291,6 +292,11 @@ export default function PointsPage() {
           </Button>
         </div>
       </Card>
+
+      {/* 智能学习推荐 */}
+      <div className={styles.recommendSection}>
+        <LearningRecommendCard compact />
+      </div>
 
       <Row gutter={[16, 16]}>
         {/* 积分统计 */}

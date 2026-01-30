@@ -17,6 +17,7 @@ import {
 import { useQuizStore, SUPPORTED_SUBJECTS, GRADE_LEVELS, DIFFICULTY_LEVELS } from '../stores/quizStore'
 import { useLanguageStore } from '../stores/languageStore'
 import ShareResult from '../components/ShareResult/ShareResult'
+import LearningRecommendCard from '../components/LearningRecommendCard'
 import styles from './QuizResultPage.module.css'
 
 const { Title, Paragraph, Text } = Typography
@@ -236,6 +237,9 @@ const QuizResultPage = () => {
           ))}
         </div>
       </Card>
+
+      {/* 智能学习推荐 */}
+      <LearningRecommendCard onActionClick={clearSession} />
 
       {/* 详细答题记录 */}
       <Card className={styles.detailCard}>
