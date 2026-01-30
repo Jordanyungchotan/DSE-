@@ -329,7 +329,7 @@ export const zhTW = {
   analysis: {
     title: 'DSE插班分析',
     universityTitle: '大學申請分析',
-    description: '請完整填寫以下資訊，AI將為您生成專業的分析報告',
+    description: '請完整填寫以下資訊，系統將為您生成專業的分析報告',
     selectType: '選擇分析類型',
     transfer: '插班分析',
     university: '大學申請分析',

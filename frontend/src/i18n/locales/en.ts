@@ -329,7 +329,7 @@ export const en = {
   analysis: {
     title: 'DSE Transfer Analysis',
     universityTitle: 'University Application Analysis',
-    description: 'Please complete the following information for a professional AI analysis report',
+    description: 'Please complete the following information for a professional analysis report',
     selectType: 'Select Analysis Type',
     transfer: 'Transfer Analysis',
     university: 'University Application',

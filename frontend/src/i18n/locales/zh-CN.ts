@@ -329,7 +329,7 @@ export const zhCN = {
   analysis: {
     title: 'DSE插班分析',
     universityTitle: '大学申请分析',
-    description: '请完整填写以下信息，AI将为您生成专业的分析报告',
+    description: '请完整填写以下信息，系统将为您生成专业的分析报告',
     selectType: '选择分析类型',
     transfer: '插班分析',
     university: '大学申请分析',
