@@ -390,19 +390,21 @@ const WrongQuestionsPage = () => {
                 </Row>
 
                 {/* 解析 */}
-                <div className={styles.explanationBox}>
-                  <Title level={5}>
-                    <BulbOutlined /> 解析
-                  </Title>
-                  <Paragraph className={styles.explanationText}>
-                    {question.explanation.split('\\n').map((line, i) => (
-                      <span key={i}>
-                        {line}
-                        <br />
-                      </span>
-                    ))}
-                  </Paragraph>
-                </div>
+                {question.explanation && (
+                  <div className={styles.explanationBox}>
+                    <Title level={5}>
+                      <BulbOutlined /> 解析
+                    </Title>
+                    <Paragraph className={styles.explanationText}>
+                      {question.explanation.split('\\n').map((line, i) => (
+                        <span key={i}>
+                          {line}
+                          <br />
+                        </span>
+                      ))}
+                    </Paragraph>
+                  </div>
+                )}
 
                 {/* 操作按钮 */}
                 <div className={styles.actionButtons}>

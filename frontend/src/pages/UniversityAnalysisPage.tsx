@@ -777,47 +777,49 @@ const UniversityAnalysisPage = () => {
             </div>
           </Card>
 
-          {/* AI 详细报告 */}
-          <Card 
-            title={
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <RobotOutlined style={{ color: '#1890ff' }} />
-                <span>{isEnglish ? 'AI Detailed Analysis' : 'AI 详细分析报告'}</span>
+          {/* 补充分析说明（仅当 ai_report 存在且 structured_report 不存在时显示） */}
+          {analysisResult.ai_report && (
+            <Card 
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <BulbOutlined style={{ color: '#1890ff' }} />
+                  <span>{isEnglish ? 'Supplementary Analysis' : '补充分析说明'}</span>
+                </div>
+              }
+              className={styles.resultCard}
+            >
+              <div className={styles.aiReportContainer}>
+                <Paragraph className={styles.aiReport}>
+                  {analysisResult.ai_report.split('\n').map((line, index) => {
+                    // 处理标题
+                    if (line.startsWith('## ')) {
+                      return <h3 key={index} className={styles.reportH3}>{line.replace('## ', '')}</h3>
+                    }
+                    if (line.startsWith('### ')) {
+                      return <h4 key={index} className={styles.reportH4}>{line.replace('### ', '')}</h4>
+                    }
+                    if (line.startsWith('#### ')) {
+                      return <h5 key={index} className={styles.reportH5}>{line.replace('#### ', '')}</h5>
+                    }
+                    // 处理列表项
+                    if (line.startsWith('- ') || line.startsWith('* ')) {
+                      return <li key={index} className={styles.reportListItem}>{line.substring(2)}</li>
+                    }
+                    // 处理编号列表
+                    if (/^\d+\.\s/.test(line)) {
+                      return <li key={index} className={styles.reportListItem}>{line.replace(/^\d+\.\s/, '')}</li>
+                    }
+                    // 空行
+                    if (!line.trim()) {
+                      return <br key={index} />
+                    }
+                    // 普通段落
+                    return <p key={index} className={styles.reportParagraph}>{line}</p>
+                  })}
+                </Paragraph>
               </div>
-            }
-            className={styles.resultCard}
-          >
-            <div className={styles.aiReportContainer}>
-              <Paragraph className={styles.aiReport}>
-                {analysisResult.ai_report.split('\n').map((line, index) => {
-                  // 处理标题
-                  if (line.startsWith('## ')) {
-                    return <h3 key={index} className={styles.reportH3}>{line.replace('## ', '')}</h3>
-                  }
-                  if (line.startsWith('### ')) {
-                    return <h4 key={index} className={styles.reportH4}>{line.replace('### ', '')}</h4>
-                  }
-                  if (line.startsWith('#### ')) {
-                    return <h5 key={index} className={styles.reportH5}>{line.replace('#### ', '')}</h5>
-                  }
-                  // 处理列表项
-                  if (line.startsWith('- ') || line.startsWith('* ')) {
-                    return <li key={index} className={styles.reportListItem}>{line.substring(2)}</li>
-                  }
-                  // 处理编号列表
-                  if (/^\d+\.\s/.test(line)) {
-                    return <li key={index} className={styles.reportListItem}>{line.replace(/^\d+\.\s/, '')}</li>
-                  }
-                  // 空行
-                  if (!line.trim()) {
-                    return <br key={index} />
-                  }
-                  // 普通段落
-                  return <p key={index} className={styles.reportParagraph}>{line}</p>
-                })}
-              </Paragraph>
-            </div>
-          </Card>
+            </Card>
+          )}
 
           {/* 免责声明 */}
           <Alert
