@@ -908,13 +908,13 @@ const UniversityAnalysisPage = () => {
             </Card>
           )}
           
-          {/* 补充分析说明（仅当 ai_report 存在且 structured_report 不存在时显示） */}
-          {!analysisResult.structured_report && analysisResult.ai_report && (
+          {/* 专家深度解读（ai_report 始终作为详细分析展示，不依赖 structured_report 是否存在） */}
+          {analysisResult.ai_report && (
             <Card 
               title={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <BulbOutlined style={{ color: '#1890ff' }} />
-                  <span>{isEnglish ? 'Supplementary Analysis' : '补充分析说明'}</span>
+                  <BulbOutlined style={{ color: '#722ed1' }} />
+                  <span>{isEnglish ? 'Analysis Rationale' : '分析逻辑与推理说明'}</span>
                 </div>
               }
               className={styles.resultCard}
