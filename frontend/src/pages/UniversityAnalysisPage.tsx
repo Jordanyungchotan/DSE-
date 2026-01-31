@@ -777,8 +777,139 @@ const UniversityAnalysisPage = () => {
             </div>
           </Card>
 
+          {/* 结构化分析报告（优先渲染） */}
+          {analysisResult.structured_report && (
+            <Card 
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <BulbOutlined style={{ color: '#1890ff' }} />
+                  <span>{isEnglish ? 'Analysis Report' : '分析报告'}</span>
+                </div>
+              }
+              className={styles.resultCard}
+            >
+              <div className={styles.structuredReportContainer}>
+                {/* 整体定位 */}
+                {analysisResult.structured_report.analysisSummary && (
+                  <div className={styles.reportSection}>
+                    <h4 className={styles.reportSectionTitle}>
+                      {isEnglish ? 'Overall Positioning' : '整体定位'}
+                    </h4>
+                    {analysisResult.structured_report.analysisSummary.positioning && (
+                      <p className={styles.reportParagraph}>
+                        {analysisResult.structured_report.analysisSummary.positioning}
+                      </p>
+                    )}
+                    
+                    {/* 最适合领域 */}
+                    {analysisResult.structured_report.analysisSummary.bestFitFields && 
+                     analysisResult.structured_report.analysisSummary.bestFitFields.length > 0 && (
+                      <div className={styles.reportSubSection}>
+                        <Text strong>{isEnglish ? 'Best Fit Fields: ' : '最适合领域：'}</Text>
+                        <div className={styles.tagContainer}>
+                          {analysisResult.structured_report.analysisSummary.bestFitFields.map((field, idx) => (
+                            <Tag key={idx} color="blue">{field}</Tag>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 核心优势 */}
+                    {analysisResult.structured_report.analysisSummary.coreStrengths && 
+                     analysisResult.structured_report.analysisSummary.coreStrengths.length > 0 && (
+                      <div className={styles.reportSubSection}>
+                        <Text strong>{isEnglish ? 'Core Strengths: ' : '核心优势：'}</Text>
+                        <ul className={styles.reportList}>
+                          {analysisResult.structured_report.analysisSummary.coreStrengths.map((strength, idx) => (
+                            <li key={idx}>{strength}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* 注意事项 */}
+                    {analysisResult.structured_report.analysisSummary.attentionPoints && 
+                     analysisResult.structured_report.analysisSummary.attentionPoints.length > 0 && (
+                      <div className={styles.reportSubSection}>
+                        <Text strong>{isEnglish ? 'Points to Note: ' : '注意事项：'}</Text>
+                        <ul className={styles.reportList}>
+                          {analysisResult.structured_report.analysisSummary.attentionPoints.map((point, idx) => (
+                            <li key={idx}>{point}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 准备建议 */}
+                {analysisResult.structured_report.preparationAdvice && (
+                  <div className={styles.reportSection}>
+                    <h4 className={styles.reportSectionTitle}>
+                      {isEnglish ? 'Preparation Advice' : '准备建议'}
+                    </h4>
+                    
+                    {/* 面试准备 */}
+                    {analysisResult.structured_report.preparationAdvice.interviewPrep && 
+                     analysisResult.structured_report.preparationAdvice.interviewPrep.length > 0 && (
+                      <div className={styles.reportSubSection}>
+                        <Text strong>{isEnglish ? 'Interview Preparation: ' : '面试准备：'}</Text>
+                        <ul className={styles.reportList}>
+                          {analysisResult.structured_report.preparationAdvice.interviewPrep.map((tip, idx) => (
+                            <li key={idx}>{tip}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* 作品集方向 */}
+                    {analysisResult.structured_report.preparationAdvice.portfolioDirection && 
+                     analysisResult.structured_report.preparationAdvice.portfolioDirection.length > 0 && (
+                      <div className={styles.reportSubSection}>
+                        <Text strong>{isEnglish ? 'Portfolio Direction: ' : '作品集方向：'}</Text>
+                        <ul className={styles.reportList}>
+                          {analysisResult.structured_report.preparationAdvice.portfolioDirection.map((dir, idx) => (
+                            <li key={idx}>{dir}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* 时间规划 */}
+                    {analysisResult.structured_report.preparationAdvice.timelineNotes && 
+                     analysisResult.structured_report.preparationAdvice.timelineNotes.length > 0 && (
+                      <div className={styles.reportSubSection}>
+                        <Text strong>{isEnglish ? 'Timeline Notes: ' : '时间规划：'}</Text>
+                        <ul className={styles.reportList}>
+                          {analysisResult.structured_report.preparationAdvice.timelineNotes.map((note, idx) => (
+                            <li key={idx}>{note}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* 风险提示 */}
+                {analysisResult.structured_report.riskWarnings && 
+                 analysisResult.structured_report.riskWarnings.length > 0 && (
+                  <div className={styles.reportSection}>
+                    <h4 className={styles.reportSectionTitle} style={{ color: '#ff4d4f' }}>
+                      {isEnglish ? 'Risk Warnings' : '风险提示'}
+                    </h4>
+                    <ul className={styles.reportList}>
+                      {analysisResult.structured_report.riskWarnings.map((warning, idx) => (
+                        <li key={idx} style={{ color: '#ff4d4f' }}>{warning}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+          
           {/* 补充分析说明（仅当 ai_report 存在且 structured_report 不存在时显示） */}
-          {analysisResult.ai_report && (
+          {!analysisResult.structured_report && analysisResult.ai_report && (
             <Card 
               title={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

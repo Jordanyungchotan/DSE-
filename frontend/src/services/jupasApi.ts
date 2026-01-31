@@ -536,6 +536,27 @@ export interface ComprehensiveAnalysisResponse {
   disclaimer: string
 }
 
+/** 结构化报告 - 由后端 AI 生成并解析的 JSON 结构 */
+export interface StructuredReport {
+  analysisSummary?: {
+    positioning?: string           // 整体定位描述
+    bestFitFields?: string[]       // 最适合的专业领域
+    coreStrengths?: string[]       // 核心优势
+    attentionPoints?: string[]     // 注意事项
+  }
+  programmeFitAnalysis?: Array<{   // 课程适配分析
+    institution?: string
+    programme?: string
+    fitType?: string               // stable/match/ambitious
+  }>
+  preparationAdvice?: {            // 准备建议
+    interviewPrep?: string[]       // 面试准备
+    portfolioDirection?: string[]  // 作品集方向
+    timelineNotes?: string[]       // 时间规划
+  }
+  riskWarnings?: string[]          // 风险提示
+}
+
 /** AI 分析响应 */
 export interface AIAnalysisResponse {
   student_profile: {
@@ -559,7 +580,11 @@ export interface AIAnalysisResponse {
       upper_quartile?: number
     }
   }>
-  ai_report: string
+  // 结构化报告（优先渲染）
+  structured_report?: StructuredReport | null
+  // 原始 AI 报告（当 structured_report 不存在时作为兜底）
+  ai_report: string | null
+  report_version?: string
   generated_at: string
   disclaimer: string
 }

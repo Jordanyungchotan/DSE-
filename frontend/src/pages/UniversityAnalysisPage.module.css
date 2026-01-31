@@ -358,3 +358,67 @@
   margin-top: 32px;
   margin-bottom: 24px;
 }
+
+/* 结构化报告容器 */
+.structuredReportContainer {
+  padding: 8px 0;
+}
+
+/* 报告分区 */
+.reportSection {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.reportSection:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* 报告分区标题 */
+.reportSectionTitle {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1890ff;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reportSectionTitle::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 18px;
+  background: #1890ff;
+  border-radius: 2px;
+}
+
+/* 报告子分区 */
+.reportSubSection {
+  margin: 12px 0;
+}
+
+/* 标签容器 */
+.tagContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* 报告列表 */
+.reportList {
+  margin: 8px 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.reportList li {
+  margin: 6px 0;
+  line-height: 1.6;
+  color: #333;
+}
