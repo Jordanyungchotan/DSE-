@@ -4,7 +4,7 @@
  * 适配 Cloudflare Workers 运行环境
  */
 
-import { SCHOOLS_BY_DISTRICT } from './data/schoolsData'
+import { SCHOOLS_BY_DISTRICT, REGION_DISTRICTS, DISTRICT_TO_REGION } from './data/schoolsData'
 import { 
   ALL_SUBJECTS, 
   ALL_SUBJECT_KEYS,
@@ -3320,39 +3320,42 @@ export default {
         return jsonResponse({ grades }, 200, origin)
       }
 
-      // 获取学校列表
+      // 获取学校列表（443所中学，4大区域18小区 - 以EDB分区为准）
       if (path === '/api/analysis/schools' && request.method === 'GET') {
         const url = new URL(request.url)
         const district = url.searchParams.get('district')
-        const band = url.searchParams.get('band')
+        const region = url.searchParams.get('region')
 
         let schools = Object.entries(SCHOOLS_BY_DISTRICT).flatMap(([dist, schoolList]) =>
           schoolList.map(school => ({
             ...school,
             district: dist,
+            regionCode: DISTRICT_TO_REGION[dist]?.code || '',
+            regionLabel: DISTRICT_TO_REGION[dist]?.label || '',
           }))
         )
+
+        // 按区域筛选
+        if (region) {
+          schools = schools.filter(s => s.regionCode === region)
+        }
 
         // 按地区筛选
         if (district) {
           schools = schools.filter(s => s.district === district)
         }
 
-        // 按 Band 筛选
-        if (band) {
-          const bandLevel = parseInt(band, 10)
-          schools = schools.filter(s => s.band === bandLevel)
-        }
-
         return jsonResponse({ 
           schools: schools.map(s => ({
             id: s.name, // 使用学校名作为 ID
             name: s.name,
-            nameEn: s.nameEn || s.name,
+            name_en: s.name_en,
             district: s.district,
-            bandLevel: s.band,
-            gender: s.gender || 'coed',
-            type: s.type || 'aided',
+            region: s.regionCode,
+            region_label: s.regionLabel,
+            gender: s.gender || '男女',
+            type: s.type || '資助',
+            religion: s.religion || '不適用',
           })),
           total: schools.length,
         }, 200, origin)
@@ -4651,61 +4654,82 @@ export default {
         return jsonResponse({ recommendations: recommendations.slice(0, 10) }, 200, origin)
       }
 
-      // 获取香港18区列表（按区域分类）
+      // 获取香港18区列表（按4大区域分类）
       if (path === '/api/districts' && request.method === 'GET') {
-        const districts = {
-          regions: [
-            {
-              name: '香港島',
-              name_en: 'Hong Kong Island',
-              districts: ['中西區', '灣仔區', '東區', '南區']
-            },
-            {
-              name: '九龍',
-              name_en: 'Kowloon',
-              districts: ['油尖旺區', '深水埗區', '九龍城區', '黃大仙區', '觀塘區']
-            },
-            {
-              name: '新界',
-              name_en: 'New Territories',
-              districts: ['葵青區', '荃灣區', '屯門區', '元朗區', '北區', '大埔區', '沙田區', '西貢區', '離島區']
-            }
-          ],
-          list: [
-            { code: 'central_western', name: '中西區', region: '香港島' },
-            { code: 'wan_chai', name: '灣仔區', region: '香港島' },
-            { code: 'eastern', name: '東區', region: '香港島' },
-            { code: 'southern', name: '南區', region: '香港島' },
-            { code: 'yau_tsim_mong', name: '油尖旺區', region: '九龍' },
-            { code: 'sham_shui_po', name: '深水埗區', region: '九龍' },
-            { code: 'kowloon_city', name: '九龍城區', region: '九龍' },
-            { code: 'wong_tai_sin', name: '黃大仙區', region: '九龍' },
-            { code: 'kwun_tong', name: '觀塘區', region: '九龍' },
-            { code: 'kwai_tsing', name: '葵青區', region: '新界' },
-            { code: 'tsuen_wan', name: '荃灣區', region: '新界' },
-            { code: 'tuen_mun', name: '屯門區', region: '新界' },
-            { code: 'yuen_long', name: '元朗區', region: '新界' },
-            { code: 'north', name: '北區', region: '新界' },
-            { code: 'tai_po', name: '大埔區', region: '新界' },
-            { code: 'sha_tin', name: '沙田區', region: '新界' },
-            { code: 'sai_kung', name: '西貢區', region: '新界' },
-            { code: 'islands', name: '離島區', region: '新界' },
-          ]
-        }
-        return jsonResponse({ districts }, 200, origin)
+        const regions = Object.entries(REGION_DISTRICTS).map(([regionName, info]) => ({
+          name: info.label,
+          name_en: regionName,
+          code: info.code,
+          districts: info.districts,
+        }))
+        
+        const list = Object.entries(DISTRICT_TO_REGION).map(([district, info]) => ({
+          code: district,
+          name: district,
+          region: info.label,
+          region_code: info.code,
+        }))
+
+        return jsonResponse({ 
+          districts: { regions, list }
+        }, 200, origin)
       }
 
-      // 获取指定区的学校列表
-      if (path === '/api/schools/by-district' && request.method === 'GET') {
+      // =====================
+      // 学校数据 API（4大区域18小区，443所中学 - 以EDB分区为准）
+      // =====================
+
+      // 获取区域和区列表（供前端 SchoolSelector 使用）
+      if (path === '/api/schools/regions' && request.method === 'GET') {
+        const data = Object.entries(REGION_DISTRICTS).map(([regionName, info]) => ({
+          code: info.code,
+          name_zh: info.label,
+          name_en: regionName,
+          display_order: ['HK', 'KLN', 'NTE', 'NTW'].indexOf(info.code),
+          districts: info.districts.map(d => ({
+            code: d,
+            name_zh: d,
+            name_en: d,
+          })),
+        }))
+
+        return jsonResponse({ success: true, data }, 200, origin)
+      }
+
+      // 按区获取学校列表（支持路径参数和查询参数）
+      if ((path === '/api/schools/by-district' || path.startsWith('/api/schools/by-district/')) && request.method === 'GET') {
         const url = new URL(request.url)
-        const district = url.searchParams.get('district')
+        // 支持路径参数 /api/schools/by-district/:district 和查询参数 ?district=xxx
+        const pathDistrict = path.replace('/api/schools/by-district/', '').replace('/api/schools/by-district', '')
+        const district = decodeURIComponent(pathDistrict) || url.searchParams.get('district')
         
-        // 使用从 schoolsData.ts 导入的学校数据（441所学校）
         if (district && SCHOOLS_BY_DISTRICT[district]) {
+          const regionInfo = DISTRICT_TO_REGION[district]
+          const schools = SCHOOLS_BY_DISTRICT[district].map((s, idx) => ({
+            id: idx + 1,
+            name_zh: s.name,
+            name: s.name,
+            name_en: s.name_en,
+            school_type: s.type,
+            type: s.type,
+            gender: s.gender,
+            religion: s.religion || '不適用',
+            district_code: district,
+            district_name: district,
+            region_code: regionInfo?.code || '',
+            region_name: regionInfo?.label || '',
+          }))
+
           return jsonResponse({ 
             success: true, 
-            district,
-            schools: SCHOOLS_BY_DISTRICT[district] 
+            district: {
+              code: district,
+              name_zh: district,
+              region_code: regionInfo?.code || '',
+              region_name: regionInfo?.label || '',
+            },
+            data: schools,
+            schools, // 兼容旧格式
           }, 200, origin)
         }
         
@@ -4713,6 +4737,51 @@ export default {
         return jsonResponse({ 
           success: true,
           districts: SCHOOLS_BY_DISTRICT 
+        }, 200, origin)
+      }
+
+      // 搜索学校（按名称搜索）
+      if (path === '/api/schools/search' && request.method === 'GET') {
+        const url = new URL(request.url)
+        const query = url.searchParams.get('q')?.trim() || ''
+        
+        if (query.length < 2) {
+          return jsonResponse({ success: true, data: [], schools: [] }, 200, origin)
+        }
+
+        const queryLower = query.toLowerCase()
+        const results: any[] = []
+
+        for (const [district, schools] of Object.entries(SCHOOLS_BY_DISTRICT)) {
+          const regionInfo = DISTRICT_TO_REGION[district]
+          for (const school of schools) {
+            if (
+              school.name.includes(query) ||
+              school.name_en.toLowerCase().includes(queryLower)
+            ) {
+              results.push({
+                id: results.length + 1,
+                name_zh: school.name,
+                name: school.name,
+                name_en: school.name_en,
+                school_type: school.type,
+                type: school.type,
+                gender: school.gender,
+                religion: school.religion || '不適用',
+                district_code: district,
+                district_name: district,
+                region_code: regionInfo?.code || '',
+                region_name: regionInfo?.label || '',
+              })
+            }
+          }
+        }
+
+        return jsonResponse({ 
+          success: true, 
+          data: results.slice(0, 50),
+          schools: results.slice(0, 50), // 兼容旧格式
+          total: results.length,
         }, 200, origin)
       }
 
