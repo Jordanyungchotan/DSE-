@@ -11,8 +11,8 @@
 // API URL 配置（统一使用 dse-rag-questions）
 // ============================================================================
 
-// 唯一后端 - dse-rag-questions
-const PRODUCTION_API_URL = 'https://dse-rag-questions.jordanyungchotan.workers.dev'
+// 唯一后端 - 通过自定义域名访问（解决部分网络无法解析 *.workers.dev 的问题）
+const PRODUCTION_API_URL = 'https://api.dse-analysis.com'
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 
   (import.meta.env.PROD ? PRODUCTION_API_URL : 'http://localhost:8787')
