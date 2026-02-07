@@ -17,6 +17,7 @@ import {
   formatSchoolGender,
 } from '../services/schoolsApi'
 import { useLanguageStore } from '../stores/languageStore'
+import { localizeText } from '../utils/t2s'
 
 interface SchoolSelectorProps {
   value?: string  // 选中的学校名称
@@ -31,6 +32,8 @@ export default function SchoolSelector({
 }: SchoolSelectorProps) {
   const { locale } = useLanguageStore()
   const isEn = locale === 'en'
+  /** 根据 locale 转换繁简 */
+  const L = (text: string) => localizeText(text, locale)
 
   const [regions, setRegions] = useState<Region[]>([])
   const [selectedRegion, setSelectedRegion] = useState<string>('')
@@ -165,7 +168,7 @@ export default function SchoolSelector({
                 >
                   <div style={{ fontWeight: 500 }}>
                     <BankOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                    {school.name_zh}
+                    {L(school.name_zh)}
                   </div>
                   {school.name_en && (
                     <div style={{ fontSize: 12, color: '#666', marginLeft: 22 }}>
@@ -174,9 +177,9 @@ export default function SchoolSelector({
                   )}
                   <div style={{ fontSize: 12, color: '#999', marginLeft: 22 }}>
                     <EnvironmentOutlined style={{ marginRight: 4 }} />
-                    {school.district_name || school.district}
-                    {school.type && <Tag style={{ marginLeft: 8, fontSize: 12 }}>{formatSchoolType(school.type)}</Tag>}
-                    {school.gender && <Tag style={{ fontSize: 12 }}>{formatSchoolGender(school.gender)}</Tag>}
+                    {L(school.district_name || school.district)}
+                    {school.type && <Tag style={{ marginLeft: 8, fontSize: 12 }}>{L(formatSchoolType(school.type))}</Tag>}
+                    {school.gender && <Tag style={{ fontSize: 12 }}>{L(formatSchoolGender(school.gender))}</Tag>}
                   </div>
                 </div>
               ))}
@@ -207,7 +210,7 @@ export default function SchoolSelector({
           {regions.map(region => (
             <Select.Option key={region.code} value={region.code}>
               <Tag color={REGION_COLORS[region.code] || REGION_COLORS[region.name_zh]} style={{ marginRight: 8 }}>
-                {isEn ? region.name_en : region.name_zh}
+                {isEn ? region.name_en : L(region.name_zh)}
               </Tag>
             </Select.Option>
           ))}
@@ -223,7 +226,7 @@ export default function SchoolSelector({
         >
           {districts.map(district => (
             <Select.Option key={district.code} value={district.code}>
-              {district.name_zh}
+              {L(district.name_zh)}
             </Select.Option>
           ))}
         </Select>
@@ -237,8 +240,8 @@ export default function SchoolSelector({
           title={
             <Space>
               <BankOutlined />
-              <span>{selectedDistrict}的学校</span>
-              <Tag>{schools.length}所</Tag>
+              <span>{L(selectedDistrict)}{isEn ? ' Schools' : '的学校'}</span>
+              <Tag>{schools.length}{isEn ? '' : '所'}</Tag>
             </Space>
           }
         >
@@ -273,9 +276,9 @@ export default function SchoolSelector({
                 >
                   <div style={{ fontWeight: 500, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                     <BankOutlined style={{ color: '#1890ff' }} />
-                    <span>{school.name_zh}</span>
-                    {school.type && <Tag color={school.type === 'dss' ? 'blue' : school.type === 'government' ? 'green' : 'default'} style={{ fontSize: 11 }}>{formatSchoolType(school.type)}</Tag>}
-                    {school.gender && <Tag color={school.gender === 'boys' ? 'cyan' : school.gender === 'girls' ? 'magenta' : 'default'} style={{ fontSize: 11 }}>{formatSchoolGender(school.gender)}</Tag>}
+                    <span>{L(school.name_zh)}</span>
+                    {school.type && <Tag color={school.type === 'dss' ? 'blue' : school.type === 'government' ? 'green' : 'default'} style={{ fontSize: 11 }}>{L(formatSchoolType(school.type))}</Tag>}
+                    {school.gender && <Tag color={school.gender === 'boys' ? 'cyan' : school.gender === 'girls' ? 'magenta' : 'default'} style={{ fontSize: 11 }}>{L(formatSchoolGender(school.gender))}</Tag>}
                   </div>
                   {school.name_en && (
                     <div style={{ fontSize: 12, color: '#666', marginLeft: 22, marginTop: 4 }}>
@@ -298,7 +301,7 @@ export default function SchoolSelector({
       {value && (
         <div style={{ marginTop: 16, padding: 12, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
           <div style={{ fontWeight: 500, color: '#52c41a' }}>
-            ✓ {isEn ? 'Selected: ' : '已选择: '}{value}
+            ✓ {isEn ? 'Selected: ' : '已选择: '}{L(value)}
           </div>
         </div>
       )}

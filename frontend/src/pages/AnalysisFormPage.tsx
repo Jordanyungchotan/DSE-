@@ -61,6 +61,7 @@ import {
   School,
   REGION_COLORS,
 } from '../services/schoolsApi'
+import { localizeText } from '../utils/t2s'
 import styles from './AnalysisFormPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
@@ -138,8 +139,10 @@ const ANALYSIS_STAGES = [
 const AnalysisFormPage = () => {
   const navigate = useNavigate()
   const [form] = Form.useForm()
-  const { t, currentLanguage } = useLanguageStore()
+  const { t, currentLanguage, locale } = useLanguageStore()
   const currentLang = currentLanguage
+  /** 根据 locale 转换繁简 */
+  const L = (text: string) => localizeText(text, locale)
   const [showSelector, setShowSelector] = useState(true)
   const [currentStep, setCurrentStep] = useState(0)
   
@@ -989,14 +992,14 @@ const AnalysisFormPage = () => {
                 >
                   <div style={{ fontWeight: 500 }}>
                     <BankOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-                    {school.name_zh}
+                    {L(school.name_zh)}
                     {selectedSchools.includes(school.name_zh) && (
                       <Tag color="success" style={{ marginLeft: 8 }}>已选</Tag>
                     )}
                   </div>
                   <div style={{ fontSize: 12, color: '#888', marginLeft: 22 }}>
                     <EnvironmentOutlined style={{ marginRight: 4 }} />
-                    {school.region_name} · {school.district_name}
+                    {L(school.region_name)} · {L(school.district_name)}
                   </div>
                 </div>
               ))}
@@ -1024,7 +1027,7 @@ const AnalysisFormPage = () => {
             {regions.map(region => (
               <Select.Option key={region.code} value={region.code}>
                 <Tag color={REGION_COLORS[region.code]} style={{ marginRight: 8 }}>
-                  {region.name_zh}
+                  {L(region.name_zh)}
                 </Tag>
               </Select.Option>
             ))}
@@ -1043,7 +1046,7 @@ const AnalysisFormPage = () => {
           >
             {districts.map(district => (
               <Select.Option key={district.code} value={district.code}>
-                {district.name_zh}
+                {L(district.name_zh)}
               </Select.Option>
             ))}
           </Select>
@@ -1058,7 +1061,7 @@ const AnalysisFormPage = () => {
           title={
             <Space>
               <BankOutlined />
-              <span>{districts.find(d => d.code === selectedDistrict)?.name_zh}的学校</span>
+              <span>{L(districts.find(d => d.code === selectedDistrict)?.name_zh || '')}的学校</span>
               <Tag color="blue">{districtSchools.length}所</Tag>
             </Space>
           }
@@ -1080,7 +1083,7 @@ const AnalysisFormPage = () => {
                   }}
                   className={styles.schoolTag}
                 >
-                  {school.name_zh}
+                  {L(school.name_zh)}
                 </Tag.CheckableTag>
               ))}
             </div>
@@ -1105,7 +1108,7 @@ const AnalysisFormPage = () => {
                 style={{ marginBottom: 8, padding: '4px 10px', fontSize: 14 }}
                 onClose={() => handleRemoveSchool(school)}
               >
-                {school}
+                {L(school)}
               </Tag>
             ))
           ) : (
