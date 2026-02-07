@@ -149,6 +149,7 @@ const UniversityAnalysisPage = () => {
   const [selectedUniversities, setSelectedUniversities] = useState<string[]>([])
   const [availableFields, setAvailableFields] = useState<ProgrammeField[]>([])
   const [loadingFields, setLoadingFields] = useState(false)
+  const [fieldsLoadError, setFieldsLoadError] = useState(false)
 
   // 分析结果
   const [analysisResult, setAnalysisResult] = useState<AIAnalysisResponse | null>(null)
@@ -164,10 +165,12 @@ const UniversityAnalysisPage = () => {
   const fetchAvailableFields = useCallback(async (universities: string[]) => {
     if (universities.length === 0) {
       setAvailableFields([])
+      setFieldsLoadError(false)
       return
     }
 
     setLoadingFields(true)
+    setFieldsLoadError(false)
     try {
       // 获取所有选中院校的专业领域并合并
       const allFields: { [id: string]: ProgrammeField } = {}
@@ -186,8 +189,11 @@ const UniversityAnalysisPage = () => {
       
       const merged = Object.values(allFields).sort((a, b) => b.count - a.count)
       setAvailableFields(merged)
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Failed to fetch fields:', error)
+      // 网络错误 / CORS / 服务不可达 时降级处理，不阻止页面使用
+      setAvailableFields([])
+      setFieldsLoadError(true)
     } finally {
       setLoadingFields(false)
     }
@@ -457,6 +463,16 @@ const UniversityAnalysisPage = () => {
                 </Form.Item>
               </Col>
               <Col xs={24} md={12}>
+                {fieldsLoadError && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    message={isEnglish ? 'Failed to load fields, you can still continue the analysis' : '专业领域加载失败，可继续分析'}
+                    style={{ marginBottom: 12 }}
+                    closable
+                    onClose={() => setFieldsLoadError(false)}
+                  />
+                )}
                 <Form.Item
                   name="targetFields"
                   label={
