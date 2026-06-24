@@ -151,8 +151,9 @@ const HistoryPage = () => {
               // 【核心修复】根据分析类型跳转到不同的结果页
               if (record.analysisType === 'transfer') {
                 navigate(`/transfer/result/${record.id}`)
+              } else if (record.analysisType === 'university') {
+                navigate(`/result/university/${record.id}`)
               } else {
-                // university / feasibility / 其他默认走 ResultPage
                 navigate(`/result/${record.id}`)
               }
             }}

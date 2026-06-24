@@ -4885,19 +4885,11 @@ export default {
       }
 
       // =====================
-      // JUPAS AI 分析 API（大学申请分析 - 前端实际调用的接口）
-      // ⚠️ 必须登录才能调用，分析结果必须保存到 analysis_records
+      // JUPAS 大学专业匹配分析 API
+      // 基于真实 JUPAS 数据的分层加权计算系统
+      // ⚠️ 必须登录，分析结果保存到 analysis_records
       // =====================
 
-      /**
-       * JUPAS AI 综合分析
-       * POST /api/jupas/analyze/ai
-       * 
-       * 【强制规则】
-       * 1. 必须登录（requireAuth）
-       * 2. 分析完成后必须写入 analysis_records
-       * 3. analysis_type = 'university'
-       */
       if (path === '/api/jupas/analyze/ai' && request.method === 'POST') {
         // 强制要求登录
         const authHeader = request.headers.get('Authorization')
@@ -4924,64 +4916,133 @@ export default {
             limit?: number
           }
 
-          // 计算 Best 5/6 分数
-          const gradeToScore: Record<string, number> = {
-            '5**': 7, '5*': 6, '5': 5, '4': 4, '3': 3, '2': 2, '1': 1, 'U': 0
+          // --- 导入计算引擎 ---
+          const { gradesToScores, calcBaseScore, calculateProgrammeMatch, sortProgrammeResults } = await import('./jupas/scoreEngine')
+          const { GRADE_TO_SCORE } = await import('./jupas/types')
+
+          // 1. 计算基础分数
+          const subjectScores = gradesToScores(body.grades, GRADE_TO_SCORE)
+          const allScores = Object.values(subjectScores).sort((a: number, b: number) => b - a)
+          const best5 = allScores.slice(0, 5).reduce((a: number, b: number) => a + b, 0)
+          const best6 = allScores.slice(0, 6).reduce((a: number, b: number) => a + b, 0)
+
+          // 2. 查询 D1 数据库中匹配的课程（取最新年份）
+          // 前端代码 → 数据库代码映射
+          const UNI_CODE_MAP: Record<string, string> = {
+            ust: 'hkust', bu: 'hkbu', ln: 'lu', eduhk: 'edu',
+            hkust: 'hkust', hkbu: 'hkbu', lu: 'lu', edu: 'edu',
+            hku: 'hku', cuhk: 'cuhk', polyu: 'polyu', cityu: 'cityu', hkmu: 'hkmu',
           }
-          const scores = Object.values(body.grades)
-            .map(g => gradeToScore[g] || 0)
-            .sort((a, b) => b - a)
-          const best5 = scores.slice(0, 5).reduce((a, b) => a + b, 0)
-          const best6 = scores.slice(0, 6).reduce((a, b) => a + b, 0)
+          const targetUniversities = (body.target_universities || []).map(
+            (u: string) => UNI_CODE_MAP[u.toLowerCase()] || u.toLowerCase()
+          )
+          const limit = body.limit || 20
 
-          // 构建学生档案
-          const studentProfile = {
-            best5,
-            best6,
-            interests: body.interests || [],
-            strengths: body.strengths || [],
+          let query = `
+            SELECT f1.* FROM jupas_scoring_formulas f1
+            INNER JOIN (
+              SELECT programme_code, MAX(year) as max_year
+              FROM jupas_scoring_formulas
+              GROUP BY programme_code
+            ) f2 ON f1.programme_code = f2.programme_code AND f1.year = f2.max_year
+          `
+          const params: string[] = []
+
+          if (targetUniversities.length > 0) {
+            const placeholders = targetUniversities.map(() => '?').join(',')
+            query += ` WHERE f1.university IN (${placeholders})`
+            params.push(...targetUniversities)
           }
 
-          // 模拟匹配课程（实际应查询数据库）
-          const matchedProgrammes: Array<{
-            code: string
-            title: string
-            university: string
-            field: string
-            match_score: number
-            academic_score: number
-            personal_score: number
-            recommendation: string
-            historical: {
-              median?: number
-              lower_quartile?: number
-              upper_quartile?: number
-            }
-          }> = []
+          // 排序: WEIGHTED_STRUCTURED(0) > SUBJECT_CONSTRAINED/SIMPLE(1) > WEIGHTED_DESCRIBED(2)
+          query += ` ORDER BY CASE f1.scoring_type
+            WHEN 'WEIGHTED_STRUCTURED' THEN 0
+            WHEN 'SUBJECT_CONSTRAINED' THEN 1
+            WHEN 'SIMPLE' THEN 1
+            WHEN 'WEIGHTED_DESCRIBED' THEN 2
+            ELSE 3 END ASC, f1.median DESC`
+          // 每所大学最多约70条记录，不做SQL LIMIT，由程序排序后截取
 
-          // 查询匹配的课程（简化版本）
-          const targetUniversities = body.target_universities || []
-          const limit = body.limit || 15
+          const stmt = env.DB.prepare(query)
+          const dbResult = params.length > 0
+            ? await stmt.bind(...params).all()
+            : await stmt.all()
 
-          // 根据 best5 分数生成推荐
-          const scoreLevel = best5 >= 28 ? 'high' : best5 >= 22 ? 'medium' : 'low'
-          
-          // 生成 AI 报告
+          // 3. 对每个课程计算分数
+          interface ScoringRow {
+            id: number; programme_code: string; programme_name: string | null;
+            university: string; year: number; scoring_base: string;
+            include_english: number; include_math: number;
+            include_specific: string; subject_weights: string;
+            sixth_subject_bonus: number; highest_attainable: number | null;
+            median: number | null; lower_quartile: number | null;
+            upper_quartile: number | null; formula_description: string | null;
+            scoring_type: string;
+          }
+
+          const matchedProgrammes = (dbResult.results as ScoringRow[]).map((row) =>
+            calculateProgrammeMatch(row, body.grades)
+          )
+
+          // 4. 排序并截取
+          const sorted = sortProgrammeResults(matchedProgrammes).slice(0, limit)
+
+          // 5. 统计摘要
+          const summary = {
+            total_matched: sorted.length,
+            weighted_calculated: sorted.filter((p) => p.weightedScore !== null).length,
+            base_only: sorted.filter((p) => p.weightedScore === null).length,
+            meets_median_count: sorted.filter((p) => p.meetsMedian === true).length,
+          }
+
+          // 6. 构建 AI 输入（不让 AI 算分，只提供解读）
           let aiReport = ''
           if (env.DEEPSEEK_API_KEY) {
             try {
-              // 严格 system prompt：禁止继续对话/询问用户
-              const systemPrompt = `你是一位香港升学顾问，专门帮助学生分析 JUPAS 大学申请。请用中文回复。
+              const topProgrammes = sorted.slice(0, 8).map((p) => {
+                const score = p.weightedScore ?? p.baseScore
+                const typeLabel = p.scoringType === 'WEIGHTED_STRUCTURED' ? '已按官方加权计算'
+                  : p.scoringType === 'WEIGHTED_DESCRIBED' ? '基础分数（保守评估）'
+                  : '基础分数'
+                const medianInfo = p.medianScore != null
+                  ? `中位数${p.medianScore}，${p.medianGap != null && p.medianGap >= 0 ? '达标' : '未达标'}(差距${p.medianGap?.toFixed(1)})`
+                  : '无收生数据'
+                return `${p.programmeCode} ${p.programmeName} [${p.university}] - 分数${score.toFixed(1)}(${typeLabel}), ${medianInfo}`
+              }).join('\n')
 
-【重要】你正在生成【正式分析报告】。
-严格规则：
-1. 输出必须是完整、封闭的分析报告
-2. 不允许向用户提问
-3. 不允许出现"是否需要我…"、"请告诉我"、"我可以为你…"等引导继续对话的句式
-4. 不允许列出可选服务、下一步选项
-5. 报告必须在总结后自然结束
-6. 结尾不得包含任何疑问句或邀请性语句
-7. 禁止说"如果你需要"、"请随时告知"、"需要我为你"等`
+              const weightedBonusInfo = sorted
+                .filter((p) => p.scoringType === 'WEIGHTED_STRUCTURED' && p.weightedScore != null)
+                .slice(0, 3)
+                .map((p) => {
+                  const bonus = (p.weightedScore ?? 0) - p.baseScore
+                  return `${p.programmeCode}: 加权后${p.weightedScore?.toFixed(1)}(基础${p.baseScore.toFixed(1)}，加权红利+${bonus.toFixed(1)})`
+                }).join('\n')
+
+              const systemPrompt = `你是香港升学顾问。请根据以下已计算好的数据提供分析建议。
+【严格规则】
+1. 禁止重新计算分数，直接使用提供的数据
+2. 输出完整封闭的分析报告（200-400字）
+3. 禁止向用户提问或引导继续对话
+4. 禁止出现"如果你需要"、"请随时告知"等语句
+5. 明确区分"已按官方加权计算"和"基础分数（保守评估）"的课程`
+
+              const userContent = `学生 DSE 成绩: Best 5 = ${best5}, Best 6 = ${best6}
+各科: ${Object.entries(body.grades).map(([s, g]) => `${s}:${g}`).join(', ')}
+兴趣: ${(body.interests || []).join('、') || '未填写'}
+目标大学: ${targetUniversities.join('、') || '未指定'}
+
+匹配课程（已由系统计算分数，禁止重算）:
+${topProgrammes}
+
+${weightedBonusInfo ? `加权红利分析:\n${weightedBonusInfo}` : ''}
+
+统计: ${summary.total_matched}个匹配课程，${summary.weighted_calculated}个已精确加权，${summary.meets_median_count}个达到中位数。
+
+请分析:
+1. 成绩定位（基于Best5=${best5}）
+2. 对匹配课程的录取可能性评估（基于与中位数的差距）
+3. 加权红利建议（哪些课程因加权获得优势）
+4. 选校策略建议`
 
               const aiResponse = await fetch('https://api.deepseek.com/chat/completions', {
                 method: 'POST',
@@ -4992,27 +5053,12 @@ export default {
                 body: JSON.stringify({
                   model: 'deepseek-chat',
                   messages: [
-                    {
-                      role: 'system',
-                      content: systemPrompt
-                    },
-                    {
-                      role: 'user',
-                      content: `学生 DSE 成绩 Best 5: ${best5} 分，Best 6: ${best6} 分。
-兴趣：${(body.interests || []).join('、') || '未填写'}
-特长：${(body.strengths || []).join('、') || '未填写'}
-目标大学：${(body.target_universities || []).join('、') || '未指定'}
-职业方向：${body.career_aspirations || '未填写'}
-
-请提供简短的升学建议（100-200字），包括：
-1. 成绩定位分析
-2. 选校建议
-3. 需要注意的事项`
-                    }
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userContent }
                   ],
-                  max_tokens: 500,
-                  temperature: 0.3,  // 降低温度
-                  top_p: 0.8,        // 限制采样范围
+                  max_tokens: 800,
+                  temperature: 0.3,
+                  top_p: 0.8,
                 })
               })
 
@@ -5021,8 +5067,7 @@ export default {
                   choices: Array<{ message: { content: string } }>
                 }
                 let rawReport = aiData.choices?.[0]?.message?.content || ''
-                
-                // 后处理：裁剪禁止的引导性语句
+                // 裁剪引导性语句
                 const forbiddenPatterns = [
                   /需要我为你/i, /是否需要我/i, /请随时告知/i, /我可以为你/i,
                   /如果你需要/i, /如果您需要/i, /请告诉我/i, /有任何问题/i,
@@ -5032,64 +5077,54 @@ export default {
                   const match = rawReport.match(pattern)
                   if (match && match.index !== undefined) {
                     const beforeMatch = rawReport.slice(0, match.index)
-                    const lastSentenceEnd = Math.max(
-                      beforeMatch.lastIndexOf('。'),
-                      beforeMatch.lastIndexOf('\n'),
-                      beforeMatch.lastIndexOf('！'),
-                      beforeMatch.lastIndexOf('？')
+                    const lastEnd = Math.max(
+                      beforeMatch.lastIndexOf('。'), beforeMatch.lastIndexOf('\n'),
+                      beforeMatch.lastIndexOf('！'), beforeMatch.lastIndexOf('？')
                     )
-                    rawReport = rawReport.slice(0, lastSentenceEnd > 0 ? lastSentenceEnd + 1 : match.index).trim()
-                    console.log('[JUPAS AI] Trimmed forbidden continuation prompt')
+                    rawReport = rawReport.slice(0, lastEnd > 0 ? lastEnd + 1 : match.index).trim()
                     break
                   }
                 }
                 aiReport = rawReport
               }
             } catch (e) {
-              console.error('[JUPAS AI] DeepSeek API error:', e)
+              console.error('[JUPAS] DeepSeek API error:', e)
             }
           }
 
-          // 如果没有 AI 报告，生成默认报告
           if (!aiReport) {
-            aiReport = `根据您的 DSE 成绩（Best 5: ${best5} 分），您在 JUPAS 申请中具有${
-              scoreLevel === 'high' ? '较强' : scoreLevel === 'medium' ? '一定' : '有限'
-            }的竞争力。建议合理选择目标专业，同时准备备选方案。`
+            const scoreLevel = best5 >= 28 ? '较强' : best5 >= 22 ? '一定' : '有限'
+            aiReport = `根据您的 DSE 成绩（Best 5: ${best5} 分），您在 JUPAS 申请中具有${scoreLevel}的竞争力。系统已为您匹配了 ${summary.total_matched} 个课程，其中 ${summary.weighted_calculated} 个已按官方加权规则精确计算分数，${summary.meets_median_count} 个达到收生中位数。建议优先关注加权后分数达标的课程。`
           }
 
           const now = new Date().toISOString()
           const recordId = crypto.randomUUID()
 
-          // 构建分析结果
           const analysisResult = {
-            student_profile: studentProfile,
-            matched_programmes: matchedProgrammes,
+            student_profile: {
+              best5,
+              best6,
+              subjectScores,
+            },
+            matched_programmes: sorted,
+            scoring_summary: summary,
             ai_report: aiReport,
             generated_at: now,
-            disclaimer: '本分析基于公开资料与教育经验模型，仅供参考，不构成任何录取保证。',
+            disclaimer: '本分析基于 JUPAS 公开资料计算，A类课程已按官方加权规则精确计算，B/C/D类为基础分数估算。仅供参考，不构成录取保证。',
           }
 
-          // 【强制】保存到 analysis_records 表
+          // 保存到 analysis_records
           await env.DB.prepare(
-            `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at) 
+            `INSERT INTO analysis_records (id, user_id, analysis_type, student_info, result, created_at)
              VALUES (?, ?, 'university', ?, ?, ?)`
-          ).bind(
-            recordId,
-            userId,
-            JSON.stringify(body),
-            JSON.stringify(analysisResult),
-            now
-          ).run()
+          ).bind(recordId, userId, JSON.stringify(body), JSON.stringify(analysisResult), now).run()
 
-          console.log(`[JUPAS AI] 分析记录已保存 - userId: ${userId}, recordId: ${recordId}`)
+          console.log(`[JUPAS] 分析完成 - userId: ${userId}, matched: ${summary.total_matched}, weighted: ${summary.weighted_calculated}`)
 
-          return jsonResponse({
-            success: true,
-            data: analysisResult,
-          }, 200, origin)
+          return jsonResponse({ success: true, data: analysisResult }, 200, origin)
 
         } catch (error) {
-          console.error('[JUPAS AI] Error:', error)
+          console.error('[JUPAS] Error:', error)
           return errorResponse('分析失败，请稍后重试', 500, origin)
         }
       }

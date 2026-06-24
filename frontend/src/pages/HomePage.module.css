@@ -176,8 +176,10 @@
 }
 
 .cardLogo {
-  width: 32px;
-  height: 32px;
+  height: 36px;
+  width: auto;
+  max-width: 160px;
+  object-fit: contain;
 }
 
 .scorePreview {

@@ -536,30 +536,68 @@ export interface ComprehensiveAnalysisResponse {
   disclaimer: string
 }
 
+/** 课程计分分类 */
+export type ProgrammeScoringType =
+  | 'WEIGHTED_STRUCTURED'   // A类: 有结构化加权 - 可精确计算
+  | 'WEIGHTED_DESCRIBED'    // B类: 描述中有加权但未结构化 - 仅基础分
+  | 'SUBJECT_CONSTRAINED'   // C类: 有科目约束无加权
+  | 'SIMPLE'                // D类: 无加权无约束
+
+/** 加权计算详情 */
+export interface WeightDetail {
+  subject: string
+  subjectLabel: string
+  grade: string
+  baseScore: number
+  weight: number
+  weightedScore: number
+}
+
+/** 匹配课程结果 */
+export interface ProgrammeMatchResult {
+  programmeCode: string
+  programmeName: string
+  university: string
+  scoringType: ProgrammeScoringType
+  scoringBase: string
+  /** 加权分数 (仅 A 类有值) */
+  weightedScore: number | null
+  /** 基础分数 (所有类型都有) */
+  baseScore: number
+  /** 中位数收生分 */
+  medianScore: number | null
+  /** 是否达到中位数 */
+  meetsMedian: boolean | null
+  /** 与中位数的差距 */
+  medianGap: number | null
+  /** 加权计算详情 (仅 A 类) */
+  weightDetails: WeightDetail[] | null
+  /** 科目约束 */
+  constraints: {
+    requireEnglish: boolean
+    requireMath: boolean
+    requireSpecific: string[]
+  }
+  /** 是否满足科目约束 */
+  meetsConstraints: boolean
+  /** 提示/声明 */
+  disclaimer: string | null
+}
+
 /** AI 分析响应 */
 export interface AIAnalysisResponse {
   student_profile: {
     best5: number
     best6: number
-    interests: string[]
-    strengths: string[]
+    subjectScores?: Record<string, number>
   }
-  matched_programmes: Array<{
-    code: string
-    title: string
-    university: string
-    field: string
-    match_score: number
-    academic_score: number
-    personal_score: number
-    recommendation: string
-    historical: {
-      median?: number
-      lower_quartile?: number
-      upper_quartile?: number
-    }
-  }>
-  // 详细的 Markdown 格式 AI 分析报告
+  matched_programmes: ProgrammeMatchResult[]
+  scoring_summary: {
+    total_matched: number
+    weighted_calculated: number
+    base_only: number
+    meets_median_count: number
+  }
   ai_report: string
   generated_at: string
   disclaimer: string

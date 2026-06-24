@@ -293,8 +293,8 @@ const ResultPage = () => {
     return <Navigate to={`/transfer/result/${resultAny.analysisId || id}`} replace />
   }
 
-  // 雷达图数据
-  const radarData = result.subjectAnalyses.map((subject) => ({
+  // 雷达图数据（防御：subjectAnalyses 可能不存在）
+  const radarData = (result.subjectAnalyses || []).map((subject) => ({
     subject: subject.subject,
     current: parseInt(subject.currentLevel) || 3,
     target: parseInt(subject.targetLevel) || 5,

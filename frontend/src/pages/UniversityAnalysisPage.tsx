@@ -39,9 +39,10 @@ import {
   analyzeWithAI,
   ProgrammeField,
   FIELD_NAMES,
-  FIELD_COLORS,
   ComprehensiveAnalysisInput,
   AIAnalysisResponse,
+  ProgrammeMatchResult,
+  UNIVERSITY_NAMES,
 } from '../services/jupasApi'
 import {
   ALL_SUBJECTS,
@@ -314,14 +315,14 @@ const UniversityAnalysisPage = () => {
         target_fields: (values.targetFields as string[]) || [],
         career_aspirations: (values.careerInterests as string) || '',
         extracurriculars: (values.extracurriculars as string) || '',
-        limit: 15
+        limit: 5
       }
 
       const response = await analyzeWithAI(input)
 
       // 处理 401 未授权 - 跳转登录
       if (response.message === 'AUTH_REQUIRED') {
-        message.warning(isEnglish ? 'Please login to use AI analysis' : '请先登录后再使用 AI 分析')
+        message.warning(isEnglish ? 'Please login to use this analysis' : '请先登录后再使用分析功能')
         navigate('/login')
         return
       }
@@ -356,8 +357,8 @@ const UniversityAnalysisPage = () => {
           </Title>
           <Text type="secondary">
             {isEnglish 
-              ? 'AI-powered analysis to help you find the best matching programmes'
-              : '基于 AI 的深度分析，帮助你找到最匹配的大学专业'}
+              ? 'Data-driven analysis based on real JUPAS scoring rules'
+              : '基于真实 JUPAS 计分规则的数据驱动分析'}
           </Text>
         </div>
       </div>
@@ -679,8 +680,8 @@ const UniversityAnalysisPage = () => {
           <div className={styles.analysisTips}>
             <Text type="secondary" style={{ fontSize: 12 }}>
               💡 {isEnglish 
-                ? 'AI is analyzing your results and matching with university programmes'
-                : '提示：AI正在分析您的成绩与各大学专业的匹配度'}
+                ? 'Applying official scoring rules and weighting formulas'
+                : '提示：正在应用官方计分规则与加权公式进行精确匹配'}
             </Text>
           </div>
         </div>
@@ -744,52 +745,70 @@ const UniversityAnalysisPage = () => {
             className={styles.resultCard}
           >
             <div className={styles.programmesGrid}>
-              {analysisResult.matched_programmes.slice(0, 5).map((prog, index) => (
-                <div 
-                  key={prog.code} 
-                  className={styles.programmeCard}
-                  style={{ borderLeftColor: FIELD_COLORS[prog.field?.toLowerCase().replace(/[^a-z]/g, '_')] || '#1890ff' }}
-                >
-                  <div className={styles.programmeHeader}>
-                    <Badge 
-                      count={index + 1} 
-                      style={{ 
-                        backgroundColor: prog.recommendation === 'safe' ? '#52c41a' : 
-                                         prog.recommendation === 'match' ? '#faad14' : '#ff4d4f' 
-                      }} 
-                    />
-                    <Tag color={
-                      prog.recommendation === 'safe' ? 'success' : 
-                      prog.recommendation === 'match' ? 'warning' : 'error'
-                    }>
-                      {prog.recommendation === 'safe' ? (isEnglish ? 'Safe' : '保底') :
-                       prog.recommendation === 'match' ? (isEnglish ? 'Target' : '目标') :
-                       (isEnglish ? 'Reach' : '冲刺')}
-                    </Tag>
-                  </div>
-                  <div className={styles.programmeTitle}>{prog.title}</div>
-                  <div className={styles.programmeUniversity}>{prog.university}</div>
-                  <div className={styles.programmeScores}>
-                    <Tooltip title={isEnglish ? 'Overall Match' : '综合匹配度'}>
-                      <span className={styles.scoreItem}>
-                        🎯 {prog.match_score}%
-                      </span>
-                    </Tooltip>
-                    <Tooltip title={isEnglish ? 'Academic Match' : '成绩匹配度'}>
-                      <span className={styles.scoreItem}>
-                        📚 {prog.academic_score}%
-                      </span>
-                    </Tooltip>
-                    {prog.historical.median && (
-                      <Tooltip title={isEnglish ? 'Median Score' : '历年中位数'}>
+              {analysisResult.matched_programmes.slice(0, 5).map((prog: ProgrammeMatchResult, index: number) => {
+                const displayScore = prog.weightedScore ?? prog.baseScore
+                const uniName = UNIVERSITY_NAMES[prog.university]
+                  ? (isEnglish ? UNIVERSITY_NAMES[prog.university].en : UNIVERSITY_NAMES[prog.university].zh)
+                  : prog.university.toUpperCase()
+                // 根据中位数差距推导推荐等级
+                const recommendation = prog.meetsMedian === true && (prog.medianGap ?? 0) >= 3 ? 'safe'
+                  : prog.meetsMedian === true ? 'match'
+                  : 'reach'
+                // 根据中位数差距推导匹配度
+                const matchScore = prog.medianScore != null 
+                  ? Math.min(99, Math.max(30, Math.round(50 + (prog.medianGap ?? 0) * 5)))
+                  : Math.min(99, Math.max(30, Math.round(displayScore * 3)))
+                const academicScore = prog.medianScore != null
+                  ? Math.min(99, Math.max(25, Math.round(displayScore / prog.medianScore * 100)))
+                  : matchScore
+
+                return (
+                  <div 
+                    key={prog.programmeCode} 
+                    className={styles.programmeCard}
+                    style={{ borderLeftColor: recommendation === 'safe' ? '#52c41a' : recommendation === 'match' ? '#faad14' : '#1890ff' }}
+                  >
+                    <div className={styles.programmeHeader}>
+                      <Badge 
+                        count={index + 1} 
+                        style={{ 
+                          backgroundColor: recommendation === 'safe' ? '#52c41a' : 
+                                           recommendation === 'match' ? '#faad14' : '#ff4d4f' 
+                        }} 
+                      />
+                      <Tag color={
+                        recommendation === 'safe' ? 'success' : 
+                        recommendation === 'match' ? 'warning' : 'error'
+                      }>
+                        {recommendation === 'safe' ? (isEnglish ? 'Safe' : '保底') :
+                         recommendation === 'match' ? (isEnglish ? 'Target' : '目标') :
+                         (isEnglish ? 'Reach' : '冲刺')}
+                      </Tag>
+                    </div>
+                    <div className={styles.programmeTitle}>{prog.programmeName}</div>
+                    <div className={styles.programmeUniversity}>{uniName} · {prog.programmeCode}</div>
+                    <div className={styles.programmeScores}>
+                      <Tooltip title={isEnglish ? 'Overall Match' : '综合匹配度'}>
                         <span className={styles.scoreItem}>
-                          📊 {prog.historical.median}
+                          🎯 {matchScore}%
                         </span>
                       </Tooltip>
-                    )}
+                      <Tooltip title={isEnglish ? 'Academic Match' : '成绩匹配度'}>
+                        <span className={styles.scoreItem}>
+                          📚 {academicScore}%
+                        </span>
+                      </Tooltip>
+                      {prog.medianScore != null && (
+                        <Tooltip title={isEnglish ? 'Median Score' : '历年中位数'}>
+                          <span className={styles.scoreItem}>
+                            📊 {prog.medianScore}
+                          </span>
+                        </Tooltip>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </Card>
 
@@ -807,7 +826,6 @@ const UniversityAnalysisPage = () => {
               <div className={styles.aiReportContainer}>
                 <Paragraph className={styles.aiReport}>
                   {analysisResult.ai_report.split('\n').map((line, index) => {
-                    // 处理标题
                     if (line.startsWith('## ')) {
                       return <h3 key={index} className={styles.reportH3}>{line.replace('## ', '')}</h3>
                     }
@@ -817,7 +835,6 @@ const UniversityAnalysisPage = () => {
                     if (line.startsWith('#### ')) {
                       return <h5 key={index} className={styles.reportH5}>{line.replace('#### ', '')}</h5>
                     }
-                    // 处理粗体文本
                     if (line.includes('**')) {
                       const parts = line.split(/\*\*([^*]+)\*\*/)
                       return (
@@ -828,19 +845,15 @@ const UniversityAnalysisPage = () => {
                         </p>
                       )
                     }
-                    // 处理列表项
                     if (line.startsWith('- ') || line.startsWith('* ')) {
                       return <li key={index} className={styles.reportListItem}>{line.substring(2)}</li>
                     }
-                    // 处理编号列表
                     if (/^\d+\.\s/.test(line)) {
                       return <li key={index} className={styles.reportListItem}>{line.replace(/^\d+\.\s/, '')}</li>
                     }
-                    // 空行
                     if (!line.trim()) {
                       return <br key={index} />
                     }
-                    // 普通段落
                     return <p key={index} className={styles.reportParagraph}>{line}</p>
                   })}
                 </Paragraph>

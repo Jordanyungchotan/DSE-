@@ -5,77 +5,54 @@ import {
   Row,
   Col,
   Typography,
-  Progress,
   Tag,
   Button,
   Spin,
   Alert,
-  Divider,
-  List,
-  Collapse,
+  Badge,
+  Tooltip,
 } from 'antd'
 import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined,
-  BankOutlined,
-  RocketOutlined,
   TrophyOutlined,
-  LineChartOutlined,
+  BulbOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import { apiFetch } from '../config/api'
 import { useLanguageStore } from '../stores/languageStore'
+import { UNIVERSITY_NAMES, ProgrammeMatchResult } from '../services/jupasApi'
 import styles from './UniversityResultPage.module.css'
 
 const { Title, Text, Paragraph } = Typography
-const { Panel } = Collapse
 
-interface UniversityResult {
-  id: string
-  createdAt: string
-  bestFive: number
-  bestSix: number
-  admissionAnalysis: {
-    overallScore: number
-    summary: string
-    targetProgramAnalyses: {
-      university: string
-      program: string
-      admissionChance: 'high' | 'medium' | 'low'
-      minScore: number
-      yourScore: number
-      analysis: string
-      recommendations: string[]
-    }[]
+interface JupasFullResult {
+  student_profile: {
+    best5: number
+    best6: number
+    subjectScores: Record<string, number>
   }
-  alternativeRecommendations: {
-    program: string
-    university: string
-    matchScore: number
-    reason: string
-  }[]
-  careerAnalysis: {
-    industryTrends: string[]
-    highDemandFields: string[]
-    salaryOutlook: string
-    aiImpact: string
+  matched_programmes: ProgrammeMatchResult[]
+  scoring_summary: {
+    total_matched: number
+    weighted_calculated: number
+    base_only: number
+    meets_median_count: number
   }
-  applicationStrategy: {
-    bandAStrategy: string[]
-    interviewTips: string[]
-    personalStatementAdvice: string[]
-  }
-  backupPlans: string[]
+  ai_report: string
+  generated_at: string
 }
 
 /**
- * 大学申请分析结果页面
+ * 大学申请分析结果页面 - 查看历史记录
  */
 const UniversityResultPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { t } = useLanguageStore()
-  const [result, setResult] = useState<UniversityResult | null>(null)
+  const { language } = useLanguageStore()
+  const isEnglish = language === 'en'
+  const [result, setResult] = useState<JupasFullResult | null>(null)
+  const [createdAt, setCreatedAt] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -89,7 +66,24 @@ const UniversityResultPage = () => {
           throw new Error('无法加载分析结果')
         }
         const data = await response.json()
-        setResult(data.result)
+        const record = data.result || data.data
+        
+        // 解析 fullResult
+        if (record?.fullResult) {
+          const parsed = typeof record.fullResult === 'string' 
+            ? JSON.parse(record.fullResult) 
+            : record.fullResult
+          setResult(parsed)
+          setCreatedAt(record.createdAt || record.created_at || '')
+        } else if (record?.full_result) {
+          const parsed = typeof record.full_result === 'string'
+            ? JSON.parse(record.full_result)
+            : record.full_result
+          setResult(parsed)
+          setCreatedAt(record.created_at || record.createdAt || '')
+        } else {
+          setError('此分析记录的详细数据不可用（旧版记录未保存完整数据）')
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : '加载失败')
       } finally {
@@ -100,27 +94,9 @@ const UniversityResultPage = () => {
     loadResult()
   }, [id])
 
-  const getChanceColor = (chance: string) => {
-    switch (chance) {
-      case 'high': return '#52c41a'
-      case 'medium': return '#faad14'
-      case 'low': return '#ff4d4f'
-      default: return '#1890ff'
-    }
-  }
-
-  const getChanceText = (chance: string) => {
-    switch (chance) {
-      case 'high': return '录取机会高'
-      case 'medium': return '录取机会中等'
-      case 'low': return '录取机会较低'
-      default: return '待评估'
-    }
-  }
-
   if (loading) {
     return (
-      <div className={styles.loadingContainer}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <Spin size="large" tip="正在加载分析结果..." />
       </div>
     )
@@ -128,216 +104,228 @@ const UniversityResultPage = () => {
 
   if (error || !result) {
     return (
-      <div className={styles.errorContainer}>
+      <div style={{ maxWidth: 800, margin: '40px auto', padding: '0 16px' }}>
         <Alert
-          type="error"
-          message="加载失败"
-          description={error || '无法找到分析结果'}
+          type="warning"
+          message="无法显示完整报告"
+          description={error || '此记录的详细数据不可用。请重新进行分析。'}
           showIcon
           action={
-            <Button onClick={() => navigate('/analysis')}>
+            <Button onClick={() => navigate('/analysis/university')} type="primary">
               重新分析
             </Button>
           }
         />
+        <Button 
+          icon={<ArrowLeftOutlined />} 
+          onClick={() => navigate(-1)} 
+          style={{ marginTop: 16 }}
+        >
+          返回
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className={styles.resultPage}>
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '24px 16px' }}>
       {/* 操作栏 */}
-      <div className={styles.actionBar}>
-        <Button
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/analysis')}
-        >
-          {t('common.back')}
-        </Button>
-      </div>
+      <Button
+        icon={<ArrowLeftOutlined />}
+        onClick={() => navigate(-1)}
+        style={{ marginBottom: 16 }}
+      >
+        返回
+      </Button>
 
-      {/* 报告内容 */}
-      <div className={styles.reportContent}>
-        {/* 报告头部 */}
-        <Card className={styles.reportHeader}>
-          <Row gutter={24} align="middle">
-            <Col xs={24} md={16}>
-              <Title level={2} className="gradient-title">
-                <RocketOutlined /> {t('analysis.universityTitle')}
-              </Title>
-              <Paragraph type="secondary">
-                生成时间：{new Date(result.createdAt).toLocaleString('zh-CN')}
-                <br />
-                最佳5科分数：<Tag color="blue">{result.bestFive}分</Tag>
-              </Paragraph>
-            </Col>
-            <Col xs={24} md={8}>
-              <div className={styles.scoreCircle}>
-                <Progress
-                  type="circle"
-                  percent={result.admissionAnalysis?.overallScore || 0}
-                  size={140}
-                  strokeColor={result.admissionAnalysis?.overallScore >= 70 ? '#52c41a' : result.admissionAnalysis?.overallScore >= 50 ? '#faad14' : '#ff4d4f'}
-                  format={(percent) => (
-                    <div className={styles.scoreContent}>
-                      <span className={styles.scoreValue}>{percent}</span>
-                      <span className={styles.scoreLabel}>综合评分</span>
-                    </div>
-                  )}
-                />
+      {/* 成功提示 */}
+      <Alert
+        message={isEnglish ? 'AI Analysis Complete!' : 'AI 分析完成！'}
+        description={isEnglish 
+          ? `Found ${result.matched_programmes.length} matching programmes for you.`
+          : `已为您匹配到 ${result.matched_programmes.length} 个适合的课程。`}
+        type="success"
+        showIcon
+        icon={<CheckCircleOutlined />}
+        style={{ marginBottom: 24 }}
+      />
+
+      {/* 学生档案摘要 */}
+      <Card style={{ marginBottom: 24 }}>
+        <Row gutter={[24, 16]}>
+          <Col xs={12} sm={6}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#999', fontSize: 12 }}>{isEnglish ? 'Best 5' : '最佳5科'}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: '#1890ff' }}>{result.student_profile.best5}</div>
+            </div>
+          </Col>
+          <Col xs={12} sm={6}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#999', fontSize: 12 }}>{isEnglish ? 'Best 6' : '最佳6科'}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: '#1890ff' }}>{result.student_profile.best6}</div>
+            </div>
+          </Col>
+          <Col xs={12} sm={6}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#999', fontSize: 12 }}>{isEnglish ? 'Matched' : '匹配课程'}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, color: '#1890ff' }}>{result.matched_programmes.length}</div>
+            </div>
+          </Col>
+          <Col xs={12} sm={6}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ color: '#999', fontSize: 12 }}>{isEnglish ? 'Generated' : '生成时间'}</div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: '#1890ff', marginTop: 8 }}>
+                {createdAt ? new Date(createdAt).toLocaleDateString() : new Date(result.generated_at).toLocaleDateString()}
               </div>
-            </Col>
-          </Row>
-        </Card>
+            </div>
+          </Col>
+        </Row>
+      </Card>
 
-        {/* 综合评估 */}
-        <Card title={<><TrophyOutlined /> 综合评估</>} className={styles.sectionCard}>
-          <Paragraph className={styles.summary}>
-            {result.admissionAnalysis?.summary || '暂无综合评估'}
-          </Paragraph>
-        </Card>
+      {/* 匹配课程列表 */}
+      <Card 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <TrophyOutlined style={{ color: '#faad14' }} />
+            <span>{isEnglish ? 'Top Matched Programmes' : '匹配度最高的课程'}</span>
+          </div>
+        }
+        style={{ marginBottom: 24 }}
+      >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {result.matched_programmes.slice(0, 5).map((prog, index) => {
+            const displayScore = prog.weightedScore ?? prog.baseScore
+            const uniName = UNIVERSITY_NAMES[prog.university]
+              ? (isEnglish ? UNIVERSITY_NAMES[prog.university].en : UNIVERSITY_NAMES[prog.university].zh)
+              : prog.university.toUpperCase()
+            const recommendation = prog.meetsMedian === true && (prog.medianGap ?? 0) >= 3 ? 'safe'
+              : prog.meetsMedian === true ? 'match'
+              : 'reach'
+            const matchScore = prog.medianScore != null 
+              ? Math.min(99, Math.max(30, Math.round(50 + (prog.medianGap ?? 0) * 5)))
+              : Math.min(99, Math.max(30, Math.round(displayScore * 3)))
+            const academicScore = prog.medianScore != null
+              ? Math.min(99, Math.max(25, Math.round(displayScore / prog.medianScore * 100)))
+              : matchScore
 
-        {/* 目标专业分析 */}
-        <Card title={<><BankOutlined /> 目标专业录取分析</>} className={styles.sectionCard}>
-          {result.admissionAnalysis?.targetProgramAnalyses?.map((program, index) => (
-            <Card 
-              key={index} 
-              size="small" 
-              className={styles.programCard}
-              style={{ marginBottom: 16 }}
-            >
-              <Row gutter={16} align="middle">
-                <Col xs={24} md={8}>
-                  <Title level={5} style={{ margin: 0 }}>{program.university}</Title>
-                  <Text>{program.program}</Text>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Tag color={getChanceColor(program.admissionChance)} style={{ fontSize: 14, padding: '4px 12px' }}>
-                    {getChanceText(program.admissionChance)}
+            return (
+              <div 
+                key={prog.programmeCode} 
+                style={{
+                  border: '1px solid #f0f0f0',
+                  borderLeft: `4px solid ${recommendation === 'safe' ? '#52c41a' : recommendation === 'match' ? '#faad14' : '#1890ff'}`,
+                  borderRadius: 8,
+                  padding: 16,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Badge 
+                    count={index + 1} 
+                    style={{ 
+                      backgroundColor: recommendation === 'safe' ? '#52c41a' : 
+                                       recommendation === 'match' ? '#faad14' : '#ff4d4f' 
+                    }} 
+                  />
+                  <Tag color={
+                    recommendation === 'safe' ? 'success' : 
+                    recommendation === 'match' ? 'warning' : 'error'
+                  }>
+                    {recommendation === 'safe' ? '保底' :
+                     recommendation === 'match' ? '目标' : '冲刺'}
                   </Tag>
-                  <br />
-                  <Text type="secondary" style={{ fontSize: 12 }}>
-                    最低分数: {program.minScore} | 你的分数: {program.yourScore}
-                  </Text>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Text>{program.analysis}</Text>
-                </Col>
-              </Row>
-              {program.recommendations?.length > 0 && (
-                <div style={{ marginTop: 12 }}>
-                  <Text strong>建议：</Text>
-                  <ul style={{ margin: '8px 0', paddingLeft: 20 }}>
-                    {program.recommendations.map((rec, i) => (
-                      <li key={i}>{rec}</li>
-                    ))}
-                  </ul>
                 </div>
-              )}
-            </Card>
-          ))}
-        </Card>
-
-        {/* 备选专业推荐 */}
-        {result.alternativeRecommendations?.length > 0 && (
-          <Card title={<><CheckCircleOutlined /> 备选专业推荐</>} className={styles.sectionCard}>
-            <Row gutter={[16, 16]}>
-              {result.alternativeRecommendations.map((alt, index) => (
-                <Col xs={24} md={12} key={index}>
-                  <Card size="small" className={styles.altCard}>
-                    <div className={styles.altHeader}>
-                      <Text strong>{alt.program}</Text>
-                      <Tag color="green">匹配度 {alt.matchScore}%</Tag>
-                    </div>
-                    <Text type="secondary">{alt.university}</Text>
-                    <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>{alt.reason}</Paragraph>
-                  </Card>
-                </Col>
-              ))}
-            </Row>
-          </Card>
-        )}
-
-        {/* 就业趋势分析 */}
-        <Card title={<><LineChartOutlined /> 就业趋势分析</>} className={styles.sectionCard}>
-          <Row gutter={24}>
-            <Col xs={24} md={12}>
-              <Title level={5}>行业趋势</Title>
-              <List
-                size="small"
-                dataSource={result.careerAnalysis?.industryTrends || []}
-                renderItem={(item) => <List.Item>{item}</List.Item>}
-              />
-            </Col>
-            <Col xs={24} md={12}>
-              <Title level={5}>高需求领域</Title>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {result.careerAnalysis?.highDemandFields?.map((field, i) => (
-                  <Tag key={i} color="blue">{field}</Tag>
-                ))}
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{prog.programmeName}</div>
+                <div style={{ color: '#999', fontSize: 12, marginBottom: 8 }}>{uniName} · {prog.programmeCode}</div>
+                <div style={{ display: 'flex', gap: 12, fontSize: 13 }}>
+                  <Tooltip title={isEnglish ? 'Overall Match' : '综合匹配度'}>
+                    <span>🎯 {matchScore}%</span>
+                  </Tooltip>
+                  <Tooltip title={isEnglish ? 'Academic Match' : '成绩匹配度'}>
+                    <span>📚 {academicScore}%</span>
+                  </Tooltip>
+                  {prog.medianScore != null && (
+                    <Tooltip title={isEnglish ? 'Median Score' : '历年中位数'}>
+                      <span>📊 {prog.medianScore}</span>
+                    </Tooltip>
+                  )}
+                </div>
               </div>
-            </Col>
-          </Row>
-          
-          <Divider />
-          
-          <Row gutter={24}>
-            <Col xs={24} md={12}>
-              <Title level={5}>薪资前景</Title>
-              <Paragraph>{result.careerAnalysis?.salaryOutlook || '暂无数据'}</Paragraph>
-            </Col>
-            <Col xs={24} md={12}>
-              <Title level={5}>AI影响分析</Title>
-              <Paragraph>{result.careerAnalysis?.aiImpact || '暂无数据'}</Paragraph>
-            </Col>
-          </Row>
-        </Card>
+            )
+          })}
+        </div>
+      </Card>
 
-        {/* 申请策略 */}
-        <Card title={<><ExclamationCircleOutlined /> 申请策略建议</>} className={styles.sectionCard}>
-          <Collapse ghost defaultActiveKey={['1']}>
-            <Panel header="Band A 选择策略" key="1">
-              <List
-                size="small"
-                dataSource={result.applicationStrategy?.bandAStrategy || []}
-                renderItem={(item) => <List.Item>{item}</List.Item>}
-              />
-            </Panel>
-            <Panel header="面试准备技巧" key="2">
-              <List
-                size="small"
-                dataSource={result.applicationStrategy?.interviewTips || []}
-                renderItem={(item) => <List.Item>{item}</List.Item>}
-              />
-            </Panel>
-            <Panel header="个人陈述建议" key="3">
-              <List
-                size="small"
-                dataSource={result.applicationStrategy?.personalStatementAdvice || []}
-                renderItem={(item) => <List.Item>{item}</List.Item>}
-              />
-            </Panel>
-          </Collapse>
+      {/* 详细分析报告 */}
+      {result.ai_report && (
+        <Card 
+          title={
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <BulbOutlined style={{ color: '#1890ff' }} />
+              <span>{isEnglish ? 'Detailed Analysis Report' : '详细分析报告'}</span>
+            </div>
+          }
+          style={{ marginBottom: 24 }}
+        >
+          <div style={{ lineHeight: 1.8 }}>
+            <Paragraph>
+              {result.ai_report.split('\n').map((line, index) => {
+                if (line.startsWith('## ')) {
+                  return <h3 key={index} style={{ marginTop: 16, marginBottom: 8, color: '#1a1a1a' }}>{line.replace('## ', '')}</h3>
+                }
+                if (line.startsWith('### ')) {
+                  return <h4 key={index} style={{ marginTop: 12, marginBottom: 6, color: '#333' }}>{line.replace('### ', '')}</h4>
+                }
+                if (line.startsWith('#### ')) {
+                  return <h5 key={index} style={{ marginTop: 8, marginBottom: 4 }}>{line.replace('#### ', '')}</h5>
+                }
+                if (line.includes('**')) {
+                  const parts = line.split(/\*\*([^*]+)\*\*/)
+                  return (
+                    <p key={index} style={{ margin: '4px 0' }}>
+                      {parts.map((part, i) => 
+                        i % 2 === 1 ? <strong key={i}>{part}</strong> : part
+                      )}
+                    </p>
+                  )
+                }
+                if (line.startsWith('- ') || line.startsWith('* ')) {
+                  return <li key={index} style={{ marginLeft: 16, marginBottom: 4 }}>{line.substring(2)}</li>
+                }
+                if (/^\d+\.\s/.test(line)) {
+                  return <li key={index} style={{ marginLeft: 16, marginBottom: 4 }}>{line.replace(/^\d+\.\s/, '')}</li>
+                }
+                if (!line.trim()) {
+                  return <br key={index} />
+                }
+                return <p key={index} style={{ margin: '4px 0' }}>{line}</p>
+              })}
+            </Paragraph>
+          </div>
         </Card>
+      )}
 
-        {/* 备选方案 */}
-        {result.backupPlans?.length > 0 && (
-          <Card title="备选方案" className={styles.sectionCard}>
-            <List
-              dataSource={result.backupPlans}
-              renderItem={(item, index) => (
-                <List.Item>
-                  <Tag color="orange">{index + 1}</Tag>
-                  {item}
-                </List.Item>
-              )}
-            />
-          </Card>
-        )}
+      {/* 免责声明 */}
+      <Alert
+        message={isEnglish ? 'Disclaimer' : '免责声明'}
+        description="本分析基于 JUPAS 公开数据计算，仅供参考，不构成录取保证。实际录取受面试、推荐信等多种因素影响。"
+        type="warning"
+        showIcon
+        style={{ marginBottom: 24 }}
+      />
+
+      {/* 重新分析按钮 */}
+      <div style={{ textAlign: 'center', marginBottom: 40 }}>
+        <Button 
+          type="primary" 
+          size="large"
+          icon={<ReloadOutlined />}
+          onClick={() => navigate('/analysis/university')}
+        >
+          {isEnglish ? 'Start New Analysis' : '开始新的分析'}
+        </Button>
       </div>
     </div>
   )
 }
 
 export default UniversityResultPage
-

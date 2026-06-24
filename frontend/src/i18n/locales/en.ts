@@ -60,10 +60,10 @@ export const en = {
 
   // System
   system: {
-    name: 'CENTER OF MASS EDUCATION',
-    shortName: 'CoM Education',
+    name: 'iEdu Education Centre',
+    shortName: 'iEdu',
     slogan: 'Professional Hong Kong DSE Education Platform',
-    copyright: '© 2024 CENTER OF MASS EDUCATION',
+    copyright: '© 2024 iEdu Education Centre',
   },
 
   // Home Page
@@ -253,19 +253,19 @@ export const en = {
       title: 'Contact Us',
       service: {
         title: '📞 Customer Service',
-        hotline: 'Hotline: (852) 2711 1288',
-        email: 'Email: wengzudan@eduzhixin.com',
-        hours: 'Online Consultation: Tue-Sun 10:00-19:00',
+        hotline: 'Hotline: (852) 3590 9416',
+        email: 'Email: wengzudan@ieduchina.com',
+        hours: 'Online Consultation: Mon-Sun 10:00-19:00',
       },
       address: {
         title: '🏢 Office Address',
-        company: 'Center of Mass education tech. limited',
-        location: 'Room B, 3/F, Blue Horseman Building, 761 Nathan Road, Prince Edward, Kowloon, Hong Kong',
+        company: 'iEdu Education Centre',
+        location: 'Shop 216-217, 2/F, 68 Yee Wo Street, Causeway Bay, Hong Kong',
       },
       social: {
         title: '📱 Follow Us',
-        wechat: 'Center of Mass Education DSE',
-        facebook: 'HK Center of Mass Education',
+        wechat: 'iEdu Education Centre',
+        facebook: 'iEdu Education Centre',
         instagram: '@centerofmass_hk',
         wechatModal: 'WeChat Official Account',
         wechatScan: 'Scan the QR code to follow our WeChat Official Account',

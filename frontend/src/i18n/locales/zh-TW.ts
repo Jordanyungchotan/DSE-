@@ -60,10 +60,10 @@ export const zhTW = {
 
   // 系統名稱
   system: {
-    name: '香港質心教育',
-    shortName: '質心教育',
+    name: '愛讀教育中心',
+    shortName: '愛讀教育',
     slogan: '專業的香港DSE升學輔導平台',
-    copyright: '© 2024 香港質心教育',
+    copyright: '© 2024 愛讀教育中心',
   },
 
   // 首頁
@@ -253,19 +253,19 @@ export const zhTW = {
       title: '聯絡我們',
       service: {
         title: '📞 客戶服務',
-        hotline: '服務熱線：(852) 2711 1288',
-        email: '客服郵箱：wengzudan@eduzhixin.com',
-        hours: '在線諮詢：週二至週日 10:00-19:00',
+        hotline: '服務熱線：(852) 3590 9416',
+        email: '客服郵箱：wengzudan@ieduchina.com',
+        hours: '在線諮詢：週一至週日 10:00-19:00',
       },
       address: {
         title: '🏢 辦公地址',
-        company: '香港質心教育',
-        location: '香港九龍彌敦道761號太子藍馬之城3樓B室',
+        company: '愛讀教育中心',
+        location: '香港銅鑼灣怡和街68號2樓216-217號舖',
       },
       social: {
         title: '📱 關注我們',
-        wechat: '質心教育DSE',
-        facebook: '香港質心教育',
+        wechat: '愛讀教育中心',
+        facebook: '愛讀教育中心',
         instagram: '@centerofmass_hk',
         wechatModal: '微信公眾號',
         wechatScan: '掃描二維碼關注我們的微信公眾號',

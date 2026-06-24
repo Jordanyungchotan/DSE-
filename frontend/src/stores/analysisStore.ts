@@ -601,7 +601,7 @@ export const useAnalysisStore = create<AnalysisState>()(
             headers['Authorization'] = `Bearer ${token}`
           }
 
-          // 【关键】使用 analysisFetch 调用 dse-analysis-api
+          // 【关键】使用 analysisFetch 调用 dse-rag-questions
           const response = await analysisFetch('/api/transfer/analyze/v2', {
             method: 'POST',
             headers,

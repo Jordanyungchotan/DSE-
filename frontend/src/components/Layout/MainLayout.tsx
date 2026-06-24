@@ -194,8 +194,7 @@ const MainLayout = () => {
         <div className={styles.headerContent}>
           {/* Logo */}
           <Link to="/" className={styles.logo}>
-            <img src="/logo.png" alt="Logo" className={styles.logoImage} />
-            <span className={styles.logoText}>{t('system.name')}</span>
+            <img src="/logo.png" alt={t('system.name')} className={styles.logoImage} />
           </Link>
 
           {/* 桌面端导航菜单 */}

@@ -39,7 +39,7 @@ const { Title, Paragraph, Text } = Typography
 const { Panel } = Collapse
 
 /**
- * 首页组件 - 质心DSE升学分析系统完整介绍页面
+ * 首页组件 - 爱读教育中心 DSE升学分析系统完整介绍页面
  */
 const HomePage = () => {
   const navigate = useNavigate()
@@ -51,7 +51,7 @@ const HomePage = () => {
 
   // 社交媒体链接
   const socialLinks = {
-    googleMaps: 'https://maps.app.goo.gl/jyDjPeBWYumwvfsMA',
+    googleMaps: 'https://www.google.com/maps/search/?api=1&query=香港銅鑼灣怡和街68號2樓216-217號舖',
     facebook: 'https://www.facebook.com/zhixinhk',
     instagram: 'https://www.instagram.com/centerofmass_hk/',
   }
@@ -327,7 +327,7 @@ const HomePage = () => {
           <div className={styles.heroVisual}>
             <div className={styles.decorativeCard}>
               <div className={styles.cardHeader}>
-                <img src="/logo.png" alt="Logo" className={styles.cardLogo} />
+                <img src="/logo.png" alt={t('system.name')} className={styles.cardLogo} />
                 <span>{t('result.title')}</span>
               </div>
               <div className={styles.scorePreview}>
