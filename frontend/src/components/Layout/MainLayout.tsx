@@ -194,7 +194,7 @@ const MainLayout = () => {
         <div className={styles.headerContent}>
           {/* Logo */}
           <Link to="/" className={styles.logo}>
-            <img src="/logo.png" alt={t('system.name')} className={styles.logoImage} />
+            <img src="/iedu-logo.png" alt={t('system.name')} className={styles.logoImage} />
           </Link>
 
           {/* 桌面端导航菜单 */}

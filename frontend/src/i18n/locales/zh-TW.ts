@@ -63,7 +63,7 @@ export const zhTW = {
     name: '愛讀教育中心',
     shortName: '愛讀教育',
     slogan: '專業的香港DSE升學輔導平台',
-    copyright: '© 2024 愛讀教育中心',
+    copyright: '© 2026 愛讀教育中心',
   },
 
   // 首頁

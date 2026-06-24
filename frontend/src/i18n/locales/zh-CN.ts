@@ -63,7 +63,7 @@ export const zhCN = {
     name: '爱读教育中心',
     shortName: '爱读教育',
     slogan: '专业的香港DSE升学辅导平台',
-    copyright: '© 2024 爱读教育中心',
+    copyright: '© 2026 爱读教育中心',
   },
 
   // 首页

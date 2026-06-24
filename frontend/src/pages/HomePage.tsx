@@ -327,7 +327,7 @@ const HomePage = () => {
           <div className={styles.heroVisual}>
             <div className={styles.decorativeCard}>
               <div className={styles.cardHeader}>
-                <img src="/logo.png" alt={t('system.name')} className={styles.cardLogo} />
+                <img src="/iedu-logo.png" alt={t('system.name')} className={styles.cardLogo} />
                 <span>{t('result.title')}</span>
               </div>
               <div className={styles.scorePreview}>

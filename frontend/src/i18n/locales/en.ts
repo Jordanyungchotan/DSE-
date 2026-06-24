@@ -63,7 +63,7 @@ export const en = {
     name: 'iEdu Education Centre',
     shortName: 'iEdu',
     slogan: 'Professional Hong Kong DSE Education Platform',
-    copyright: '© 2024 iEdu Education Centre',
+    copyright: '© 2026 iEdu Education Centre',
   },
 
   // Home Page
